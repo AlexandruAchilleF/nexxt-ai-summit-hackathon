@@ -147,4 +147,15 @@ public sealed record ExtractionReport(SourceNote Source, int? Fields, int? Corre
 public sealed record SignalReport(SourceNote Source, bool EngineTakesSignals, IReadOnlyList<string> CasesWithSignal, int? ChangedDecision);
 
 /// <summary>Part 3: the agent's time per case against the mentor's manual estimate. No number is made up.</summary>
-public sealed record EfficiencyReport(SourceNote Agent, double? AgentMinutesPerCase, SourceNote Manual, decimal? ManualMinutesPerCase);
+public sealed record EfficiencyReport(SourceNote Agent, double? AgentMinutesPerCase, SourceNote Manual, decimal? ManualMinutesPerCase)
+{
+    /// <summary>Manual minus agent minutes, only when both are a result; negative when the agent is slower.</summary>
+    public decimal? SavedMinutesPerCase =>
+        Agent.IsResult && Manual.IsResult && AgentMinutesPerCase is { } agent && ManualMinutesPerCase is { } manual ? manual - (decimal)agent : null;
+
+    public SourceNote Saved => SavedMinutesPerCase is null
+        ? new(EvaluationSource.Unavailable, "Compared only when the agent's time and the manual time both have a source.",
+            "Se compară doar când timpul agentului și timpul manual au amândouă o sursă.")
+        : new(EvaluationSource.Real, "The manual time minus the agent's time, both with a source.",
+            "Timpul manual minus timpul agentului, amândouă cu sursă.");
+}

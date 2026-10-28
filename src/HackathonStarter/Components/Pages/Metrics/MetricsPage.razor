@@ -3,10 +3,16 @@
 @using HackathonStarter.Features.Rules
 @using HackathonStarter.Features.Synthetic
 @inject IEvaluationService Evaluation
+@implements IDisposable
 
 <PageTitle>@T("Metrics") · @SiteConfig.Name</PageTitle>
 
 <PageHeader Title="@T("Metrics")" Description="@T("Every number on this page comes from one run of the evaluation service: the rule engine on the golden cases and the synthetic clients, the shield and the evidence verifier on the generated PDFs. Nothing is typed in by hand; what cannot be measured yet says why.")" />
+
+@if (_running && _report is not null)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-2" />
+}
 
 @if (_error is not null)
 {
@@ -15,14 +21,19 @@
 else if (_report is not { } r)
 {
     <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
-    <MudText Typo="Typo.body2" Class="mt-2 metrics-muted">@T("Running the evaluation...")</MudText>
+    <div class="mt-2"><MudText Typo="Typo.body2" Class="metrics-muted">@T("Running the evaluation...")</MudText></div>
 }
 else
 {
     <section class="metrics-section" aria-labelledby="metrics-spec">
         @SectionHead("metrics-spec", T("1. Specification coverage"), r.Spec.Duration)
         @SourceLine(r.Spec.Source)
-        <MudText Typo="Typo.body2" Class="metrics-muted mb-4">@T("Rule engine version: {0}", OrDash(r.Spec.EngineVersion))</MudText>
+        <MudText Typo="Typo.body2" Class="metrics-muted mb-4">
+            @T("Rule engine version: {0}", OrDash(r.Spec.EngineVersion))@if (r.Spec.GoldenTotals.Evaluated + r.Spec.SyntheticTotals.Evaluated is > 0 and var evaluated)
+            {
+                @(" · " + T("{0} ms per evaluation (the code only)", Format.Number((decimal)(r.Spec.Duration.TotalMilliseconds / evaluated), 2)))
+            }
+        </MudText>
 
         @if (r.Spec.Golden.Count == 0 && r.Spec.Synthetic.Count == 0)
         {
@@ -36,6 +47,10 @@ else
             <div class="d-flex flex-wrap align-center justify-space-between gap-2 mt-6 mb-2">
                 <MudText Typo="Typo.h6">@T("Case by case")</MudText>
                 <MudSwitch T="bool" @bind-Value="_onlyFailed" Color="Color.Error" Label="@T("Only the failed ones")" />
+            </div>
+            <div class="metrics-legend mb-3">
+                <span><span class="metrics-rule mono">@T("RULE")</span> @T("expected indicium")</span>
+                <span><span class="metrics-rule metrics-rule-cleared mono">@T("RULE")</span> @T("checked, does not apply")</span>
             </div>
             <MudTabs Outlined="true" Rounded="true" Elevation="0" TabPanelsClass="pa-0">
                 <MudTabPanel Text="@T("Golden cases ({0})", r.Spec.Golden.Count)">
@@ -64,13 +79,13 @@ else
                 {
                     <MudItem xs="6" md="3">
                         <StatCard Label="@ConcealmentLabel(tally.Concealment)" Value="@($"{tally.Detected} / {tally.Hidden}")" Delay="@(i * 40)"
-                                  Hint="@(tally.Hidden == 0 ? T("none in the documents") : T("{0} missed", tally.Missed))"
+                                  Hint="@(tally.Hidden == 0 ? T("none in the documents") : T("missed: {0}", tally.Missed))"
                                   Tone="@(tally.Hidden == 0 ? null : tally.Missed == 0 ? "success" : "error")" Icon="@Icons.Material.Rounded.VisibilityOff" />
                     </MudItem>
                 }
                 <MudItem xs="12" md="6">
                     <StatCard Label="@T("False alarms on clean documents")" Value="@($"{r.Uncertainty.Shield.FalseAlarms} / {r.Uncertainty.Shield.CleanDocuments}")"
-                              Hint="@T("{0} documents read", r.Uncertainty.Shield.Documents.Count)" Tone="@(r.Uncertainty.Shield.FalseAlarms == 0 ? "success" : "error")"
+                              Hint="@T("documents read: {0}", r.Uncertainty.Shield.Documents.Count)" Tone="@(r.Uncertainty.Shield.FalseAlarms == 0 ? "success" : "error")"
                               Icon="@Icons.Material.Rounded.Description" />
                 </MudItem>
             </MudGrid>
@@ -84,9 +99,14 @@ else
             <MudItem xs="12" sm="4">@QuoteCard(T("Quotes only in hidden text, rejected"), r.Uncertainty.Quotes.Hidden, verified: false, 40)</MudItem>
             <MudItem xs="12" sm="4">@QuoteCard(T("Invented quotes rejected"), r.Uncertainty.Quotes.Invented, verified: false, 80)</MudItem>
         </MudGrid>
-        @if (r.Uncertainty.Quotes.Hidden.Quotes > 0)
+        @if (r.Uncertainty.Quotes.Hidden is { Quotes: > 0 } hidden)
         {
-            <MudText Typo="Typo.caption" Class="metrics-muted d-block mt-2">@T("{0} of the hidden-text quotes were rejected with the red flag \"found only in hidden text\"; the others were not found at all, because hidden text is masked.", r.Uncertainty.Quotes.Hidden.FoundOnlyInHiddenText)</MudText>
+            <MudText Typo="Typo.caption" Class="metrics-muted d-block mt-2">
+                @T("Hidden-text quotes rejected with the red flag \"found only in hidden text\": {0}.", hidden.FoundOnlyInHiddenText)@if (hidden.Rejected > hidden.FoundOnlyInHiddenText)
+                {
+                    @(" " + T("Not found at all, because hidden text is masked: {0}.", hidden.Rejected - hidden.FoundOnlyInHiddenText))
+                }
+            </MudText>
         }
 
         <MudGrid Spacing="3" Class="mt-4">
@@ -120,25 +140,11 @@ else
                           Value="@(r.Efficiency.ManualMinutesPerCase is { } manual ? Minutes(manual) : T("unavailable"))" /></div>
             </MudItem>
             <MudItem xs="12" md="4">
-                @if (Saved(r.Efficiency) is { } saved)
-                {
-                    @SourceLine(new(EvaluationSource.Real, "The agent's time and the manual time both have a source.", "Timpul agentului și timpul manual au amândouă o sursă."))
-                    <div class="metrics-card"><StatCard Label="@T("Time saved per case")" Icon="@Icons.Material.Rounded.Timer" Value="@Minutes(saved)" /></div>
-                }
-                else
-                {
-                    @SourceLine(new(EvaluationSource.Unavailable, "Compared only when the agent's time and the manual time both have a source.", "Se compară doar când timpul agentului și timpul manual au amândouă o sursă."))
-                    <div class="metrics-card"><StatCard Label="@T("Time saved per case")" Icon="@Icons.Material.Rounded.Timer" Value="@T("unavailable")" /></div>
-                }
+                @SourceLine(r.Efficiency.Saved)
+                <div class="metrics-card"><StatCard Label="@T("Time saved per case")" Icon="@Icons.Material.Rounded.Timer"
+                          Value="@(r.Efficiency.SavedMinutesPerCase is { } saved ? Minutes(saved) : T("unavailable"))" /></div>
             </MudItem>
         </MudGrid>
-        @if (r.Spec.GoldenTotals.Evaluated + r.Spec.SyntheticTotals.Evaluated is > 0 and var evaluated)
-        {
-            <MudText Typo="Typo.caption" Class="metrics-muted d-block mt-3">
-                @T("For reference, the rule engine alone took {0} ms per evaluation on this run: the code's part only, not the agent's or a person's time.",
-                   Format.Number((decimal)(r.Spec.Duration.TotalMilliseconds / evaluated), 2))
-            </MudText>
-        }
     </section>
 }
 
@@ -146,6 +152,7 @@ else
     private EvaluationReport? _report;
     private string? _error;
     private bool _running, _onlyFailed;
+    private readonly CancellationTokenSource _cts = new();
 
     protected override Task OnInitializedAsync() => RunAsync();
 
@@ -155,16 +162,22 @@ else
         try
         {
             _error = null;
-            _report = await Evaluation.RunAsync();
+            _report = await Evaluation.RunAsync(_cts.Token);
         }
+        catch (OperationCanceledException) when (_cts.IsCancellationRequested) { }
         catch (Exception ex) { _error = ex.Message; }
         finally { _running = false; }
     }
 
-    /// <summary>Only when both times are a result (a real run and the mentor's estimate), never one of them alone.</summary>
-    private static decimal? Saved(EfficiencyReport e) =>
-        e is { AgentMinutesPerCase: { } agent, ManualMinutesPerCase: { } manual, Agent.IsResult: true, Manual.IsResult: true }
-            ? manual - (decimal)agent : null;
+    public void Dispose()
+    {
+        _cts.Cancel();
+        _cts.Dispose();
+    }
+
+    /// <summary>"DL-NEW-90, 26 Jan 2027"; no rule = the guide gives no deadline (FATCA, Q1).</summary>
+    private static string DeadlineText(string? ruleId, DateTime? dueAt) =>
+        string.Join(", ", new[] { ruleId ?? T("no deadline from the guide"), dueAt is { } d ? Format.Date(DateTime.SpecifyKind(d, DateTimeKind.Utc)) : null }.OfType<string>());
 
     private static string OrDash(string text) => string.IsNullOrEmpty(text) ? "—" : text;
 
@@ -217,7 +230,7 @@ else
                 </MudItem>
                 <MudItem xs="6" md="3">
                     <StatCard Label="@T("Passed")" Value="@($"{t.Passed} / {t.Evaluated}")" Delay="@(delay + 120)"
-                              Hint="@(t.Cases == t.Evaluated ? T("decision and rules match") : T("evaluated; not evaluated here: {0}", t.Cases - t.Evaluated))"
+                              Hint="@(t.Cases == t.Evaluated ? T("decision and rules match") : T("not evaluated here (shield or no input): {0}", t.Cases - t.Evaluated))"
                               Tone="@(t.Failed == 0 ? null : "error")" Icon="@Icons.Material.Rounded.Rule" />
                 </MudItem>
             </MudGrid>
@@ -296,13 +309,14 @@ else
             {
                 <div class="metrics-mismatch">@T("Reportable jurisdictions differ")</div>
             }
-            @if (row.Deadline is { Matches: false })
+            @if (row.Deadline is { Matches: false } deadline)
             {
-                <div class="metrics-mismatch">@T("Deadline differs from the card")</div>
+                <div class="metrics-mismatch">@T("Deadline differs from the card: card {0}, calculator {1}", DeadlineText(deadline.Expected.RuleId, deadline.Expected.DueAt),
+                    deadline.Actual is { } actual ? DeadlineText(actual.RuleId, actual.DueAt) : T("no case opened"))</div>
             }
             @if (row.Error is not null)
             {
-                <div class="metrics-mismatch">@T("The engine threw {0}", row.Error)</div>
+                <div class="metrics-mismatch">@T("The engine failed with {0}", row.Error)</div>
             }
             @if (row.Workflow)
             {
@@ -323,8 +337,8 @@ else
         var count = verified ? tally.Verified : tally.Rejected;
         var percent = verified ? tally.VerifiedPercent : tally.RejectedPercent;
         var tone = tally.Quotes == 0 ? null : count == tally.Quotes ? "success" : "error";
-        return @<StatCard Label="@label" Value="@(percent is { } p ? Format.Percent((decimal)p) : T("unavailable"))" Delay="@delay" Tone="@tone"
-                          Hint="@(tally.Quotes == 0 ? T("no quotes on this run") : T("{0} of {1} quotes", count, tally.Quotes))" Icon="@Icons.Material.Rounded.FormatQuote" />;
+        return @<StatCard Label="@label" Value="@(tally.Quotes == 0 ? T("unavailable") : $"{count} / {tally.Quotes}")" Delay="@delay" Tone="@tone"
+                          Hint="@(percent is { } p ? Format.Percent((decimal)p) : T("no quotes on this run"))" Icon="@Icons.Material.Rounded.FormatQuote" />;
     }
 
     /// <summary>Golden titles are written in English and translated in Lang.Ro.Evaluation; the report itself keeps no titles.</summary>
@@ -339,7 +353,8 @@ else
         if (golden)
             return GoldenCases.All.FirstOrDefault(c => c.Id == row.Id)?.GuidePage is { } page ? page == "design" ? T("design") : page : "—";
         var pages = row.ExpectedIndicia.Concat(row.ExpectedCleared).Select(k => k.Split(':', '/')[0]).Distinct()
-            .Where(RuleCatalog.Contains).Select(id => RuleCatalog.Get(id).GuidePage).Distinct().ToList();
+            .Where(RuleCatalog.Contains).Select(RuleCatalog.Get)
+            .Select(rule => rule.Basis == RuleBasis.Interpretation ? T("{0} (interpretation)", rule.GuidePage) : rule.GuidePage).Distinct().ToList();
         return pages.Count == 0 ? "—" : string.Join("; ", pages);
     }
 

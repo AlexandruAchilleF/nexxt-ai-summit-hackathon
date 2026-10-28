@@ -39,7 +39,8 @@
     max-width: 340px;
 }
 
-.metrics-table ::deep .metrics-rule {
+::deep .metrics-rule,
+.metrics-rule {
     padding: 1px 6px;
     border-radius: 6px;
     background: var(--app-well, rgba(0, 0, 0, .05));
@@ -47,7 +48,8 @@
     white-space: nowrap;
 }
 
-.metrics-table ::deep .metrics-rule-cleared {
+::deep .metrics-rule-cleared,
+.metrics-rule-cleared {
     background: transparent;
     border: 1px dashed var(--mud-palette-lines-default);
     color: var(--mud-palette-text-secondary);
@@ -72,4 +74,12 @@
     padding-left: 10px;
     padding-right: 10px;
     vertical-align: top;
+}
+
+.metrics-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    font-size: 13px;
+    color: var(--mud-palette-text-secondary);
 }

@@ -207,6 +207,22 @@ public class EvaluationServiceTests
     }
 
     [Fact]
+    public void The_time_saved_is_compared_only_when_both_times_are_a_result()
+    {
+        SourceNote real = new(EvaluationSource.Real, "", ""), unavailable = new(EvaluationSource.Unavailable, "", "");
+
+        var both = new EfficiencyReport(real, 4.5, real, 22.5m);
+        Assert.Equal(18m, both.SavedMinutesPerCase);
+        Assert.Equal(EvaluationSource.Real, both.Saved.Source);
+        Assert.Equal(-2.5m, new EfficiencyReport(real, 25, real, 22.5m).SavedMinutesPerCase);
+
+        var agentMissing = new EfficiencyReport(unavailable, 4.5, real, 22.5m);
+        Assert.Null(agentMissing.SavedMinutesPerCase);
+        Assert.Equal(EvaluationSource.Unavailable, agentMissing.Saved.Source);
+        Assert.Null(new EfficiencyReport(real, 4.5, unavailable, null).SavedMinutesPerCase);
+    }
+
+    [Fact]
     public void Every_golden_title_has_a_Romanian_translation_for_metrics() =>
         Assert.All(GoldenCases.All, c => Assert.True(Lang.Translations.ContainsKey(c.Title), c.Title));
 

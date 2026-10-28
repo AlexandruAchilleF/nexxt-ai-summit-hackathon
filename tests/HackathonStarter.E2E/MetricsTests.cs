@@ -20,7 +20,9 @@ public class MetricsTests(AppFixture app)
         await Assertions.Expect(maria).ToHaveCountAsync(1);
         await Assertions.Expect(maria).ToContainTextAsync("CRS-IND-ADDR:DE");
 
-        await page.GetByRole(AriaRole.Button, new() { Name = "Run again" }).First.ClickAsync();
-        await Assertions.Expect(page.GetByText("Real run").First).ToBeVisibleAsync();
+        var runAgain = page.GetByRole(AriaRole.Button, new() { Name = "Run again" }).First;
+        await runAgain.ClickAsync();
+        await Assertions.Expect(runAgain).ToBeEnabledAsync();
+        await Assertions.Expect(maria).ToContainTextAsync("CRS-IND-ADDR:DE");
     }
 }
