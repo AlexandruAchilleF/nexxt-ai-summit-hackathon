@@ -1,0 +1,156 @@
+@using HackathonStarter.Agents
+@using HackathonStarter.Components.Agent
+@using HackathonStarter.Features.Cases
+@using HackathonStarter.Features.Sentinel
+@using HackathonStarter.Features.Sentinel.Demo
+@implements IDisposable
+@inject AgentRunService RunService
+@inject AgentRunner Runner
+@inject RunStore Store
+@inject IEnumerable<AgentDefinition> Agents
+@inject IDemoScenarios DemoScenarios
+@inject ISnackbar Snackbar
+
+@* The two CRS Sentinel actions of a case (SentinelActions): one run each, with the case code in the fixed message. The agent
+   reads and drafts; sending the request and closing the case wait for the approval below, and code decides both. *@
+<MudPaper Outlined="true" Class="pa-4 case-agent" Style="min-width:0">
+    <div class="crs-head">
+        <div>
+            <div class="app-card-title d-flex align-center gap-1"><MudIcon Icon="@Icons.Material.Rounded.SmartToy" Style="font-size:18px" /> CRS Sentinel</div>
+            <div class="crs-hint">@T("The agent reads the documents, records the quotes and the signals and drafts the letter. Code decides; nothing is sent or closed without your approval.")</div>
+        </div>
+        @if (IsEditor && Case.IsOpen)
+        {
+            <div class="d-flex flex-wrap gap-2">
+                <MudButton Variant="@(CanAnalyze ? Variant.Filled : Variant.Outlined)" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.ManageSearch"
+                           Disabled="@(_busy || !CanAnalyze)" OnClick="() => StartAsync(SentinelActions.Analyze(Case.Code))" data-testid="agent-analyze">@SentinelActions.AnalyzeLabel</MudButton>
+                <MudButton Variant="@(CanVerify ? Variant.Filled : Variant.Outlined)" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.FactCheck"
+                           Disabled="@(_busy || !CanVerify)" OnClick="() => StartAsync(SentinelActions.Verify(Case.Code))" data-testid="agent-verify">@SentinelActions.VerifyLabel</MudButton>
+            </div>
+        }
+    </div>
+    @if (!IsEditor && Case.IsOpen)
+    {
+        <div class="crs-hint mt-2">@T("Only admin and member can start the agent and approve its actions.")</div>
+    }
+    @if (_run is { } run)
+    {
+        <div class="d-flex align-center justify-space-between mt-3 mb-1">
+            <div class="crs-hint" style="margin:0">@(_busy ? T("The agent is working…") : T("Last run"))</div>
+            <MudButton Variant="Variant.Text" Size="Size.Small" Href="@($"/runs/{run.Id}")" EndIcon="@Icons.Material.Rounded.ChevronRight">@T("Open the run")</MudButton>
+        </div>
+        <AgentTrace Run="run" Running="_busy" OnDecide="@(IsEditor && !_busy ? EventCallback.Factory.Create<(AgentStep Step, bool Approved)>(this, DecideAsync) : default)" />
+    }
+</MudPaper>
+
+@code {
+    [Parameter, EditorRequired] public Case Case { get; set; } = default!;
+    /// <summary>Admin and member: start the runs and decide their approvals (AgentRunner.DecideAsync checks again).</summary>
+    [Parameter] public bool IsEditor { get; set; }
+    [Parameter] public DemoUser? User { get; set; }
+    /// <summary>After a run finishes or an approval runs: the page reloads the case.</summary>
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private AgentRun? _run;
+    private ActiveRun? _active;
+    private bool _busy, _disposed;
+    private string? _loadedFor;
+
+    private string ConversationId => $"case-{Case.Code}";
+    private bool CanAnalyze => Case.Status == CaseStatus.Open;
+    private bool CanVerify => WaitsForClient(Case);
+
+    private static bool WaitsForClient(Case c) => c.Status is CaseStatus.AwaitingClient or CaseStatus.Reminded or CaseStatus.Escalated;
+
+    /// <summary>
+    /// For the Demo menu's "the client answers": the case waits for the client and a scripted answer exists (Maria's new
+    /// self-certification). Takes the page's case, which can be newer than this component's parameter.
+    /// </summary>
+    public bool CanDeliverAnswer(Case c) => IsEditor && WaitsForClient(c) && DemoScenarios.List().Any(s => s.ClientCode == c.ClientCode && s.HasResponse);
+
+    public async Task DeliverAnswerAsync()
+    {
+        try
+        {
+            await DemoScenarios.DeliverResponseAsync(Case.Code);
+            Snackbar.Add(T("The client's answer is in the file. Use \"{0}\".", SentinelActions.VerifyLabel), Severity.Success);
+            await OnChanged.InvokeAsync();
+        }
+        catch (Exception ex) { Snackbar.Add(T(ex.Message), Severity.Error); }
+    }
+
+    /// <summary>Shows this case's last run again after a reload, and re-attaches to it while it still runs.</summary>
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedFor == Case.Code) return;
+        _loadedFor = Case.Code;
+        var last = (await Store.ListByConversationAsync(ConversationId)).LastOrDefault(r => r.Agent == SentinelTools.AgentName);
+        if (last is null) { _run = null; return; }
+        if (last.Status == RunStatus.Running && RunService.Get(last.Id) is { } live) Attach(live);
+        else _run = last.Status == RunStatus.Running ? await Store.GetAsync(last.Id) ?? last : last;
+    }
+
+    private async Task StartAsync(string message)
+    {
+        if (_busy || User is null) return;
+        try
+        {
+            var active = await RunService.StartAsync(SentinelTools.AgentName, [new ChatTurn("user", message)], [], User, ConversationId);
+            Attach(active);
+        }
+        catch (Exception ex) { Snackbar.Add(T(ex.Message), Severity.Error); }
+    }
+
+    private void Attach(ActiveRun active)
+    {
+        _active = active;
+        _run = active.Run;
+        _busy = true;
+        active.Updated += OnRunUpdated;
+        _ = active.Completion.ContinueWith(async done =>
+        {
+            active.Updated -= OnRunUpdated;
+            if (_disposed) return;
+            await InvokeAsync(async () =>
+            {
+                _busy = false;
+                _active = null;
+                _run = done.Result;
+                StateHasChanged();
+                await OnChanged.InvokeAsync();
+            });
+        }, TaskScheduler.Default);
+    }
+
+    private DateTime _lastRender;
+
+    private async Task OnRunUpdated(AgentRun run)
+    {
+        if (_disposed) return;
+        if (DateTime.UtcNow - _lastRender < TimeSpan.FromMilliseconds(40) && run.Status == RunStatus.Running) return;
+        _lastRender = DateTime.UtcNow;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task DecideAsync((AgentStep Step, bool Approved) args)
+    {
+        if (_run is null || Agents.FirstOrDefault(a => a.Name == SentinelTools.AgentName) is not { } agent) return;
+        try
+        {
+            _run = await Runner.DecideAsync(agent, _run.Id, args.Step.Id, args.Approved);
+            if (_run.Steps.FirstOrDefault(s => s.Id == args.Step.Id)?.Error is { } error)
+                Snackbar.Add(T("Approved, but the action failed: {0}", error), Severity.Error);
+            else
+                Snackbar.Add(args.Approved ? T("Approved and executed") : T("Rejected"), args.Approved ? Severity.Success : Severity.Info);
+            await OnChanged.InvokeAsync();
+        }
+        catch (Exception ex) { Snackbar.Add(T(ex.Message), Severity.Error); }
+    }
+
+    // Leaving the page does not stop the agent: the run finishes in the background and is saved.
+    public void Dispose()
+    {
+        _disposed = true;
+        if (_active is not null) _active.Updated -= OnRunUpdated;
+    }
+}

@@ -387,6 +387,7 @@ public static partial class Lang
         AddRoSentinel(d);
         AddRoEvaluation(d);
         AddRoCrsUi(d);
+        AddRoCaseAgent(d);
         return d;
     }
 
@@ -400,4 +401,5 @@ public static partial class Lang
     static partial void AddRoSentinel(Dictionary<string, string> ro);
     static partial void AddRoEvaluation(Dictionary<string, string> ro);
     static partial void AddRoCrsUi(Dictionary<string, string> ro);
+    static partial void AddRoCaseAgent(Dictionary<string, string> ro);
 }

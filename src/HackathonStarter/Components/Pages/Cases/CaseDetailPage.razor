@@ -64,6 +64,8 @@ else
         <CaseNextStep @ref="_next" Case="c" Now="_now" RequiredDocs="_requiredDocs" Current="_currentOutcome" IsOperator="_isOperator" IsEditor="_isEditor"
                       User="_user" ClientName="@_client?.FullName" OnChanged="LoadAsync" />
 
+        <CaseAgentPanel @ref="_agent" Case="c" IsEditor="_isEditor" User="_user" OnChanged="LoadAsync" />
+
         <DeadlineClock Case="c" Now="_now" />
 
         <div class="crs-grid two">
@@ -243,6 +245,7 @@ else
     private DateTime _now;
     private DemoUser? _user;
     private CaseNextStep? _next;
+    private CaseAgentPanel? _agent;
     private string? _error;
 
     [CascadingParameter] public DemoContext? Demo { get; set; }
@@ -302,6 +305,8 @@ else
             actions.Add(new(T("To the reminder day"), Icons.Material.Rounded.NotificationsActive, () => MoveAsync(Days(remind)), T("day {0}", CrsUi.DayNumber(c.OpenedAt, remind))));
         if (_isOperator && c.DueAt is { } due && due > _now)
             actions.Add(new(T("Past the deadline"), Icons.Material.Rounded.EventBusy, () => MoveAsync(Days(due) + 1), T("the case expires"), Destructive: true));
+        if (_agent?.CanDeliverAnswer(c) == true)
+            actions.Add(new(T("The client answers"), Icons.Material.Rounded.MarkEmailRead, _agent.DeliverAnswerAsync, T("the new self-certification arrives")));
         if (_next?.CanFillSample == true)
             actions.Add(new(T("Fill in the sample answer"), Icons.Material.Rounded.AutoFixHigh, () => { _next.FillSample(); return Task.CompletedTask; }, T("from the golden case")));
         if (actions.Count == 0) Demo.Withdraw(this);
@@ -317,11 +322,12 @@ else
 
     protected override void OnAfterRender(bool firstRender)
     {
-        // The next-step component exists only after the first render with data: offer the sample answer then.
-        if (_loaded && _next is not null && _offeredSample != _next.CanFillSample) { _offeredSample = _next.CanFillSample; OfferDemo(); }
+        // The next-step and agent components exist only after the first render with data: offer their shortcuts then.
+        var offer = (_next?.CanFillSample == true, _case is not null && _agent?.CanDeliverAnswer(_case) == true);
+        if (_loaded && _next is not null && _offered != offer) { _offered = offer; OfferDemo(); }
     }
 
-    private bool? _offeredSample;
+    private (bool Sample, bool Answer)? _offered;
 
     /// <summary>What code says about this indicium on the client's data today: covered by a new self-certification or not.</summary>
     private RuleHit? Coverage(Indicium ind) => _currentOutcome?.Indicia.FirstOrDefault(h => h.RuleId == ind.RuleId && h.Jurisdiction == ind.Jurisdiction);
