@@ -848,14 +848,38 @@ public class CaseServiceTests
     }
 
     [Fact]
+    public async Task Register_refuses_a_self_certification_dated_after_it_was_received()
+    {
+        await using var host = await CreateAsync();
+        await host.SeedClientAsync("CL-0001", NewAccount);
+        var code = await host.AwaitingClientAsync("CL-0001", "DE");
+        var selfCertId = await host.SubmitSelfCertificationAsync("CL-0001", code, host.Clock.UtcNow.AddDays(85), null, "DE");
+
+        var refused = await Assert.ThrowsAsync<InvalidOperationException>(() => host.As(Member).Cases.RegisterResponseAsync(code, SelfCertResponse(selfCertId)));
+
+        Assert.Contains("dated at the latest on the date of receipt (guide p. 34)", refused.Message);
+        var item = (await host.As(Viewer).Cases.GetAsync(code))!;
+        Assert.Equal(CaseStatus.AwaitingClient, item.Status);
+        Assert.Empty(item.Responses);
+        Assert.Empty(host.Audit.OfKind(AuditKinds.ResponseRegistered));
+    }
+
+    [Fact]
     public async Task Close_refuses_a_self_certification_dated_after_it_was_received()
     {
         await using var host = await CreateAsync();
         await host.SeedClientAsync("CL-0001", NewAccount);
         var code = await host.AwaitingClientAsync("CL-0001", "DE");
         host.AdvanceDays(10);
-        var selfCertId = await host.SubmitSelfCertificationAsync("CL-0001", code, host.Clock.UtcNow.AddDays(3), null, "DE");
+        var selfCertId = await host.SubmitSelfCertificationAsync("CL-0001", code, host.Clock.UtcNow, null, "DE");
         await host.As(Member).Cases.RegisterResponseAsync(code, SelfCertResponse(selfCertId));
+        // Registering already refuses it; closing checks again on what is stored.
+        await using (var db = await host.DbAsync())
+        {
+            var stored = await db.SelfCertifications.SingleAsync(s => s.Id == selfCertId);
+            stored.SignedAt = stored.ReceivedAt.AddDays(3);
+            await db.SaveChangesAsync();
+        }
 
         var refused = await Assert.ThrowsAsync<InvalidOperationException>(() => host.As(Admin).Cases.CloseAsync(code, ConfirmationChannel.Remote));
 
