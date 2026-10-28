@@ -1,5 +1,5 @@
 ---
-description: Integration engineer. Bedrock provider in Services/Ai.cs, TIN on Europa through TargetClient, Textract, Docker, Render/AWS, CI. Use for anything that talks to an external system or deploys.
+description: Integration engineer. Bedrock provider in Services/Ai.cs, TIN on Europa through TargetClient, Docker, Render/AWS, CI. Use for anything that talks to an external system or deploys.
 mode: subagent
 claude_tools: Read, Grep, Glob, Edit, Write, Bash
 model: opus

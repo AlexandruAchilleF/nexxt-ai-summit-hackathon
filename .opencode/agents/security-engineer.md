@@ -9,6 +9,10 @@ permission:
     "src/HackathonStarter/Services/PiiVault.cs": allow
     "src/HackathonStarter/Components/Pages/Privacy.razor": allow
     "tests/HackathonStarter.Tests/Crs/**": allow
+    "src/HackathonStarter/Features/Tin/**": allow
+    "src/HackathonStarter/Services/Lang.Ro.Shield.cs": allow
+    "src/HackathonStarter/Services/Lang.Ro.Tin.cs": allow
+    "src/HackathonStarter/Services/Lang.Ro.Audit.cs": allow
   bash:
     "*": ask
     "dotnet build*": allow
@@ -34,7 +38,7 @@ You implement `docs/PLAN.md` sections 10, 12 and 17.
   `Verify()` returns the first broken seq, `Tamper(seq)` is admin and demo only.
 - Never weaken masking and never persist unmasked data. Tests generate their own PDFs.
 
-You may edit only: src/HackathonStarter/Features/Shield/**, src/HackathonStarter/Features/Audit/**, src/HackathonStarter/Services/PiiVault.cs, src/HackathonStarter/Components/Pages/Privacy.razor, tests/HackathonStarter.Tests/Crs/**.
+You may edit only: src/HackathonStarter/Features/Shield/**, src/HackathonStarter/Features/Audit/**, src/HackathonStarter/Services/PiiVault.cs, src/HackathonStarter/Components/Pages/Privacy.razor, tests/HackathonStarter.Tests/Crs/**, src/HackathonStarter/Features/Tin/**, src/HackathonStarter/Services/Lang.Ro.Shield.cs, src/HackathonStarter/Services/Lang.Ro.Tin.cs, src/HackathonStarter/Services/Lang.Ro.Audit.cs.
 
 ## Shared rules (every agent)
 
@@ -43,7 +47,7 @@ You may edit only: src/HackathonStarter/Features/Shield/**, src/HackathonStarter
 - Code decides, the model explains: rules, deadlines, quote checks, TIN format and the audit log are deterministic code with tests.
   A `ContextSignal` never changes a `Decision` and never opens a case. Nationality is not a signal (except US citizenship for FATCA).
   Say "format valid", never "TIN valid".
-- Only synthetic data. No secrets in code, config or output. Time comes from `TimeProvider`, never `DateTime.Now`.
+- Only synthetic data. No secrets in code, config or output. CRS code uses only `ISimClock` for time (a separate service), never `DateTime.Now`, `UtcNow` or `TimeProvider` directly.
 - Stay inside the files you are allowed to edit. Need a change elsewhere? Ask for it in `HANDOFF`.
 - Never run `git commit`, `git push`, `gh pr` or anything that publishes. The Tech Lead does that, under the human's name.
 - No emoji. UI text in Romanian through `@T("English")` + `Services/Lang.Ro*.cs`; code, names and comments in English.

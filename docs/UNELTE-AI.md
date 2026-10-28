@@ -12,19 +12,19 @@
 | `tech-lead` | Agentul principal: împarte sarcina, trimite la specialiști, revizuiește, integrează |
 | `domain-analyst` | Întrebări CRS/FATCA, răspunde doar din ghid, cu pagina |
 | `architect` | Contracte, interfețe, impactul unei schimbări (doar propune) |
-| `rules-engineer` | P1: `Features/Rules` |
-| `workflow-engineer` | P2: cazuri, termene, data simulată |
-| `security-engineer` | P3: scut, jurnal, mascare |
+| `rules-engineer` | R1: `Features/Rules` |
+| `workflow-engineer` | R2: cazuri, termene, data simulată |
+| `security-engineer` | R3: scut, jurnal, mascare |
 | `integration-engineer` | Bedrock, TIN on Europa, Docker, CI, deploy |
-| `agent-engineer` | P4: agentul, uneltele, mock-ul, verificările |
-| `data-engineer` | P5: entități, seed, date sintetice, cazuri-etalon |
+| `agent-engineer` | R4: agentul, uneltele, mock-ul, verificările |
+| `data-engineer` | R5: entități, seed, date sintetice, cazuri-etalon |
 | `frontend-engineer` | Paginile Blazor, după 22:00 |
 | `test-engineer` | Teste xUnit și Playwright |
 | `qa-verifier` | Build + teste, raport (nu repară) |
 | `code-reviewer` | Review pe diff, cu lista CRS |
 | `docs-writer` | README, documente, pitch |
 
-**Comenzile:** `/verify` (build + teste) · `/golden` (cele 18 cazuri) · `/crs-review` (review pe branch) ·
+**Comenzile:** `/verify` (build + teste) · `/golden` (cazurile-etalon) · `/crs-review` (review pe branch) ·
 `/ghid <întrebare>` (răspuns din ghid) · `/handoff` (distribuie blocurile HANDOFF) · `/pr` (commit + PR pe numele tău).
 
 ## 2. Skill-uri de proces (cum lucrăm)

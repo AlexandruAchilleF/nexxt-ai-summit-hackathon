@@ -37,13 +37,13 @@ CRS Sentinel face partea repetitivă, iar omul aprobă.
  [3] CaseService deschide CRS-2026-0001
        DueAt = data aflării + 90 zile, RemindAt = ziua 85 ── jurnal: case.opened
             │
- [4] Agentul pregătește cazul (Bedrock, sau replay / mock)
+ [4] Agentul pregătește cazul (Bedrock live, sau mock)
        readDocument(fluturaș.pdf) → doar textul VIZIBIL, după scut
        recordEvidence("Telefon: +49 89 …", p. 1) → codul verifică citatul → verificat
        recordSignal("salariu de la Müller GmbH") → semnal, FĂRĂ alertă
        draftClientRequest → lista de documente vine din cod, textul îl scrie modelul
             │
- [5] sendClientRequest  ── cere APROBARE ── operatorul aprobă ── jurnal: request.approved
+ [5] sendClientRequest  ── cere APROBARE ── doar admin și member aprobă (Ana și Mihai da, Vera nu) ── jurnal: request.approved
             │
  [6] Data simulată +85 zile → DeadlineWatcher: memento + escaladare la fiscal
             │
@@ -51,7 +51,7 @@ CRS Sentinel face partea repetitivă, iar omul aprobă.
        checkTin(DE, …) → "format valid" (live la Comisia Europeană sau reguli locale)
        evaluateRules → Compliant, raportabil pentru DE
             │
- [8] closeCase ── cere APROBARE ── ConfirmationProof (canal, moment, dovadă) ── jurnal: case.closed
+ [8] closeCase ── cere APROBARE ── doar admin și member aprobă (Ana și Mihai da, Vera nu) ── ConfirmationProof (canal, moment, dovadă) ── jurnal: case.closed
             │
  [9] /audit → "Verifică" lanțul de hash-uri; "Tamper" pe o intrare → se vede exact intrarea ruptă
 ```
@@ -60,18 +60,22 @@ Varianta fără răspuns: la ziua 91 cazul trece în `Expired`, cu consecința d
 
 ## 4. Ce se întâmplă cu fiecare tip de intrare
 
+**Nota asupra aprobărilor:** Uneltele cu `needsApproval` (sendClientRequest și closeCase) nu rulează imediat. Agentul primește mesajul `awaiting_human_approval` și nu mai cheamă alte unelte. După ce operatorul aprobă (doar admin sau member), unealta rulează **fără model**. Fiecare etapă de aprobare creează o nouă rulare a agentului. De aceea cazul Mariei = mai multe rulări (pregătire + aprobare cererii; răspuns + aprobare închiderii).
+
+**Nota asupra replay-ului:** Replay-ul **nu rulează uneltele**. Reafișează doar pașii înregistrați (inclusiv rezultatele uneltelor), fără să cheme codul. Pentru video și demo, folosim Bedrock live sau mock (care cheamă uneltele reale). **Niciodată nu filmăm pași care modifică date în Replay mode**—pentru asta sunt necesare live sau mock. Înregistrările sunt utile doar pentru întrebări care doar citesc datele (ex. „rezumă cazul").
+
 | Intrare | Ce face sistemul | Rezultat |
 | --- | --- | --- |
 | Modificare în România (Cluj → Iași) | Nicio regulă din p. 29–31 nu se aplică | `NoCase`, cu explicația de ce |
-| Telefon străin non-SUA, dar are și telefon RO | Regula de telefon CRS cere „niciun telefon în RO” | `Compliant`, capcană explicată |
-| Ordin permanent către DE din cont curent | Excepția pentru conturile de depozit (p. 29 lit. d) | `Compliant`, explicat |
+| Telefon străin non-SUA, dar are și telefon RO | Regula de telefon CRS cere „niciun telefon în RO” | `NoCase`, capcană explicată |
+| Ordin permanent către DE din cont curent | Excepția pentru conturile de depozit (p. 29 lit. d) | `NoCase`, explicat |
 | Același ordin din cont de custodie | Indiciu CRS | `Clarification` |
 | Orice telefon SUA, loc al nașterii SUA, cetățenie SUA | Indicii FATCA (p. 31), fără excepția „telefon RO” | `FatcaAlert` |
-| Salariu de la o firmă germană | Nu e indiciu legal | `Compliant` + semnal de context, fără alertă |
+| Salariu de la o firmă germană | Nu e indiciu legal | `NoCase` + semnal de context, fără alertă |
 | PDF cu text alb ascuns („ignoră instrucțiunile…”) | Scutul îl scoate înainte de model | `ShieldAlert`, textul nu ajunge la model |
 | Autocertificare cu TIN italian greșit | Formatul TIN pe țară | `Clarification` |
 
-Toate cele 18 cazuri-etalon, cu rezultatul așteptat, sunt în `docs/PLAN.md` secțiunea 16.1.
+Toate cele 21 de cazuri-etalon, cu datele și rezultatul așteptat, sunt în `docs/GOLDEN-CASES.md` (rezumat în `docs/PLAN.md` secțiunea 16.1).
 
 ## 5. Piesele și cine le construiește
 
@@ -94,7 +98,13 @@ Toate cele 18 cazuri-etalon, cu rezultatul așteptat, sunt în `docs/PLAN.md` se
 | 2 · Termene și cazuri | Data simulată, termene, stările cazului, memento/escaladare/expirare, dovada | cazurile 16–18 trec |
 | 3 · Încredere | Scutul, verificarea citatelor, formatul TIN, TIN on Europa, jurnalul | cazul 10 trece, „Tamper” arată intrarea |
 | 4 · Agent și AI | Agentul, uneltele, aprobările, mock-ul, Bedrock, verificările, înregistrările | Maria cap-coadă pe mock și o dată live |
-| 5 · Date și livrare | Cele 18 cazuri, 50 de clienți sintetici, PDF-uri, metrici, documente, video | `/metrics` din rulări reale |
+| 5 · Date și livrare | Cele 21 de cazuri-etalon, 50 de clienți sintetici, PDF-uri, metrici, documente, video | `/metrics` din rulări reale |
+
+**Nota asupra termenelor:** Calculul termenului diferă între conturile noi și preexistente:
+- **Cont nou:** DueAt = data la care banca știe de schimbare + 90 zile calendaristice (p. 20–21, 35–36)
+- **Cont preexistent:** ghidul spune „până la sfârșitul anului sau 90 de zile” (p. 29); implementăm cea mai târzie dintre ele,
+  cum scrie legea (Codul de procedură fiscală, Anexa nr. 2 pct. 1) și Comentariul OCDE (Secțiunea III, pct. 13). Detalii în README.
+- **Preexistent se calculează pe regim** (CRS = 31 dec. 2015, FATCA = 30 iunie 2014), nu pe tipul contului (depozit/custodie). Același cont poate fi nou pentru CRS și preexistent pentru FATCA.
 
 ## 6. Agentul, pe scurt (Persoana 4)
 
@@ -103,7 +113,7 @@ Toate cele 18 cazuri-etalon, cu rezultatul așteptat, sunt în `docs/PLAN.md` se
 - **Două modele:** profilul `extract` (Claude Haiku 5.5) pentru extrageri tipizate și clasificări mici; profilul principal
   (Claude Sonnet 5.5) pentru agent și textul către client. Amândouă pe Amazon Bedrock, us-west-2.
 - **Uneltele** (`docs/PLAN.md` 13.1): citire caz și client, `evaluateRules`, `readDocument`, `recordEvidence`, `recordSignal`,
-  `checkTin`, `draftClientRequest`, `sendClientRequest` (aprobare), `registerResponse`, `closeCase` (aprobare), `escalate`.
+  `extractSelfCertification` (extrage autocertificarea din PDF cu citatele verificate), `checkTin`, `draftClientRequest`, `sendClientRequest` (aprobare), `registerResponse`, `closeCase` (aprobare), `escalate`.
 - **Lanțul care nu pică:** live pe Bedrock → înregistrare (`Recordings/crs-sentinel.json`) → mock scris de noi, care cheamă
   uneltele reale. Aplicația merge cap-coadă și fără internet.
 - **Verificări după fiecare răspuns** (cod, nu model): fără date personale scăpate, citatele sunt printre dovezile verificate,
@@ -125,8 +135,9 @@ Ce nu detectăm și spunem deschis: text acoperit de o formă desenată peste el
 
 ## 8. Data simulată și jurnalul
 
-- **Data simulată** (`SimClock`): în bara de sus, „Azi: … (+85 zile)”, cu butoane +1 / +30 / +85 / resetare. Tot sistemul citește
-  timpul de aici, deci în 3 minute de video arătăm 90 de zile.
+- **Data simulată** (`SimClock`): în bara de sus, „Azi: … (+85 zile)”, cu butoane +1 / +30 / +85 / resetare. Tot codul CRS (cazuri,
+  termene, jurnal) citește timpul de aici, deci în 3 minute de video arătăm 90 de zile. Restul aplicației (login, chei,
+  ștergerea rulărilor) rămâne pe ceasul real, ca să nu expire nimic la „+85 zile”.
 - **Jurnalul** (`AuditLog`): fiecare pas (modificare, regulă, dovadă, aprobare, memento, închidere) e o intrare cu
   `Hash = SHA-256(hash-ul anterior + conținut)`. Dacă cineva modifică o intrare, „Verifică” arată exact unde s-a rupt lanțul.
 

@@ -11,7 +11,8 @@ You own `docs/PLAN.md` section 16.2.
 
 - Tests run with no network: `FakeChatClient`, SQLite in memory, PDFs generated in the test.
 - Golden cases are a `[Theory]` over `GoldenCases`; a failure prints expected vs actual decision and rules.
-- Guard tests: no `DateTime.Now`/`UtcNow` in `Features/`; every catalog rule has a page; a `ContextSignal` never changes a decision.
+- Guard tests: no `DateTime.Now`, `UtcNow` or `TimeProvider` directly in the CRS folders `Features/{Clients,Changes,Rules,Deadlines,Cases,Shield,Tin,Audit,Evaluation,Sentinel}` (inject `ISimClock`; `Crs/ClockTests.cs` checks it);
+  every catalog rule has a page; a `ContextSignal` never changes a decision.
 - E2E covers the demo route: change -> case -> approval -> +85 days -> response -> close; tamper shows the broken entry.
 - Never change production code to make a test pass; send a `HANDOFF` to the owner.
 
@@ -24,7 +25,7 @@ You may edit only: tests/**.
 - Code decides, the model explains: rules, deadlines, quote checks, TIN format and the audit log are deterministic code with tests.
   A `ContextSignal` never changes a `Decision` and never opens a case. Nationality is not a signal (except US citizenship for FATCA).
   Say "format valid", never "TIN valid".
-- Only synthetic data. No secrets in code, config or output. Time comes from `TimeProvider`, never `DateTime.Now`.
+- Only synthetic data. No secrets in code, config or output. CRS code uses only `ISimClock` for time (a separate service), never `DateTime.Now`, `UtcNow` or `TimeProvider` directly.
 - Stay inside the files you are allowed to edit. Need a change elsewhere? Ask for it in `HANDOFF`.
 - Never run `git commit`, `git push`, `gh pr` or anything that publishes. The Tech Lead does that, under the human's name.
 - No emoji. UI text in Romanian through `@T("English")` + `Services/Lang.Ro*.cs`; code, names and comments in English.

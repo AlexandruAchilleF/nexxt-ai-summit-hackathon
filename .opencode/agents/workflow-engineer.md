@@ -8,6 +8,8 @@ permission:
     "src/HackathonStarter/Features/Deadlines/**": allow
     "src/HackathonStarter/Features/Changes/**": allow
     "tests/HackathonStarter.Tests/Crs/**": allow
+    "src/HackathonStarter/Services/Lang.Ro.Cases.cs": allow
+    "src/HackathonStarter/Services/Lang.Ro.Changes.cs": allow
   bash:
     "*": ask
     "dotnet build*": allow
@@ -26,16 +28,22 @@ permission:
 
 You implement `docs/PLAN.md` section 9.
 
-- `SimClock : TimeProvider` with a settable offset; everything uses `TimeProvider.GetUtcNow()`.
+- `ISimClock` (implemented by `SimClock`, not a `TimeProvider`) is a separate service with a settable offset, not replacing
+  `TimeProvider.System`. CRS services inject only `ISimClock`, never `DateTime.Now`, `UtcNow` or the app-wide `TimeProvider`, which stays the system clock so auth
+  cookies, data protection keys and run retention do not jump 85 days. Moving the clock goes through a scoped control that
+  requires the admin role and writes a `clock.changed` audit entry.
 - `DeadlineCalculator`: 90 days after the bank knows of the change (guide p. 35-36); reminder 5 days before. Preexisting accounts:
-  "end of year or 90 days" (p. 29) is NEVERIFICAT; keep it behind one policy method with a visible TODO and a test.
-- On expiry: resident in the original AND the new jurisdiction (p. 35-36).
+  the later of 31 December and 90 days (p. 29 says "or"; the law says "whichever is later": Fiscal Procedure Code, Annex 2
+  point 1, and OECD CRS Commentary on Section III, para 13). Keep it behind one policy method with a test.
+- On expiry: new account (`DL-EXPIRED-NEW`): resident in the original AND the new jurisdiction (p. 35-36); preexisting
+  (`DL-EXPIRED-PRE`): at least the new jurisdiction (p. 29). FATCA has no deadline in the guide (p. 38): `DueAt` is null.
+- `DeadlineCalculator` already implements DL-NEW-90, DL-PRE-YEAR and FATCA-SC with tests (`Crs/DeadlineCalculatorTests.cs`).
 - Case transitions only through explicit `CaseService` methods, each with a role check and an audit entry; an invalid transition
   throws. `DeadlineWatcher.TickAsync(now)` is testable without real time.
 - You never write CRS rules; you consume `RuleOutcome`.
 - Golden cases 16-18 must pass: "+85 days -> reminded/escalated", "+91 days -> expired", "student explanation -> closed with proof".
 
-You may edit only: src/HackathonStarter/Features/Cases/**, src/HackathonStarter/Features/Deadlines/**, src/HackathonStarter/Features/Changes/**, tests/HackathonStarter.Tests/Crs/**.
+You may edit only: src/HackathonStarter/Features/Cases/**, src/HackathonStarter/Features/Deadlines/**, src/HackathonStarter/Features/Changes/**, tests/HackathonStarter.Tests/Crs/**, src/HackathonStarter/Services/Lang.Ro.Cases.cs, src/HackathonStarter/Services/Lang.Ro.Changes.cs.
 
 ## Shared rules (every agent)
 
@@ -44,7 +52,7 @@ You may edit only: src/HackathonStarter/Features/Cases/**, src/HackathonStarter/
 - Code decides, the model explains: rules, deadlines, quote checks, TIN format and the audit log are deterministic code with tests.
   A `ContextSignal` never changes a `Decision` and never opens a case. Nationality is not a signal (except US citizenship for FATCA).
   Say "format valid", never "TIN valid".
-- Only synthetic data. No secrets in code, config or output. Time comes from `TimeProvider`, never `DateTime.Now`.
+- Only synthetic data. No secrets in code, config or output. CRS code uses only `ISimClock` for time (a separate service), never `DateTime.Now`, `UtcNow` or `TimeProvider` directly.
 - Stay inside the files you are allowed to edit. Need a change elsewhere? Ask for it in `HANDOFF`.
 - Never run `git commit`, `git push`, `gh pr` or anything that publishes. The Tech Lead does that, under the human's name.
 - No emoji. UI text in Romanian through `@T("English")` + `Services/Lang.Ro*.cs`; code, names and comments in English.

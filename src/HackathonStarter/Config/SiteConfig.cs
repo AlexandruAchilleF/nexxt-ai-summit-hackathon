@@ -78,7 +78,7 @@ public static class SiteConfig
                 "Doar modificările care ating un indiciu din lege pornesc un termen. Restul se opresc la filtru, cu explicație.",
                 [
                     new(Icons.Material.Rounded.Rule, "Filtru în cod", "O mutare din Cluj în Iași nu deschide niciun caz, iar regula spune de ce."),
-                    new(Icons.Material.Rounded.Timer, "Termen pe tipul de cont", "90 de zile la conturile noi; la cele preexistente, sfârșitul anului sau 90 de zile."),
+                    new(Icons.Material.Rounded.Timer, "Termenul, din ziua în care banca află", "90 de zile calendaristice, cu pagina din ghid; conturile vechi și cele noi au reguli diferite."),
                     new(Icons.Material.Rounded.FormatQuote, "Dovezi cu citat", "Fiecare dovadă are citatul exact, verificat de cod în document."),
                     new(Icons.Material.Rounded.Lightbulb, "Indicii și semnale", "Un salariu din Germania e semnal, nu indiciu: se arată, dar nu pornește nimic."),
                 ]),
@@ -129,7 +129,7 @@ public static class SiteConfig
                 "Only changes that touch an indicium from the law start a deadline. The rest stop at the filter, with an explanation.",
                 [
                     new(Icons.Material.Rounded.Rule, "Filter in code", "A move from Cluj to Iași opens no case, and the rule says why."),
-                    new(Icons.Material.Rounded.Timer, "Deadline by account type", "90 days for new accounts; for pre-existing ones, the end of the year or 90 days."),
+                    new(Icons.Material.Rounded.Timer, "The deadline, from the day the bank knows", "90 calendar days, with the guide page; pre-existing and new accounts follow different rules."),
                     new(Icons.Material.Rounded.FormatQuote, "Evidence with quotes", "Every piece of evidence has its exact quote, checked by code against the document."),
                     new(Icons.Material.Rounded.Lightbulb, "Indicia and signals", "A salary from Germany is a signal, not an indicium: it is shown, but triggers nothing."),
                 ]),
@@ -154,11 +154,12 @@ public static class SiteConfig
     public static readonly NavItem[] Nav =
     [
         new("Dashboard", "/dashboard", Icons.Material.Rounded.SpaceDashboard),
-        // Items and Calculators stay reachable by URL (tests use them) until the CRS pages replace them.
+        new("Cases", "/cases", Icons.Material.Rounded.AssignmentLate, "CRS"),
+        new("New change", "/changes/new", Icons.Material.Rounded.EditNote, "CRS"),
+        new("Audit log", "/audit", Icons.Material.Rounded.VerifiedUser, "CRS"),
+        new("Metrics", "/metrics", Icons.Material.Rounded.Insights, "CRS"),
+        // Assistant, Arena, Scenarios, Items and Calculators stay reachable by URL (E2E tests and the Docker CI check use them).
         // @gen:nav (the feature generator inserts new pages above this line)
-        new("Assistant", "/assistant", Icons.Material.Rounded.AutoAwesome, "Agents"),
-        new("Agent Arena", "/arena", Icons.Material.Rounded.Forum, "Agents"),
-        new("Scenarios", "/scenarios", Icons.Material.Rounded.QuestionAnswer, "Agents"),
         new("Agent runs", "/runs", Icons.Material.Rounded.History, "Agents"),
         new("Exports", "/exports", Icons.Material.Rounded.FileDownload, "Agents"),
         new("Architecture", "/architecture", Icons.Material.Rounded.AccountTree, "Agents"),
@@ -169,7 +170,7 @@ public static class SiteConfig
     /// Bottom navigation on phones (max 4–5 hrefs from <see cref="Nav"/>; the menu button still shows everything).
     /// Empty = no bottom bar.
     /// </summary>
-    public static readonly string[] MobileNav = ["/dashboard", "/assistant", "/runs", "/settings"];
+    public static readonly string[] MobileNav = ["/dashboard", "/cases", "/changes/new", "/settings"];
 
     /// <summary>
     /// Installable app (PWA): "Install" in Chrome/Edge (desktop + Android), "Add to Home Screen" on iPhone.
@@ -194,6 +195,11 @@ public static class Roles
 
     /// <summary>Roles that can create/edit data and approve agent actions.</summary>
     public const string Editors = Admin + "," + Member;
+
+    // CRS Sentinel names for the same roles: the operator approves requests and closings (and moves the demo clock),
+    // the tax department receives escalations.
+    public const string Operator = Admin;
+    public const string TaxDepartment = Member;
 }
 
 public record DemoUser(string Id, string Name, string Email, string Role, string Color)
