@@ -101,11 +101,12 @@ sunt din p. 31 (Acordul FATCA, Anexa I, Secțiunea II, paragraful B). Catalogul 
 
 | Grup | Reguli | Pagina |
 | --- | --- | --- |
-| Indicii CRS | `CRS-IND-RES`, `-ADDR`, `-MAIL`, `-PHONE`, `-SO`, `-POA`, `-CO` | 29 (lit. a–f), 48 |
-| Indicii FATCA | `FATCA-IND-CIT`, `-POB`, `-ADDR`, `-PHONE`, `-SO`, `-POA`, `-CO` | 31 |
-| Autocertificarea | `SC-VALID`, `SC-TIN-FORMAT`, `SC-TIN-MISSING`, `SC-CONSISTENT`, `FATCA-SC` | 34, 36–37, 53, 38 |
+| Generale | `GEN-CHANGE-CIRC` (schimbarea de circumstanțe), `GEN-NEW-ACCOUNT` (indiciile pe un cont nou); `GEN-DOMESTIC` (mutarea în țară) | 29–30, 33, 35–36; `GEN-DOMESTIC`: NEVERIFICAT (§5) |
+| Indicii CRS | `CRS-IND-RES`, `-ADDR`, `-MAIL`, `-PHONE`, `-SO`, `-POA`, `-CO` | 29 (lit. a–f), 17–18, 31, 48 |
+| Indicii FATCA | `FATCA-IND-CIT`, `-POB`, `-ADDR`, `-PHONE`, `-SO`, `-POA`, `-CO`; `FATCA-SCOPE-ALL` (toate conturile) | 31, 25 |
+| Autocertificarea | `SC-VALID`, `SC-TIN-FORMAT`, `SC-TIN-MISSING`, `SC-CONSISTENT`, `FATCA-SC`, `FATCA-TIN` | 33–34, 36–37, 48, 53, 38 |
 | Termene și expirare | `DL-NEW-90`, `DL-PRE-YEAR`, `DL-EXPIRED-NEW`, `DL-EXPIRED-PRE` | 20–21, 29, 35–36 |
-| Răspunsul clientului | `RESP-EXPLANATION`: student cu viză, profesor sau stagiar, diplomat, funcționar UE | 37 |
+| Răspunsul clientului | `RESP-EXPLANATION`: student cu viză, profesor sau stagiar, diplomat, funcționar UE | 35, 37 |
 
 **Deciziile** (precedența, de la cea mai puternică): `ShieldAlert` > `FatcaAlert` > `Clarification` > `Compliant` >
 `NoCase`. `NoCase` = nicio regulă de indiciu nu s-a aplicat; `Compliant` = există indicii, dar toate sunt acoperite de
@@ -126,7 +127,8 @@ CRS preexistent = existent la 31.12.2015, FATCA preexistent = existent la 30.06.
 - **Indiciile la conturile noi.** În ghid, lista de indicii e procedura pentru conturile preexistente (p. 29, 31). Pentru
   conturile noi, ghidul cere autocertificarea și testul de rezonabilitate față de informațiile băncii (p. 33). Folosim
   indiciile drept criterii prin care autocertificarea e contrazisă.
-- **Mutarea în țară** (`GEN-DOMESTIC`) nu are o pagină proprie: nicio regulă din p. 29–31 nu se aplică, deci `NoCase`.
+- **NEVERIFICAT: mutarea în țară** (`GEN-DOMESTIC`) nu are o pagină proprie în ghid (în cod: `RuleCatalog.NotVerified`):
+  nicio regulă din p. 29–31 nu se aplică, deci `NoCase`.
 - **Termenul la contul preexistent.** Ghidul (p. 29) spune „până în ultima zi a anului calendaristic în cauză [...], sau
   în 90 de zile calendaristice”, în paragraful despre testul adresei de rezidență (nota 57). Aplicăm cea mai târzie
   dintre cele două date. Pentru contul documentat prin adresa de rezidență așa scrie legea (Codul de procedură fiscală,
@@ -229,7 +231,9 @@ Metricile vin doar din rulări reale (`/metrics` și testele), prezentate separa
 
 Rularea pe commit-ul `e0bc47c`, 28.10.2026, 22:08, **fără model** (nicio cheie, niciun apel AI): pagina `/metrics`, cu
 aplicația pornită local, și `IEvaluationService.RunAsync()` chemat direct dau aceleași cifre. Pe `eaea3f3` (după #44, la
-22:14), `IEvaluationService` dă din nou aceleași cifre. Toate cifrele de mai jos vin din cod determinist, nu din AI.
+22:14), `IEvaluationService` dă din nou aceleași cifre. Pe `0a467f1` (după #55, la 23:32), pagina `/metrics`, cu aplicația
+pornită fără `appsettings.Local.json` și fără credențiale AWS, dă aceleași cifre. Toate cifrele de mai jos vin din cod
+determinist, nu din AI.
 
 **1. Acoperirea specificației** (motorul `crs-rules/1.2`): regulile din ghid sunt implementate și testate, pe 20 de
 cazuri-etalon cu date de intrare și pe 50 de clienți sintetici.
@@ -298,25 +302,26 @@ IAM), niciodată din repo. În `appsettings.Local.json` (ignorat de git): `"AI":
 
 Lucrăm în paralel, pe module; fiecare PR intră doar cu CI verde (build cu 0 warnings, teste unitare și E2E).
 
-Starea de pe `main` la commit-ul `46e6c81`, verificată în cod pe 28.10.2026, la 23:15: `dotnet build -warnaserror` fără
-warnings, testele unitare 1254 din 1254, E2E 30 din 30 (CI-ul de pe `main`).
+Starea de pe `main` la commit-ul `0a467f1`, verificată local pe 28.10.2026, la 23:30: `dotnet build -warnaserror` fără
+warnings, testele unitare 1315 din 1315, E2E 30 din 30. Aplicația pornește fără `appsettings.Local.json` și fără
+credențiale AWS, pe mock.
 
 | Modul | Rol | Pe `main` | În lucru | Lipsește |
 | --- | --- | --- | --- | --- |
 | Documentația: planul, regulile verificate, paginile ghidului, cazurile-etalon, sursele, scenariul video, textul `/privacy` | toți | da (#1–#4, #6, #7, #10, #12, #14, #15, #19, #30, #33, #34) | | |
 | Contractele și entitățile (Faza 0), `SimClock` | integrator | da (#13, #18) | | |
 | `CrsRuleEngine`, `RuleCatalog`, `GoldenEngineTests` | R1 | da (#16, #37, #41) | | |
-| `ChangeService`, `CaseService` (stările cazului), `DeadlineCalculator`, `DeadlineWatcher`, `SimClockControl`, cazurile de flux cap-coadă, resetarea demo-ului | R2 | da (#28, #40, #43; meniul „Demo” cu data simulată în #49) | | |
+| `ChangeService`, `CaseService` (stările cazului), `DeadlineCalculator`, `DeadlineWatcher`, `SimClockControl`, cazurile de flux cap-coadă, resetarea demo-ului | R2 | da (#28, #40, #43, #55; meniul „Demo” cu data simulată în #49) | | |
 | `HiddenTextShield`, `EvidenceVerifier`, `TinFormat` + TIN on Europa, `AuditLog`; scanarea unui document nescanat din pagina clientului | R3 | da (#23, #48) | | |
 | Pagina `/privacy` (jurnal, TIN on Europa, Bedrock, retenție, temeiul legal) | R3 | da (#26) | | |
 | Provider Bedrock | R4 | da (#5) | | |
-| Runtime-ul agentului (aprobarea oprește rularea), verificările CRS pe răspuns, mascarea telefoanelor străine | R4 | da (#20, #35) | | |
-| `CrsSentinelAgent`: cele 14 unelte, system prompt-ul, mock RO/EN (Maria cap-coadă), verificările active; mock-ul scrie doar la cele două acțiuni ale cazului (mesajele fixe din `SentinelActions`) | R4 | da (#44, #47) | | înregistrarea `Recordings/crs-sentinel.json`; butoanele „Analizează dosarul” și „Verifică răspunsul” pe pagina cazului (nu sunt pe `main`); pasul din UI care pune autocertificarea Mariei în dosar |
+| Runtime-ul agentului (aprobarea oprește rularea, o aprobare rulează o singură dată), verificările CRS pe răspuns, mascarea telefoanelor străine | R4 | da (#20, #35, #51, #52) | | |
+| `CrsSentinelAgent`: cele 14 unelte, system prompt-ul, mock RO/EN (Maria cap-coadă), verificările active; mock-ul scrie doar la cele două acțiuni ale cazului (mesajele fixe din `SentinelActions`) | R4 | da (#44, #47) | #53 (ecranele cazului cu panoul agentului), #54 (Maria live pe Bedrock) | înregistrarea `Recordings/crs-sentinel.json`; butoanele „Analizează dosarul” și „Verifică răspunsul” pe pagina cazului (nu sunt pe `main`); pasul din UI care pune autocertificarea Mariei în dosar |
 | Datele: 50 de clienți sintetici, PDF-urile cazurilor-etalon, cazurile-etalon transcrise, seed-ul | R5 | da (#8, #9, #11, #17, #21, #22, #25, #27, #31, #36, #39) | | |
 | `EvaluationService` (cele trei feluri de cifre) și pagina `/metrics` | R5 | da (#29, #38, #42) | | |
 | Pagina clientului `/clients`, `/clients/{code}` (adrese, conturi, ordine permanente, autocertificări, documente, cazuri) | R5 | da (#45) | | |
 | Paginile CRS: `/dashboard`, `/cases`, `/cases/{code}` (ceasul termenului, cererea, răspunsul, închiderea cu aprobare), `/changes/new`, meniul „Demo” | UI | da (#49) | | |
-| README-ul și pitch-ul la zi cu `main` | R5 | | #46 | |
+| README-ul și pitch-ul la zi cu `main` | R5 | da (#46) | | |
 | Landing-ul și subsolurile | R5 | da (#24, #32) | | |
 
 **Paginile CRS, așa cum sunt acum pe `main`:**
