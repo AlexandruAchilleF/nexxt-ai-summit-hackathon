@@ -1,13 +1,546 @@
 @page "/cases/{Code}"
+@inject ICaseService CaseService
+@inject ISimClock SimClock
+@inject CurrentUser CurrentUser
 
 <PageTitle>@T("Case {0}", Code) · @SiteConfig.Name</PageTitle>
 
 <MudButton Href="/cases" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Class="mb-4" Size="Size.Small">@T("All cases")</MudButton>
 
-<PageHeader Title="@T("Case {0}", Code)" Description="@T("Indicia with the guide page, evidence, the client request and the deadline.")" />
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Class="mb-4" />
+}
+else if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@_error</MudAlert>
+}
+else if (_case is null)
+{
+    <PageHeader Title="@T("Case {0}", Code)" />
+    <EmptyState Icon="@Icons.Material.Rounded.FactCheck" Title="@T("Case not found")" Description="@T("This case does not exist or you do not have access to it.")" />
+}
+else
+{
+    <PageHeader Title="@T("Case {0}", Code)" Description="@T("Indicia with the guide page, evidence, the client request and the deadline.")" />
 
-<EmptyState Icon="@Icons.Material.Rounded.FactCheck" Title="@T("Coming in the next phase")" Description="@T("The backend for this page is being built.")" />
+    <!-- Header with status -->
+    <MudPaper Class="pa-4 mb-4">
+        <div class="d-flex justify-space-between align-center mb-3">
+            <div>
+                <MudText Typo="Typo.h6" Class="mud-text-secondary font-family-monospace">@_case.Code</MudText>
+                <CaseStatusPill Status="_case.Status" Large="true" />
+            </div>
+            <div class="mud-text-secondary">
+                <MudText Typo="Typo.caption">@T("Client") @_case.ClientCode</MudText>
+                <MudText Typo="Typo.caption">@T("Regime") @_case.Regime</MudText>
+            </div>
+        </div>
+    </MudPaper>
+
+    <!-- Demo date bar -->
+    <DemoDateBar Now="_now" OnDateChanged="@((DateTime dt) => _now = dt)" />
+
+    <!-- Deadline clock -->
+    @if (_case.DueAt is not null)
+    {
+        <DeadlineClock Case="_case" Now="_now" />
+    }
+
+    <!-- Indicia section -->
+    @if (_case.Indicia.Count > 0)
+    {
+        <MudPaper Class="pa-4 mb-4">
+            <MudText Typo="Typo.h6" Class="mb-3">@T("Indicia found")</MudText>
+            <MudStack Spacing="2">
+                @foreach (var indicium in _case.Indicia)
+                {
+                    <MudPaper Elevation="0" Class="pa-3 mud-background-gray">
+                        <div>
+                            <MudText Typo="Typo.subtitle2" Class="font-family-monospace">@indicium.RuleId</MudText>
+                            <MudText Typo="Typo.body2">@indicium.Explanation</MudText>
+                            <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                <GuidePageRef Page="@indicium.GuidePage" RuleId="@indicium.RuleId" />
+                            </MudText>
+                            @if (!string.IsNullOrEmpty(indicium.Jurisdiction))
+                            {
+                                <MudChip T="string" Label="true" Class="mt-2">@indicium.Jurisdiction</MudChip>
+                            }
+                        </div>
+                    </MudPaper>
+                }
+            </MudStack>
+        </MudPaper>
+    }
+
+    <!-- Evidence section -->
+    @if (_case.Evidence.Count > 0)
+    {
+        <MudExpansionPanel Text="@T("Evidence")" Class="mb-4">
+            <MudStack Spacing="2">
+                @foreach (var evidence in _case.Evidence)
+                {
+                    <MudPaper Elevation="0" Class="pa-2 mud-background-gray">
+                        <MudText Typo="Typo.body2">@evidence.Quote</MudText>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                            @evidence.Source — @Format.Date(evidence.At)
+                        </MudText>
+                    </MudPaper>
+                }
+            </MudStack>
+        </MudExpansionPanel>
+    }
+
+    <!-- Signals section (visibly separate) -->
+    @if (_case.Signals.Count > 0)
+    {
+        <MudAlert Severity="Severity.Info" Class="mb-4" Dense="true">
+            <MudText Typo="Typo.subtitle2" Class="mb-2">@T("Signals (no alerts)")</MudText>
+            <MudStack Spacing="1">
+                @foreach (var signal in _case.Signals)
+                {
+                    <MudText Typo="Typo.body2">@signal.Description</MudText>
+                }
+            </MudStack>
+        </MudAlert>
+    }
+
+    <!-- Request block -->
+    <MudPaper Class="pa-4 mb-4">
+        <MudText Typo="Typo.h6" Class="mb-3">@T("Request")</MudText>
+
+        @if (_case.Requests.Count == 0)
+        {
+            @if (CanDraft())
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => _showDraftForm = !_showDraftForm)" Class="mb-3">
+                    @T("Draft request")
+                </MudButton>
+            }
+            else if (_user?.Role == Roles.Viewer)
+            {
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">@T("No request yet. Members or admins can draft one.")</MudText>
+            }
+
+            @if (_showDraftForm && CanDraft())
+            {
+                <MudPaper Elevation="0" Class="pa-4 mud-background-gray mt-3">
+                    <MudForm @ref="_draftForm" @bind-IsValid="_draftValid">
+                        <MudStack Spacing="3">
+                            <MudText Typo="Typo.subtitle2">@T("Request body")</MudText>
+                            <MudTextField @bind-Value="_draftBody" Label="@T("Message to client")" Lines="4" Variant="Variant.Outlined"
+                                          Validation="@(new Func<string, IEnumerable<string>>(v => ValidateDraftBody(v)))" />
+
+                            @if (_requiredDocuments.Count > 0)
+                            {
+                                <div>
+                                    <MudText Typo="Typo.caption" Class="mud-text-secondary mb-2">@T("Required documents"):</MudText>
+                                    <MudStack Spacing="1">
+                                        @foreach (var doc in _requiredDocuments)
+                                        {
+                                            <MudText Typo="Typo.body2">• @doc</MudText>
+                                        }
+                                    </MudStack>
+                                </div>
+                            }
+
+                            <div class="d-flex gap-2">
+                                <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="@HandleDraftRequest" Disabled="!_draftValid">
+                                    @T("Save request")
+                                </MudButton>
+                                <MudButton Variant="Variant.Text" OnClick="@(() => { _showDraftForm = false; _draftBody = ""; })">
+                                    @T("Cancel")
+                                </MudButton>
+                            </div>
+                        </MudStack>
+                    </MudForm>
+                </MudPaper>
+            }
+        }
+        else
+        {
+            @foreach (var request in _case.Requests)
+            {
+                <MudPaper Elevation="0" Class="pa-3 mb-2 mud-background-gray">
+                    <div class="d-flex justify-space-between mb-2">
+                        <MudText Typo="Typo.subtitle2">@request.Status</MudText>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">@Format.Date(request.CreatedAt)</MudText>
+                    </div>
+                    <MudText Typo="Typo.body2" Class="mb-2">@request.Body</MudText>
+                    @if (request.RequestedDocuments.Count > 0)
+                    {
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary mb-2">@T("Required documents"):</MudText>
+                        <ul class="mb-2">
+                            @foreach (var doc in request.RequestedDocuments)
+                            {
+                                <li>@doc</li>
+                            }
+                        </ul>
+                    }
+
+                    @if (request.Status == RequestStatus.Draft && CanManageRequest())
+                    {
+                        <div class="d-flex gap-2">
+                            <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Small" OnClick="@(() => HandleApproveRequest(request.Id))">
+                                @T("Approve")
+                            </MudButton>
+                            <MudButton Variant="Variant.Filled" Color="Color.Error" Size="Size.Small" OnClick="@(() => _rejectRequestId = request.Id)">
+                                @T("Reject")
+                            </MudButton>
+                        </div>
+
+                        @if (_rejectRequestId == request.Id)
+                        {
+                            <MudPaper Elevation="0" Class="pa-3 mt-2 mud-background-gray">
+                                <MudTextField @bind-Value="_rejectionReason" Label="@T("Rejection reason")" Lines="2" Variant="Variant.Outlined" />
+                                <div class="d-flex gap-2 mt-2">
+                                    <MudButton Variant="Variant.Filled" Color="Color.Error" Size="Size.Small" OnClick="@(() => HandleRejectRequest(request.Id))">
+                                        @T("Confirm")
+                                    </MudButton>
+                                    <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => _rejectRequestId = null)">
+                                        @T("Cancel")
+                                    </MudButton>
+                                </div>
+                            </MudPaper>
+                        }
+                    }
+                </MudPaper>
+            }
+        }
+    </MudPaper>
+
+    <!-- Day 85 Reminder (if applicable) -->
+    @if (_case.RemindAt is { } remindAt && CaseText.DaysUntil(remindAt, _now) <= 0 && _case.RemindedAt is null)
+    {
+        <MudAlert Severity="Severity.Warning" Class="mb-4">
+            <MudText Typo="Typo.subtitle2" Class="mb-2">@T("Day 85 reminder")</MudText>
+            <MudText Typo="Typo.body2" Class="mb-2">@T("This case requires attention on day 85. A reminder draft should be reviewed and approved.")</MudText>
+            @if (CanManageRequest())
+            {
+                <div class="d-flex gap-2">
+                    <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Small" OnClick="@HandleReminderApprove">
+                        @T("Approve reminder")
+                    </MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Error" Size="Size.Small" OnClick="@HandleReminderReject">
+                        @T("Reject reminder")
+                    </MudButton>
+                </div>
+            }
+        </MudAlert>
+    }
+
+    <!-- Response block -->
+    @if (_case.Status is CaseStatus.AwaitingClient or CaseStatus.Reminded or CaseStatus.Escalated or CaseStatus.ResponseReceived)
+    {
+        <MudPaper Class="pa-4 mb-4">
+            <MudText Typo="Typo.h6" Class="mb-3">@T("Response")</MudText>
+
+            @if (_case.Responses.Count == 0 && CanRegisterResponse())
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => _showResponseForm = !_showResponseForm)">
+                    @T("Register response")
+                </MudButton>
+
+                @if (_showResponseForm)
+                {
+                    <MudPaper Elevation="0" Class="pa-4 mud-background-gray mt-3">
+                        <MudForm @ref="_responseForm" @bind-IsValid="_responseValid">
+                            <MudStack Spacing="3">
+                                <MudText Typo="Typo.subtitle2">@T("Client answer")</MudText>
+
+                                <MudSelect @bind-Value="_responseKind" Label="@T("Response kind")" Variant="Variant.Outlined" T="ResponseKind">
+                                    <MudSelectItem Value="@ResponseKind.NewSelfCertification">@T("New self-certification")</MudSelectItem>
+                                    <MudSelectItem Value="@ResponseKind.ReasonableExplanation">@T("Reasonable explanation")</MudSelectItem>
+                                    <MudSelectItem Value="@ResponseKind.Other">@T("Other answer")</MudSelectItem>
+                                </MudSelect>
+
+                                @if (_responseKind == ResponseKind.NewSelfCertification)
+                                {
+                                    <MudSelect @bind-Value="_residenceCountry" Label="@T("Residence country")" Variant="Variant.Outlined" T="string">
+                                        <MudSelectItem Value="@("RO")">Romania</MudSelectItem>
+                                        <MudSelectItem Value="@("DE")">Germany</MudSelectItem>
+                                        <MudSelectItem Value="@("AT")">Austria</MudSelectItem>
+                                        <MudSelectItem Value="@("US")">United States</MudSelectItem>
+                                    </MudSelect>
+
+                                    <MudTextField @bind-Value="_tin" Label="@T("TIN")" Variant="Variant.Outlined"
+                                                  Validation="@(new Func<string, IEnumerable<string>>(v => ValidateTin(v)))" />
+
+                                    <MudDatePicker @bind-Date="_signedDate" Label="@T("Signed date")" Variant="Variant.Outlined" />
+                                }
+
+                                <MudSelect @bind-Value="_channel" Label="@T("Channel")" Variant="Variant.Outlined" T="string">
+                                    <MudSelectItem Value="@("online")">@T("Online")</MudSelectItem>
+                                    <MudSelectItem Value="@("inperson")">@T("In person")</MudSelectItem>
+                                    <MudSelectItem Value="@("remote")">@T("Remote")</MudSelectItem>
+                                </MudSelect>
+
+                                <MudTextField @bind-Value="_responseSummary" Label="@T("Summary")" Lines="3" Variant="Variant.Outlined" />
+
+                                <div class="d-flex gap-2">
+                                    <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="@HandleRegisterResponse" Disabled="!_responseValid">
+                                        @T("Register")
+                                    </MudButton>
+                                    <MudButton Variant="Variant.Text" OnClick="@(() => { _showResponseForm = false; ResetResponseForm(); })">
+                                        @T("Cancel")
+                                    </MudButton>
+                                </div>
+                            </MudStack>
+                        </MudForm>
+                    </MudPaper>
+                }
+            }
+            else if (_case.Responses.Count > 0)
+            {
+                @foreach (var response in _case.Responses)
+                {
+                    <MudPaper Elevation="0" Class="pa-3 mb-2 mud-background-gray">
+                        <MudText Typo="Typo.subtitle2">@response.Kind</MudText>
+                        <MudText Typo="Typo.body2" Class="mb-2">@response.Summary</MudText>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">@Format.Date(response.ReceivedAt)</MudText>
+                    </MudPaper>
+                }
+            }
+            else if (_user?.Role == Roles.Viewer)
+            {
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">@T("Awaiting client response.")</MudText>
+            }
+        </MudPaper>
+    }
+
+    <!-- Close case section (admin only) -->
+    @if (CanCloseCase() && _case.Status == CaseStatus.ResponseReceived)
+    {
+        <MudPaper Class="pa-4 mb-4">
+            <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="@HandleCloseCase">
+                @T("Close case")
+            </MudButton>
+        </MudPaper>
+    }
+
+    <!-- Proof and audit -->
+    @if (_case.Proof is not null)
+    {
+        <MudPaper Class="pa-4 mb-4">
+            <MudText Typo="Typo.h6" Class="mb-3">@T("Proof")</MudText>
+            <MudText Typo="Typo.body2">@T("Confirmed via") @CaseText.Channel(_case.Proof.Channel) — @T("Signed document")</MudText>
+            @if (_case.ClosedAt is not null)
+            {
+                <MudText Typo="Typo.caption" Class="mud-text-secondary mt-2">@T("Closed on") @Format.Date(_case.ClosedAt.Value)</MudText>
+            }
+        </MudPaper>
+    }
+}
 
 @code {
     [Parameter] public string Code { get; set; } = "";
+
+    private Case? _case;
+    private bool _loading = true;
+    private string? _error;
+    private DateTime _now = DateTime.UtcNow;
+    private bool _showDraftForm = false;
+    private bool _showResponseForm = false;
+    private List<string> _requiredDocuments = [];
+    private int? _rejectRequestId;
+    private DemoUser? _user;
+
+    // Draft form state
+    private MudForm? _draftForm;
+    private bool _draftValid = false;
+    private string _draftBody = "";
+
+    // Response form state
+    private MudForm? _responseForm;
+    private bool _responseValid = false;
+    private ResponseKind _responseKind = ResponseKind.NewSelfCertification;
+    private string _residenceCountry = "RO";
+    private string _tin = "";
+    private DateTime? _signedDate = DateTime.UtcNow;
+    private string _channel = "online";
+    private string _responseSummary = "";
+    private string _rejectionReason = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _now = SimClock.UtcNow;
+            _user = await CurrentUser.GetAsync();
+            _case = await CaseService.GetAsync(Code);
+
+            if (_case is not null)
+            {
+                _requiredDocuments = (await CaseService.RequiredDocumentsAsync(Code)).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private bool CanDraft() => _user?.Role is Roles.Admin or Roles.Member && _case?.Status == CaseStatus.Open;
+
+    private bool CanManageRequest() => _user?.Role == Roles.Admin;
+
+    private bool CanRegisterResponse() => _user?.Role is Roles.Admin or Roles.Member;
+
+    private bool CanCloseCase() => _user?.Role == Roles.Admin;
+
+    private IEnumerable<string> ValidateDraftBody(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            yield return T("Request body is required");
+    }
+
+    private IEnumerable<string> ValidateTin(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            yield return T("TIN is required");
+        // TIN format validation is done by the service
+    }
+
+    private void ResetResponseForm()
+    {
+        _responseKind = ResponseKind.NewSelfCertification;
+        _residenceCountry = "RO";
+        _tin = "";
+        _signedDate = DateTime.UtcNow;
+        _channel = "online";
+        _responseSummary = "";
+    }
+
+    private async Task HandleDraftRequest()
+    {
+        try
+        {
+            if (_case is null) return;
+
+            await CaseService.DraftRequestAsync(_case.Code, "ro", _draftBody, RequestKind.Initial);
+            _case = await CaseService.GetAsync(_case.Code);
+            _showDraftForm = false;
+            _draftBody = "";
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task HandleApproveRequest(int requestId)
+    {
+        try
+        {
+            if (_case is null) return;
+            await CaseService.ApproveRequestAsync(_case.Code, requestId, "online");
+            _case = await CaseService.GetAsync(_case.Code);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task HandleRejectRequest(int requestId)
+    {
+        try
+        {
+            if (_case is null) return;
+            await CaseService.RejectRequestAsync(_case.Code, requestId, _rejectionReason);
+            _case = await CaseService.GetAsync(_case.Code);
+            _rejectRequestId = null;
+            _rejectionReason = "";
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task HandleRegisterResponse()
+    {
+        try
+        {
+            if (_case is null) return;
+
+            var response = new NewResponse(
+                Kind: _responseKind,
+                Category: ExplanationCategory.None,
+                Channel: _channel,
+                Summary: _responseSummary,
+                HasDocumentaryEvidence: false
+            );
+
+            await CaseService.RegisterResponseAsync(_case.Code, response);
+            _case = await CaseService.GetAsync(_case.Code);
+            _showResponseForm = false;
+            ResetResponseForm();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task HandleReminderApprove()
+    {
+        try
+        {
+            if (_case is null) return;
+            var reminderRequest = _case.Requests.FirstOrDefault(r => r.Kind == RequestKind.Reminder);
+            if (reminderRequest is not null)
+            {
+                await CaseService.ApproveRequestAsync(_case.Code, reminderRequest.Id, "online");
+                _case = await CaseService.GetAsync(_case.Code);
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task HandleReminderReject()
+    {
+        try
+        {
+            if (_case is null) return;
+            var reminderRequest = _case.Requests.FirstOrDefault(r => r.Kind == RequestKind.Reminder);
+            if (reminderRequest is not null)
+            {
+                await CaseService.RejectRequestAsync(_case.Code, reminderRequest.Id, "Rejected at day 85");
+                _case = await CaseService.GetAsync(_case.Code);
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task HandleCloseCase()
+    {
+        try
+        {
+            if (_case is null) return;
+            await CaseService.CloseAsync(_case.Code, ConfirmationChannel.Online);
+            _case = await CaseService.GetAsync(_case.Code);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
 }
