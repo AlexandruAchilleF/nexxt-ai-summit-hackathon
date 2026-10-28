@@ -149,9 +149,14 @@ public class GoldenEngineTests
         var c = EngineCases.Get("12");
         var outcome = Engine.Evaluate(c.Before, c.After, c.Change);
 
-        var hit = Assert.Single(outcome.Indicia);
+        var hit = Assert.Single(outcome.Indicia, h => h.RuleId == RuleIds.CrsInCareOf);
         Assert.Contains("cont nedocumentat", hit.ExplanationRo);
         Assert.Equal(RuleBasis.Interpretation, hit.Basis); // the old Cluj address is on file, but not current (Q6)
+        // Î10: the same c/o address is also CRS-IND-MAIL; it is not another indicium, so the undocumented-account route stays.
+        var mail = Assert.Single(outcome.Indicia, h => h.RuleId == RuleIds.CrsMailing);
+        Assert.Equal(("IT", "Addresses/InCareOf", RuleBasis.Interpretation), (mail.Jurisdiction, mail.SourceField, mail.Basis));
+        Assert.Contains("registrul pe hârtie", outcome.ExplanationRo);
+        Assert.Contains("cont nedocumentat", outcome.ExplanationRo);
         Assert.Contains("valoare mică", Assert.Single(outcome.Cleared, x => x.RuleId == RuleIds.FatcaInCareOf).ExplanationRo);
     }
 

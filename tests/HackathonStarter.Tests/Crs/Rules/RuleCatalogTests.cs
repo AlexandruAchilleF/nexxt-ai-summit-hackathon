@@ -77,6 +77,7 @@ public class RuleCatalogTests
     [InlineData("GR", true)]
     [InlineData("CH", true)] // ANAF list 1.a
     [InlineData("GB", true)]
+    [InlineData("UK", true)] // the common code for the United Kingdom, normalized to GB
     [InlineData("MD", true)]
     [InlineData("OM", true)] // ANAF list 1.b: still reported
     [InlineData("US", false)] // FATCA only
@@ -87,6 +88,28 @@ public class RuleCatalogTests
     public void Crs_reportable_jurisdictions(string? country, bool expected)
     {
         Assert.Equal(expected, Jurisdictions.IsCrsReportable(country));
+    }
+
+    [Theory]
+    [InlineData("EL", "GR")]
+    [InlineData("uk", "GB")]
+    [InlineData(" UK ", "GB")]
+    [InlineData("GB", "GB")]
+    [InlineData(null, "")]
+    public void Normalize_maps_the_non_iso_codes(string? country, string expected)
+    {
+        Assert.Equal(expected, Jurisdictions.Normalize(country));
+    }
+
+    [Fact]
+    public void Domestic_has_no_guide_page_and_the_indicia_route_deadline_cites_pct_16()
+    {
+        Assert.Equal(RuleCatalog.NotVerified, RuleCatalog.Get(RuleIds.Domestic).GuidePage);
+        var year = RuleCatalog.Get(RuleIds.DeadlinePreexistingYear);
+        Assert.Equal(RuleBasis.Interpretation, year.Basis);
+        Assert.Contains("Anexa 1, Sec. III.B pct. 16", year.LegalBasis);
+        Assert.Contains("Comentariul OCDE, Sec. III pct. 16", year.LegalBasis);
+        Assert.DoesNotContain("Anexa 2", year.LegalBasis);
     }
 
     [Fact]
