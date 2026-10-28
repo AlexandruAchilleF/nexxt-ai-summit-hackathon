@@ -260,7 +260,8 @@ public sealed class SentinelTools(IServiceProvider services)
                 EvidenceId = e.Id, Verified = false, Label = SentinelWording.SignalLabel,
                 Note = "The quote is not in the visible text: no signal was saved. Do not use this quote.",
             };
-        var s = await Cases.AddSignalAsync(new NewSignal(c.ClientCode, c.Code, description.Trim(), e.Id));
+        // A free text from the model: saved masked, like an escalation reason (the quote is the verified evidence).
+        var s = await Cases.AddSignalAsync(new NewSignal(c.ClientCode, c.Code, PiiVault.ForStorage().Mask(description.Trim()), e.Id));
         return new { s.Id, EvidenceId = e.Id, e.Quote, Verified = true, Label = SentinelWording.SignalLabel, s.Description, e.Page };
     }
 
@@ -283,7 +284,17 @@ public sealed class SentinelTools(IServiceProvider services)
 
         int? selfCertificationId = null;
         object? outcome = null;
-        if (check.Complete)
+        // Pressing "Verify" again (e.g. after registerResponse failed) must not record the same document a second time.
+        var already = (await Clients.GetAsync(c.ClientCode))?.SelfCertifications
+            .Where(s => s.DocumentId == doc.DocumentId && s.Status == SelfCertStatus.Valid && SentinelWording.Utc(s.ReceivedAt) >= SentinelWording.Utc(c.OpenedAt))
+            .OrderByDescending(s => s.Id).FirstOrDefault();
+        if (check.Complete && already is not null)
+        {
+            selfCertificationId = already.Id;
+            outcome = Outcome(services.GetRequiredService<ICrsRuleEngine>().EvaluateSelfCertification(
+                ClientSnapshot.From((await Clients.GetAsync(c.ClientCode))!), SelfCertificationSnapshot.From(already)));
+        }
+        else if (check.Complete)
         {
             var recorded = await services.GetRequiredService<IChangeService>().RecordAsync(new ChangeRequest(
                 c.ClientCode, ChangeKind.SelfCertSubmitted, "online", SelfCertification: check.Snapshot, DocumentId: doc.DocumentId, CaseCode: c.Code));
@@ -383,7 +394,7 @@ public sealed class SentinelTools(IServiceProvider services)
             selfCertificationId = owner?.SelfCertifications
                 .Where(s => s.Status == SelfCertStatus.Valid && SentinelWording.Utc(s.ReceivedAt) >= SentinelWording.Utc(c.OpenedAt))
                 .OrderByDescending(s => s.ReceivedAt).ThenByDescending(s => s.Id).Select(s => s.Id).FirstOrDefault() ?? 0;
-        var r = await Cases.RegisterResponseAsync(c.Code, new NewResponse(k, cat, channel.Trim(), summary.Trim(),
+        var r = await Cases.RegisterResponseAsync(c.Code, new NewResponse(k, cat, channel.Trim(), PiiVault.ForStorage().Mask((summary ?? "").Trim()),
             documentId > 0 ? documentId : null, SelfCertificationId: selfCertificationId > 0 ? selfCertificationId : null));
         var toPerson = k == ResponseKind.Other || cat == ExplanationCategory.Other;
         return new
@@ -427,7 +438,7 @@ public sealed class SentinelTools(IServiceProvider services)
     {
         var code = Arg(args, "caseCode") ?? "?";
         var channel = Arg(args, "channel") ?? "email";
-        var line = int.TryParse(Arg(args, "requestId"), out var id) ? LetterFirstLine(code, id) : null;
+        var line = int.TryParse(Arg(args, "requestId"), out var id) ? LetterFirstLine(id) : null;
         return line is null
             ? Lang.T("Send the request for case {0} by {1}", code, channel)
             : Lang.T("Send the request for case {0} by {1}: {2}", code, channel, line);
@@ -440,20 +451,11 @@ public sealed class SentinelTools(IServiceProvider services)
         return Lang.T("Close case {0} (channel: {1}); the code re-evaluates the rules first", code, channel);
     }
 
-    private string? LetterFirstLine(string caseCode, int requestId)
-    {
-        if (_firstLines.TryGetValue(requestId, out var line)) return line;
-        try
-        {
-            // Drafted in an earlier run: the approval card is built synchronously by the runner.
-            var c = Cases.GetAsync(caseCode).GetAwaiter().GetResult();
-            return FirstLine(c?.Requests.FirstOrDefault(r => r.Id == requestId)?.Body);
-        }
-        catch (Exception)
-        {
-            return null; // the card still shows the case and the channel
-        }
-    }
+    /// <summary>
+    /// The first line of a letter drafted in this run. A letter from an earlier run is not read here: the runner builds the
+    /// card synchronously, and blocking on the database there could deadlock; the card then shows the case and the channel.
+    /// </summary>
+    private string? LetterFirstLine(int requestId) => _firstLines.TryGetValue(requestId, out var line) ? line : null;
 
     private static string? FirstLine(string? body)
     {

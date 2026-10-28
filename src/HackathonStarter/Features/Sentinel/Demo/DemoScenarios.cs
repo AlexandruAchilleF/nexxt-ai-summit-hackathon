@@ -66,7 +66,15 @@ public sealed class DemoScenarios(IDbContextFactory<AppDbContext> dbFactory, ICh
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
             var existing = await db.ClientDocuments.Where(d => d.ClientId == c.ClientId && d.FileName == answer.FileName).Select(d => (int?)d.Id).FirstOrDefaultAsync();
-            if (existing is int id) return id; // delivered already: the same document, no second upload
+            if (existing is int id)
+            {
+                // Delivered already: the same document, no second upload; its change too, unless recording it failed last time.
+                var marker = $"\"documentId\":{id}";
+                if (await db.ChangeEvents.AnyAsync(e => e.ClientId == c.ClientId && e.Kind == ChangeKind.DocumentUploaded && e.NewValueJson != null && e.NewValueJson.Contains(marker)))
+                    return id;
+                await RecordUploadAsync(c, id, answer.FileName);
+                return id;
+            }
 
             var pdf = SyntheticPdfs.Get(answer.FileName).Bytes;
             using var parsed = PdfDocument.Open(pdf);
@@ -79,10 +87,13 @@ public sealed class DemoScenarios(IDbContextFactory<AppDbContext> dbFactory, ICh
             documentId = document.Id;
         }
 
-        await changes.RecordAsync(new ChangeRequest(c.ClientCode, ChangeKind.DocumentUploaded, "online", DocumentId: documentId,
-            CaseCode: c.Code, Summary: $"Răspuns primit: {answer.FileName}"));
+        await RecordUploadAsync(c, documentId, answer.FileName);
         return documentId;
     }
+
+    private Task<ChangeResult> RecordUploadAsync(Case c, int documentId, string fileName) =>
+        changes.RecordAsync(new ChangeRequest(c.ClientCode, ChangeKind.DocumentUploaded, "online", DocumentId: documentId,
+            CaseCode: c.Code, Summary: $"Răspuns primit: {fileName}"));
 
     private static DemoScenario Find(string scenarioId) =>
         Scenarios.FirstOrDefault(s => string.Equals(s.Id, scenarioId?.Trim(), StringComparison.OrdinalIgnoreCase))
