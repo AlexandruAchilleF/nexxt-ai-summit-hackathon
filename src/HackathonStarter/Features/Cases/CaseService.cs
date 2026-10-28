@@ -190,6 +190,10 @@ public class CaseService(
         return OpenAsync(change, outcome, actor, logChange);
     }
 
+    // Lock order is always case writer -> audit writer, including changes that may open a case.
+    internal static Task<T> OpeningOperationAsync<T>(IDbContextFactory<AppDbContext> factory, Func<AppDbContext, Task<T>> work) =>
+        AuditOperation.Current is { } db ? work(db) : WriteAsync(() => AuditOperation.RunAsync(factory, work));
+
     private async Task<Case> OpenAsync(ChangeEvent change, RuleOutcome outcome, string actor, Func<int, Task>? logChange)
     {
         var uncovered = outcome.Uncovered.GroupBy(h => (h.RuleId, h.Jurisdiction)).Select(g => g.First()).ToList();
@@ -197,9 +201,8 @@ public class CaseService(
             throw new InvalidOperationException($"Decision {outcome.Decision} has no uncovered indicium: no case to open.");
         var regime = Combine(uncovered.Select(h => h.Regime));
 
-        return await WriteAsync(async () =>
+        return await OpeningOperationAsync(dbFactory, async db =>
         {
-            await using var db = await dbFactory.CreateDbContextAsync();
             var client = await db.Clients.AsNoTracking().Include(c => c.Accounts).FirstOrDefaultAsync(c => c.Id == change.ClientId)
                 ?? throw new KeyNotFoundException($"Client {change.ClientId} not found.");
             var now = clock.UtcNow;
@@ -271,11 +274,11 @@ public class CaseService(
         return item;
     }
 
-    /// <summary>The change's entries (<paramref name="logChange"/>) before the case's, which is written even if they fail.</summary>
+    /// <summary>The change's entries precede the case's; any failure rolls back the shared transaction.</summary>
     private static async Task LogAsync(Func<int, Task>? logChange, int caseId, Func<Task> caseEntry)
     {
-        try { if (logChange is not null) await logChange(caseId); }
-        finally { await caseEntry(); }
+        if (logChange is not null) await logChange(caseId);
+        await caseEntry();
     }
 
     /// <summary>

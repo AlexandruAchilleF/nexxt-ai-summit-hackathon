@@ -38,7 +38,8 @@ Save, then `after = ClientSnapshot.From(client)`. Outcome:
 Save `ChangeEvent` (ReceivedAt = clock now, Summary = request.Summary or a code-built one without personal data,
 Old/NewValueJson masked with `PiiVault.ForStorage().Mask`) and `RuleEvaluation` (ResultJson = the outcome serialized and
 masked; EngineVersion; EvaluatedAt). If `outcome.Uncovered` is not empty: `caseService.OpenAsync(change, outcome)`, before
-the audit entries (a failed append never leaves such a change without its case). Then audit `change.received` and one
+the audit entries. Change, evaluation, case and audit now share one EF context and transaction; an append failure rolls
+back all of them, so there is neither an uncovered persisted change nor a partial audit history. Then audit `change.received` and one
 `rule.applied` per indicium and per cleared rule. If `request.CaseCode` is set and the kind is SelfCertSubmitted, the case
 must be open (otherwise `InvalidOperationException` naming its status, before anything is saved); the self-certification
 answers that case, and a new uncovered hit (e.g. SC-TIN-FORMAT) extends it through `OpenAsync`, never a new case.

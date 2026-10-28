@@ -340,11 +340,10 @@ public class ChangeServiceTests
         await Assert.ThrowsAsync<InvalidOperationException>(() => host.MoveAsync("CL-0016", "ES"));
 
         await using var db = await host.DbAsync();
-        Assert.Equal(1, await db.ChangeEvents.CountAsync());
-        Assert.Equal(1, await db.RuleEvaluations.CountAsync());
-        var item = await db.Cases.Include(c => c.Indicia).SingleAsync();
-        Assert.Equal(["CRS-IND-ADDR:ES"], item.Indicia.Select(i => $"{i.RuleId}:{i.Jurisdiction}"));
-        Assert.Single(host.Audit.OfKind(AuditKinds.CaseOpened));
+        Assert.Empty(await db.ChangeEvents.ToListAsync());
+        Assert.Empty(await db.RuleEvaluations.ToListAsync());
+        Assert.Empty(await db.Cases.ToListAsync());
+        Assert.Empty(host.Audit.Entries);
     }
 
     [Fact]

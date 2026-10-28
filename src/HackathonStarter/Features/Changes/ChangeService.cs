@@ -24,8 +24,8 @@ public interface IChangeService
 
 /// <summary>
 /// The only writer of client data (besides CaseService's AcceptedExplanation on close). One change: apply it to the client,
-/// snapshot before/after, let code decide (rule engine or shield), save the change and the evaluation in one transaction,
-/// then the case, then the audit log (the change's entries before the case's). Depends on ICaseService; CaseService never
+/// snapshot before/after, let code decide (rule engine or shield), save the change, evaluation, case and audit in one
+/// transaction (the change's audit entries before the case's). Depends on ICaseService; CaseService never
 /// depends on this. Owner: R2.
 /// </summary>
 public class ChangeService(
@@ -53,7 +53,7 @@ public class ChangeService(
         Validate(request);
 
         await Writer.WaitAsync();
-        try { return await RecordLockedAsync(request, "user:" + user.Id, systemCases: null); }
+        try { return await CaseService.OpeningOperationAsync(dbFactory, db => RecordLockedAsync(db, request, "user:" + user.Id, systemCases: null)); }
         finally { Writer.Release(); }
     }
 
@@ -71,13 +71,12 @@ public class ChangeService(
         Validate(request);
 
         await Writer.WaitAsync();
-        try { return await RecordLockedAsync(request, actor, systemCases); }
+        try { return await CaseService.OpeningOperationAsync(dbFactory, db => RecordLockedAsync(db, request, actor, systemCases)); }
         finally { Writer.Release(); }
     }
 
-    private async Task<ChangeResult> RecordLockedAsync(ChangeRequest request, string actor, CaseService? systemCases)
+    private async Task<ChangeResult> RecordLockedAsync(AppDbContext db, ChangeRequest request, string actor, CaseService? systemCases)
     {
-        await using var db = await dbFactory.CreateDbContextAsync();
         var client = await ClientService.Full(db).AsTracking().FirstOrDefaultAsync(c => c.Code == request.ClientCode)
             ?? throw new KeyNotFoundException($"Client {request.ClientCode} not found.");
 
@@ -106,47 +105,39 @@ public class ChangeService(
         else if (applied.SelfCertification is { } selfCert) outcome = engine.EvaluateSelfCertification(after, SelfCertificationSnapshot.From(selfCert));
         else outcome = engine.Evaluate(before, after, request.Kind);
 
-        ChangeEvent change;
-        await using (var transaction = await db.Database.BeginTransactionAsync())
+        if (shielded is not null)
+            await db.ClientDocuments.Where(d => d.Id == shielded.DocumentId)
+                .ExecuteUpdateAsync(s => s.SetProperty(d => d.ShieldVerdict, shielded.Result.Verdict));
+        await db.SaveChangesAsync(); // the client's new state first: the new self-certification gets its id
+
+        var vault = PiiVault.ForStorage(); // one vault: the old and new values share placeholders
+        var change = new ChangeEvent
         {
-            if (shielded is not null)
-                await db.ClientDocuments.Where(d => d.Id == shielded.DocumentId)
-                    .ExecuteUpdateAsync(s => s.SetProperty(d => d.ShieldVerdict, shielded.Result.Verdict));
-            await db.SaveChangesAsync(); // the client's new state first: the new self-certification gets its id
+            ClientId = client.Id,
+            Kind = request.Kind,
+            Summary = string.IsNullOrWhiteSpace(request.Summary) ? Summarize(request, applied) : vault.Mask(request.Summary.Trim()),
+            OldValueJson = applied.Old is null ? null : vault.Mask(JsonSerializer.Serialize(applied.Old, Json)),
+            NewValueJson = applied.New is null ? null : vault.Mask(JsonSerializer.Serialize(applied.New, Json)),
+            SourceChannel = request.Channel.Trim(),
+            ReceivedAt = now,
+        };
+        db.ChangeEvents.Add(change);
+        await db.SaveChangesAsync();
 
-            var vault = PiiVault.ForStorage(); // one vault: the old and new values share placeholders
-            change = new ChangeEvent
-            {
-                ClientId = client.Id,
-                Kind = request.Kind,
-                Summary = string.IsNullOrWhiteSpace(request.Summary) ? Summarize(request, applied) : vault.Mask(request.Summary.Trim()),
-                OldValueJson = applied.Old is null ? null : vault.Mask(JsonSerializer.Serialize(applied.Old, Json)),
-                NewValueJson = applied.New is null ? null : vault.Mask(JsonSerializer.Serialize(applied.New, Json)),
-                SourceChannel = request.Channel.Trim(),
-                ReceivedAt = now,
-            };
-            db.ChangeEvents.Add(change);
-            await db.SaveChangesAsync();
+        var evaluation = new RuleEvaluation
+        {
+            ChangeEventId = change.Id,
+            Decision = outcome.Decision,
+            ResultJson = PiiVault.ForStorage().Mask(JsonSerializer.Serialize(outcome, Json)),
+            EngineVersion = outcome.EngineVersion,
+            EvaluatedAt = now,
+        };
+        db.RuleEvaluations.Add(evaluation);
+        await db.SaveChangesAsync();
+        change.EvaluationId = evaluation.Id;
+        await db.SaveChangesAsync();
 
-            var evaluation = new RuleEvaluation
-            {
-                ChangeEventId = change.Id,
-                Decision = outcome.Decision,
-                ResultJson = PiiVault.ForStorage().Mask(JsonSerializer.Serialize(outcome, Json)),
-                EngineVersion = outcome.EngineVersion,
-                EvaluatedAt = now,
-            };
-            db.RuleEvaluations.Add(evaluation);
-            await db.SaveChangesAsync();
-            change.EvaluationId = evaluation.Id;
-            await db.SaveChangesAsync();
-            await transaction.CommitAsync();
-        }
-
-        // The audit log (another connection; codes, rule IDs and jurisdictions only): the change received, its rules, then the
-        // case it opens. CaseService saves the case first and calls LogChangeAsync with its id before its own entry, so a
-        // failed append never leaves a change with uncovered indicia and no case. An answer to an open case that brings a new
-        // uncovered hit (e.g. a TIN in the wrong format) extends that case: OpenAsync adds to the client's open case.
+        // All writes use the operation's context and transaction, including the case callback and audit appends.
         async Task LogChangeAsync(int? caseId)
         {
             await audit.AppendAsync(actor, AuditKinds.ChangeReceived, new
