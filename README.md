@@ -68,7 +68,7 @@ Maria are un cont nou (deschis după 1 ian. 2016) și se mută la München.
        checkTin(DE)  → „format valid”
        evaluateRules → Compliant, raportabil pentru DE
  [8] closeCase: cere APROBAREA operatorului → dovada confirmării (canal, moment, hash)   jurnal: case.closed
- [9] /audit → „Verifică” lanțul de hash-uri; „Tamper” pe o intrare arată exact intrarea ruptă
+ [9] /audit → „Verifică” lanțul de hash-uri; „Falsifică” pe o intrare arată exact intrarea ruptă
 ```
 
 Fără răspuns, la ziua 91 cazul trece în `Expired`, cu consecința din ghid (rezidentă în RO și în DE). Diagrama completă,
@@ -167,8 +167,7 @@ cheamă uneltele reale (§11).
   Tranzițiile cazului sunt doar aici, fiecare cu verificare de rol și cu intrare în jurnal.
 - **Agentul** e un agent cu unelte, orchestrat de cod, cu omul la decizie: nu atinge baza de date direct, iar cine
   deschide cazul, regulile și termenele sunt în cod. Runtime-ul cere aprobarea omului pentru uneltele marcate `needsApproval`
-  și, după aprobare, le rulează fără model; așa sunt marcate
-  `sendClientRequest` și `closeCase` (#44).
+  și, după aprobare, le rulează fără model; așa sunt marcate `sendClientRequest` și `closeCase` (#44).
 - **Data simulată** (`SimClock`) e un serviciu separat, cu decalaj setabil („+85 de zile”). Codul CRS nu citește ora din
   altă parte; restul aplicației rămâne pe ceasul real.
 - Entitățile, interfețele și structura folderelor: [`docs/PLAN.md` §6–13](docs/PLAN.md#6-arhitectura).
@@ -228,8 +227,8 @@ Metricile vin doar din rulări reale (`/metrics` și testele), prezentate separa
 ### Ultima rulare
 
 Rularea pe commit-ul `e0bc47c`, 28.10.2026, 22:08, **fără model** (nicio cheie, niciun apel AI): pagina `/metrics`, cu
-aplicația pornită local, și `IEvaluationService.RunAsync()` chemat direct dau aceleași cifre. Pe `eaea3f3` (după #44, la 22:14),
-`IEvaluationService` dă din nou aceleași cifre. Toate cifrele de mai jos vin din cod determinist, nu din AI.
+aplicația pornită local, și `IEvaluationService.RunAsync()` chemat direct dau aceleași cifre. Pe `eaea3f3` (după #44, la
+22:14), `IEvaluationService` dă din nou aceleași cifre. Toate cifrele de mai jos vin din cod determinist, nu din AI.
 
 **1. Acoperirea specificației** (motorul `crs-rules/1.2`): regulile din ghid sunt implementate și testate, pe 20 de
 cazuri-etalon cu date de intrare și pe 50 de clienți sintetici.
@@ -303,7 +302,7 @@ warnings, testele unitare 1236 din 1236, E2E 23 din 23.
 
 | Modul | Rol | Pe `main` | În lucru | Lipsește |
 | --- | --- | --- | --- | --- |
-| Documentația: planul, regulile verificate, paginile ghidului, cazurile-etalon, sursele, scenariul video, textul `/privacy` | toți | da (#1–#4, #6, #7, #10, #12, #14, #15, #19, #30, #33) | | |
+| Documentația: planul, regulile verificate, paginile ghidului, cazurile-etalon, sursele, scenariul video, textul `/privacy` | toți | da (#1–#4, #6, #7, #10, #12, #14, #15, #19, #30, #33, #34) | | |
 | Contractele și entitățile (Faza 0), `SimClock` | integrator | da (#13, #18) | | |
 | `CrsRuleEngine`, `RuleCatalog`, `GoldenEngineTests` | R1 | da (#16, #37, #41) | | |
 | `ChangeService`, `CaseService` (stările cazului), `DeadlineCalculator`, `DeadlineWatcher`, `SimClockControl`, cazurile de flux cap-coadă, resetarea demo-ului | R2 | da (#28, #40, #43) | | butoanele datei simulate în bara de sus |
@@ -311,7 +310,7 @@ warnings, testele unitare 1236 din 1236, E2E 23 din 23.
 | Pagina `/privacy` (jurnal, TIN on Europa, Bedrock, retenție, temeiul legal) | R3 | da (#26) | | |
 | Provider Bedrock | R4 | da (#5) | | |
 | Runtime-ul agentului (aprobarea oprește rularea), verificările CRS pe răspuns, mascarea telefoanelor străine | R4 | da (#20, #35) | | |
-| `CrsSentinelAgent`: cele 14 unelte, system prompt-ul, mock RO/EN (Maria cap-coadă), verificările active | R4 | da (#44) | | înregistrarea `Recordings/crs-sentinel.json`; legarea agentului de pagina cazului |
+| `CrsSentinelAgent`: cele 14 unelte, system prompt-ul, mock RO/EN (Maria cap-coadă), verificările active | R4 | da (#44) | #47 (mock-ul scrie doar la cele două acțiuni ale cazului, texte libere salvate mascate) | înregistrarea `Recordings/crs-sentinel.json`; legarea agentului de pagina cazului |
 | Datele: 50 de clienți sintetici, PDF-urile cazurilor-etalon, cazurile-etalon transcrise, seed-ul | R5 | da (#8, #9, #11, #17, #21, #22, #25, #27, #31, #36, #39) | | |
 | `EvaluationService` (cele trei feluri de cifre) și pagina `/metrics` | R5 | da (#29, #38, #42) | | |
 | Landing-ul și subsolurile | R5 | da (#24, #32) | | |
@@ -320,10 +319,10 @@ warnings, testele unitare 1236 din 1236, E2E 23 din 23.
 
 | Pagina | Ce arată |
 | --- | --- |
-| `/audit` | Lanțul de hash-uri, „Verifică” și „Tamper” (admin). La pornire are intrările istoricului din seed (#39) |
+| `/audit` | Lanțul de hash-uri, „Verifică” și „Falsifică” („Tamper” în EN, admin). La pornire are intrările istoricului din seed (#39) |
 | `/metrics` | Cele trei feluri de cifre din `EvaluationService`, cu „Rulează din nou”, caz cu caz (§8) |
 | `/privacy` | Textul actualizat (#26) |
-| `/cases`, `/cases/{code}`, `/changes/new`, `/clients/{code}` | Doar titlul și „Vine în faza următoare” |
+| `/cases`, `/cases/{code}`, `/changes/new`, `/clients/{code}` | Doar titlul și „Vine în faza următoare” (pagina clientului e în PR #45, deschis) |
 | `/settings` | „Resetează datele demo” (admin) readuce datele CRS, jurnalul și data simulată la starea de la pornire (#43) |
 | `/dashboard` | Încă dashboard-ul template-ului (elemente demo), nu cazurile CRS |
 

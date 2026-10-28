@@ -37,10 +37,11 @@ durata segmentului ei; cele ≈ 9 s rămase până la 3:00 sunt pentru pauze și
 `AI:AgentMode = Live`. Mock: fără model, cu `AI:AgentMode = Auto`. Detaliile sunt în checklist (secțiunea 4). Replay e
 acceptabil doar pentru o întrebare care citește (ex. „Rezumă cazul”), iar scenariul de mai jos nu are niciuna.
 
-**Ce e pe main (28.10.2026, 22:15, `eaea3f3`):** `/audit` (cu istoricul din seed) și `/metrics` funcționează;
-`/cases`, `/cases/{code}`, `/changes/new` și `/clients/{code}` sunt doar schelete („Vine în faza următoare”), `/dashboard` e
-încă cel din template, data simulată nu are butoane în UI. Agentul are cele 14 unelte și mock-ul RO/EN (#44), dar nu e încă legat de pagina cazului. Etichetele marcate „(după R2)”
-sau „(după R3)” vin din `PLAN.md` §15 și nu există încă în cod.
+**Ce e pe main (28.10.2026, 22:15, `eaea3f3`):** `/audit` (cu istoricul din seed, „Verifică” și „Falsifică”, adică
+„Tamper” în EN) și `/metrics` funcționează; `/cases`, `/cases/{code}`, `/changes/new` și `/clients/{code}` sunt doar
+schelete („Vine în faza următoare”; pagina clientului e în PR #45), `/dashboard` e încă cel din template, iar data simulată
+nu are butoane în UI. Agentul are cele 14 unelte și mock-ul RO/EN (#44), dar nu e încă legat de pagina cazului. Etichetele
+marcate „(după R2)” (bara datei simulate, „Trimite” pe `/changes/new`) vin din `PLAN.md` §15 și nu există încă în cod.
 
 ## 2. Scenariul, cuvânt cu cuvânt
 
@@ -144,11 +145,11 @@ deschide niciun caz.”, cu motivele „text alb” și „font < 2 pt”.
 
 > Un agent cu unelte, orchestrat de cod, cu omul la decizie. CNP-ul, IBAN-ul, cardul și e-mailul sunt mascate înainte de model. Jurnalul are lanț de hash-uri: modific o intrare și verificarea arată exact unde s-a rupt. Template-ul era gata; partea CRS e scrisă în hackathon.
 
-**Ce se vede:** `/architecture` (cod / AI / om). Apoi `/audit`: „Verifică” (după R3) → lanț întreg; „Tamper” (după R3) pe o
+**Ce se vede:** `/architecture` (cod / AI / om). Apoi `/audit`: „Verifică” → lanț întreg; „Falsifică” („Tamper”) pe o
 intrare a cazului Mariei → „Verifică” → intrarea ruptă evidențiată, cu `Seq`-ul ei. Supratitrare: „Demo: doar date
 sintetice · Amazon Bedrock, us-west-2” (pe mock: „Simulare: unelte reale, fără model”).
 
-**Mod:** fără agent („Tamper” e cod, doar admin).
+**Mod:** fără agent („Falsifică” e cod, doar admin).
 
 **Cifre și surse:** ce se maschează: `PiiVault` (CNP, IBAN, card, e-mail și doar telefoanele românești,
 `PiiVault.cs:131–133`); numele și adresele nu se maschează (`PLAN.md` §17, README §9).
@@ -293,8 +294,8 @@ aprobare (`PLAN.md` §6.3); deciziile `NoCase` și `Compliant` merg direct în j
       Testează modelul principal (Bedrock e pe main din PR #5) și fiecare profil din `AI:Profiles`; profilul `extract`
       există doar dacă îl punem în `appsettings.Local.json` (modelul e în `appsettings.Local.example.json`); ținta
       `tin-on-europa` e în `appsettings.json` (PR #23).
-- [ ] Logați ca Ana (operator, admin): data simulată și „Tamper” cer admin (`PLAN.md` §15, după R2 și R3); aprobările cer
-      admin sau member (`AgentRunner.DecideAsync`).
+- [ ] Logați ca Ana (operator, admin): data simulată și „Falsifică” („Tamper”) cer admin (`PLAN.md` §15; data simulată
+      după R2); aprobările cer admin sau member (`AgentRunner.DecideAsync`).
 - [ ] Zoom 125% în browser, fără bara de bookmark-uri; interfața în RO (butonul RO/EN); export 1080p.
 - [ ] Textele exacte ale celor două mesaje către agent (S3, S4) fixate cu R4 și încercate pe mock (după R4).
 - [ ] Cifrele din S8 (completate din `/metrics` pe `e0bc47c`, 28.10.2026, 22:08) verificate din nou pe versiunea filmată,
