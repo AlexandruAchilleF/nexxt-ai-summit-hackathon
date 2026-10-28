@@ -14,8 +14,17 @@ public enum Decision { NoCase, Compliant, Clarification, FatcaAlert, ShieldAlert
 
 public enum Regime { Crs, Fatca, Both }
 
+/// <summary>
+/// How solid the ground under a rule or a hit is. Verified = the text is in the law or the guide. Interpretation = our
+/// reading where the sources are silent or ambiguous (shown in the UI). Policy = a bank choice, not a legal obligation.
+/// </summary>
+public enum RuleBasis { Verified, Interpretation, Policy }
+
 /// <summary>One rule of the catalog. <see cref="GuidePage"/> is the page of the ANAF guide (29.12.2025), or "NEVERIFICAT".</summary>
-public record RuleDefinition(string Id, Regime Regime, string Title, string TitleRo, string GuidePage, int Version = 1);
+/// <param name="LegalBasis">Article in the law (Legea 207/2015, CPF Anexa 1 / 2, IGA), e.g. "CPF Anexa 1, Sec. III.B pct. 12 lit. c)".</param>
+public record RuleDefinition(string Id, Regime Regime, string Title, string TitleRo, string GuidePage, int Version = 1,
+                             string Description = "", string DescriptionRo = "", string LegalBasis = "",
+                             RuleBasis Basis = RuleBasis.Verified);
 
 /// <summary>
 /// A rule that was checked: an indicium (it applies) or a cleared rule (it does not, with the reason). Explanations are
@@ -23,8 +32,9 @@ public record RuleDefinition(string Id, Regime Regime, string Title, string Titl
 /// </summary>
 /// <param name="CoveredBy">None = uncovered: it starts an action. SelfCertification = the jurisdiction is declared (reportable
 /// for it). AcceptedExplanation = explained (not reportable for it). A Cleared rule did not apply at all.</param>
+/// <param name="Basis">Interpretation on a new account or where our reading decides; the UI shows it.</param>
 public record RuleHit(string RuleId, Regime Regime, string Jurisdiction, string Explanation, string ExplanationRo, string GuidePage,
-                      string SourceField, Coverage CoveredBy = Coverage.None);
+                      string SourceField, Coverage CoveredBy = Coverage.None, RuleBasis Basis = RuleBasis.Verified);
 
 public enum Coverage { None, SelfCertification, AcceptedExplanation }
 
@@ -70,6 +80,14 @@ public interface ICrsRuleEngine
 
     /// <summary>The client's current state, with no change: the agent's evaluateRules tool, re-evaluation before closing, metrics.</summary>
     RuleOutcome EvaluateCurrent(ClientSnapshot client);
+
+    /// <summary>
+    /// The current state of a client whose change the bank has known since <paramref name="changeKnownAt"/>: re-evaluation
+    /// before closing a case (pass the latest Case.Indicia AddedAt). A self-certification signed that day or later is a new
+    /// one, so a "not a US person" form can cover a FATCA indicium where the agreement allows it (IGA Annex I, II.B.4 and
+    /// III.B.2). Without the date, only a form declaring US status covers one. The default ignores the date.
+    /// </summary>
+    RuleOutcome EvaluateCurrent(ClientSnapshot client, DateTime changeKnownAt) => EvaluateCurrent(client);
 
     /// <summary>A new self-certification checked against the bank's data (TIN format, missing TIN reason, consistency).</summary>
     RuleOutcome EvaluateSelfCertification(ClientSnapshot client, SelfCertificationSnapshot selfCertification);
