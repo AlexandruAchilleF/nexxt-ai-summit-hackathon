@@ -88,6 +88,24 @@ public class LangTests
     }
 
     [Fact]
+    public void TFilled_translates_saved_text_built_from_a_key_with_its_values()
+    {
+        var before = CultureInfo.CurrentUICulture;
+        try
+        {
+            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("ro-RO");
+            Assert.Equal("Toate citatele (2) sunt dovezi verificate.", Lang.TFilled("All 2 quotation(s) are verified evidence."));
+            Assert.Equal("1 din 3 citate nu se află printre cele 2 citate verificate.", Lang.TFilled("1 of 3 quotation(s) are not among the 2 verified quote(s)."));
+            Assert.Equal("Răspunsul nu conține niciun citat.", Lang.TFilled("The answer contains no quotation."));
+            Assert.Equal("Not a key 2", Lang.TFilled("Not a key 2"));
+
+            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("en-GB");
+            Assert.Equal("All 2 quotation(s) are verified evidence.", Lang.TFilled("All 2 quotation(s) are verified evidence."));
+        }
+        finally { CultureInfo.CurrentUICulture = before; }
+    }
+
+    [Fact]
     public void Placeholders_match_between_languages()
     {
         static string Holes(string s) => string.Join(",", System.Text.RegularExpressions.Regex.Matches(s, @"\{\d+\}").Select(m => m.Value).Order());

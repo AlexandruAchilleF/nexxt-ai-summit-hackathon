@@ -3,6 +3,7 @@ using HackathonStarter.Agents;
 using HackathonStarter.Config;
 using HackathonStarter.Features.Checks;
 using HackathonStarter.Features.Items;
+using HackathonStarter.Tests.Crs.Sentinel;
 using HackathonStarter.Tests.Support;
 using Microsoft.Extensions.AI;
 
@@ -109,6 +110,7 @@ public class AgentRunnerTests
     [Fact]
     public async Task An_approved_action_that_fails_is_not_shown_as_done()
     {
+        using var _ = new UiLanguage("en-GB"); // the runner writes the decision in the UI language
         var model = new FakeChatClient().CallTool("updateItem", new { id = 999, title = "Ghost", status = "Archived" }).Reply("proposed");
         await using var host = await TestHost.CreateAsync(model);
         var run = await host.RunAsync("assistant", "Archive the 'Ghost' item");
