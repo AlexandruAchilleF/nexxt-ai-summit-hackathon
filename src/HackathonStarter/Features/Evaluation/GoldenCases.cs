@@ -52,6 +52,8 @@ public record GoldenCase(
     public IReadOnlyList<string>? ExpectedReportableFor { get; init; }
     /// <summary>Null = no case, so no deadline.</summary>
     public GoldenDeadline? ExpectedDeadline { get; init; }
+    /// <summary>The DL-EXPIRED-* rule of the consequence on expiry (Case.OutcomeRuleId); null when the card names none.</summary>
+    public string? ExpectedOutcomeRuleId { get; init; }
     /// <summary>The client's answer and what is expected after it (workflow cases).</summary>
     public GoldenResponse? Response { get; init; }
 
@@ -495,7 +497,7 @@ public static class GoldenCases
             // (a second tick repeats neither).
             ExpectedDeadline = new("DL-NEW-90", Preexisting: false, NewAccountDueAt, NewAccountRemindAt),
         },
-        new("17a", "Same case after the deadline", "CL-0016", GoldenOwner.R2, Decision.Clarification, ["CRS-IND-ADDR:ES"], [], "DL-EXPIRED-NEW", "Expired: resident in RO and ES")
+        new("17a", "Same case after the deadline", "CL-0016", GoldenOwner.R2, Decision.Clarification, ["CRS-IND-ADDR:ES"], [], "DL-NEW-90", "Expired: resident in RO and ES")
         {
             Layer = GoldenLayer.Workflow,
             Status = GoldenStatus.Validated,
@@ -510,8 +512,9 @@ public static class GoldenCases
             // After expiry (Case.ReportableFor): resident in RO (the initial self-certification) and in ES; RO is not reportable
             // for an RO resident. At the change the engine gives [], as in 16.
             ExpectedReportableFor = ["ES"],
-            // The header names the expiry rule (Case.OutcomeRuleId); the deadline is case 16's.
-            ExpectedDeadline = new("DL-EXPIRED-NEW", Preexisting: false, NewAccountDueAt, NewAccountRemindAt),
+            // The deadline is case 16's; on expiry the case records DL-EXPIRED-NEW.
+            ExpectedDeadline = new("DL-NEW-90", Preexisting: false, NewAccountDueAt, NewAccountRemindAt),
+            ExpectedOutcomeRuleId = "DL-EXPIRED-NEW",
         },
         new("17b", "Move to Spain in March, preexisting account", "CL-0017", GoldenOwner.R2, Decision.Clarification, ["CRS-IND-ADDR:ES"], [], "DL-PRE-YEAR", "Deadline 31 Dec; on expiry resident at least in ES (DL-EXPIRED-PRE)")
         {
@@ -532,6 +535,7 @@ public static class GoldenCases
             // variant A), as case 12. 31.12 at 23:59:59 in Bucharest (Î5, UTC+2).
             ExpectedDeadline = new("DL-PRE-YEAR", Preexisting: true,
                 new DateTime(2026, 12, 31, 21, 59, 59, DateTimeKind.Utc), new DateTime(2026, 12, 26, 21, 59, 59, DateTimeKind.Utc)),
+            ExpectedOutcomeRuleId = "DL-EXPIRED-PRE",
         },
         new("18", "Answer in time: student", "CL-0018", GoldenOwner.R2, Decision.Clarification, ["CRS-IND-ADDR:DE"], [], "DL-NEW-90", "Compliant on re-evaluation, closed with proof; not reportable for DE")
         {

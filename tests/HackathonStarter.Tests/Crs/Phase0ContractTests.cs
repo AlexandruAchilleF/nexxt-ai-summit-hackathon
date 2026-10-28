@@ -480,6 +480,8 @@ public class Phase0ContractTests
             problems.AddRange(c.ExpectedCleared.Where(id => !known.Contains(id)).Select(id => $"case {c.Id}: cleared {id}"));
             if (c.ExpectedDeadlineRule is { } deadline && !known.Contains(deadline))
                 problems.Add($"case {c.Id}: deadline rule {deadline}");
+            if (c.ExpectedOutcomeRuleId is { } outcome && !known.Contains(outcome))
+                problems.Add($"case {c.Id}: outcome rule {outcome}");
         }
         Assert.True(problems.Count == 0, "Golden cases refer to rules missing from RuleCatalog:\n" + string.Join("\n", problems));
     }
