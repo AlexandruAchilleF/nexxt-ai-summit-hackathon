@@ -315,7 +315,7 @@ warnings, testele unitare 1254 din 1254, E2E 30 din 30 (CI-ul de pe `main`).
 | Datele: 50 de clienți sintetici, PDF-urile cazurilor-etalon, cazurile-etalon transcrise, seed-ul | R5 | da (#8, #9, #11, #17, #21, #22, #25, #27, #31, #36, #39) | | |
 | `EvaluationService` (cele trei feluri de cifre) și pagina `/metrics` | R5 | da (#29, #38, #42) | | |
 | Pagina clientului `/clients`, `/clients/{code}` (adrese, conturi, ordine permanente, autocertificări, documente, cazuri) | R5 | da (#45) | | |
-| Paginile CRS: `/dashboard`, `/cases`, `/cases/{code}` (ceasul termenului, cererea, răspunsul, închiderea cu aprobare), `/changes/new`, meniul „Demo” | UI | | #49 (`ui/crs-pages`, cu conflict cu `main`) | |
+| Paginile CRS: `/dashboard`, `/cases`, `/cases/{code}` (ceasul termenului, cererea, răspunsul, închiderea cu aprobare), `/changes/new`, meniul „Demo” | UI | | #49 (`ui/crs-pages`) | |
 | README-ul și pitch-ul la zi cu `main` | R5 | | #46 | |
 | Landing-ul și subsolurile | R5 | da (#24, #32) | | |
 

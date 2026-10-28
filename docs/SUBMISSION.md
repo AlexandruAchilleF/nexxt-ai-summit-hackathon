@@ -11,12 +11,12 @@ Faptele și paginile din ghid: [`RESEARCH-CRS.md`](RESEARCH-CRS.md).
 
 Textul vocii, cuvânt cu cuvânt, cu numărul de cuvinte, ce se vede pe fiecare segment, modul de filmare, sursele cifrelor și
 checklist-ul de filmare: [`PITCH.md`](PITCH.md). E singurul text al vocii; aici rămân doar timpii și sfaturile. Timpii
-de mai jos sunt cei din `PITCH.md` §1, calculați pe cuvintele rostite (377, cu cifrele citite în litere, ≈ 2:54).
+de mai jos sunt cei din `PITCH.md` §1, calculați pe cuvintele rostite (371, cu cifrele citite în litere, ≈ 2:51).
 
 | Timp | Parte | Segmentele din `PITCH.md` | Ce se vede |
 | --- | --- | --- | --- |
 | 0:00–0:32 | **Problema** | S1 | Titlul, apoi `/dashboard`: termenele care expiră |
-| 0:32–1:24 | **Maria, cap-coadă** | S2–S4 | `/changes/new` → `/cases/{code}`: Maria Popescu (`CL-0001`) se mută la München → caz deschis, termen de 90 de zile → dovadă cu citat verificat, salariul german ca semnal, fără alertă → cererea aprobată de operator → data simulată +85 de zile: memento și escaladare → autocertificare nouă, format valid → caz închis cu dovada confirmării |
+| 0:32–1:24 | **Maria, cap-coadă** | S2–S4 | `/changes/new` → `/cases/{code}`, rulările agentului pe `/runs/{id}` (pornite prin API): Maria Popescu (`CL-0001`) se mută la München → caz deschis, termen de 90 de zile → dovadă cu citat verificat, salariul german ca semnal, fără alertă → cererea aprobată de operator → data simulată +85 de zile: memento și escaladare → autocertificare nouă, format valid → caz închis cu dovada confirmării |
 | 1:24–1:58 | **Capcane și scut** | S5–S6 | `/changes/new`: Andrei Pop (`CL-0013`), Radu Ionescu (`CL-0005`, cazul 5a lângă 5c), Ioana Mureșan (`CL-0015`); `/clients/CL-0010`: Victor Neagu, textul alb ascuns oprit de scut |
 | 1:58–2:20 | **Arhitectura** | S7 | `/architecture`, apoi `/audit` cu „Falsifică” („Tamper”) |
 | 2:20–2:46 | **Testabil** | S8 | `/metrics`: cazurile-etalon, așteptat vs. obținut |
