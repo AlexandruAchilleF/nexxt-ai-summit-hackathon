@@ -45,7 +45,9 @@ public static partial class Lang
     }
 
     // Keys with {0}… and enough fixed text to be told apart, the most specific first.
-    private static readonly Lazy<List<(Regex Pattern, int Slots, string Ro)>> Patterns = new(() =>
+    private static readonly Lazy<List<(Regex Pattern, int Slots, string Ro)>> Patterns = new(BuildPatterns);
+
+    private static List<(Regex Pattern, int Slots, string Ro)> BuildPatterns() =>
         [.. RoText
             .Where(e => e.Key.Contains("{0}") && !e.Key.Contains("{{") && Regex.Replace(e.Key, @"\{\d+\}", "").Trim().Length >= 12)
             .OrderByDescending(e => Regex.Replace(e.Key, @"\{\d+\}", "").Length)
@@ -56,7 +58,7 @@ public static partial class Lang
                     seen.Add(m.Groups[1].Value) ? $"(?<p{m.Groups[1].Value}>.+?)" : $@"\k<p{m.Groups[1].Value}>");
                 return (new Regex($"^{regex}$", RegexOptions.Singleline),
                     seen.Select(int.Parse).Max() + 1, e.Value);
-            })]);
+            })];
 
     /// <summary>Content written in both languages (SiteConfig copy, longer texts).</summary>
     public static TValue Pick<TValue>(TValue ro, TValue en) => IsEn ? en : ro;
