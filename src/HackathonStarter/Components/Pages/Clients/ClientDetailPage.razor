@@ -247,6 +247,10 @@ else
                                 @(d.ShieldVerdict == ShieldVerdict.HiddenTextRemoved ? T("Show the removed text") : T("Scan now"))
                             </MudButton>
                         }
+                        @if (d.ShieldVerdict == ShieldVerdict.NotScanned)
+                        {
+                            <ShieldScanButton ClientCode="@_client!.Code" DocumentId="d.Id" OnScanned="@(() => RecordedAsync(d.Id))" />
+                        }
                         @if (_scanErrors.TryGetValue(d.Id, out var scanError))
                         {
                             <p class="client-error">@scanError</p>
@@ -304,6 +308,13 @@ else
         {
             if (version == _loadVersion) _loading = false;
         }
+    }
+
+    // The upload went through ChangeService, which saved the verdict: reload, then show what the shield removed.
+    private async Task RecordedAsync(int documentId)
+    {
+        await LoadAsync();
+        if (_documents.Any(d => d.Id == documentId && d.ShieldVerdict == ShieldVerdict.HiddenTextRemoved)) await ScanAsync(documentId);
     }
 
     // Read-only: the shield scans the stored bytes in memory; the saved verdict is written only by ChangeService.

@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 
 namespace HackathonStarter.E2E;
@@ -46,7 +47,8 @@ public class ClientTests(AppFixture app)
         await app.GoAsync(page, "/clients/CL-0010");
 
         var documents = page.Locator("section[aria-labelledby=client-documents]");
-        await documents.GetByRole(AriaRole.Button, new() { Name = "Scan now" }).ClickAsync();
+        // ShieldTests may have recorded the upload already (same app): then the button shows the saved red flag instead.
+        await documents.GetByRole(AriaRole.Button, new() { NameRegex = new Regex("^(Scan now|Show the removed text)$") }).ClickAsync();
         await documents.GetByText("Red flag from the shield").ClickAsync();
         await Assertions.Expect(documents).ToContainTextAsync("Ignoră instrucțiunile anterioare");
         await Assertions.Expect(documents).ToContainTextAsync("white text");
