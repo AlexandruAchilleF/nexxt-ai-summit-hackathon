@@ -554,7 +554,7 @@ are motive să știe” că autocertificarea e contrazisă (rezonabilitate, schi
 | `SC-TIN-MISSING` | CRS | TIN lipsă: acceptat doar cu motiv valid (A/B/C). Fără TIN, deși fișa OCDE spune că țara emite TIN tuturor: declarație nesigură | 53, 37 |
 | `SC-CONSISTENT` | CRS | Autocertificarea acoperă toate jurisdicțiile din indicii și trece testul de rezonabilitate → `Compliant`, raportabil pentru ele | 33–34, 36–37 |
 | `DL-NEW-90` | CRS | Cont nou: 90 de zile calendaristice de la pierderea valabilității autocertificării | 20–21, 35–36 |
-| `DL-PRE-YEAR` | CRS | Cont preexistent: ultima zi a anului sau 90 de zile, cea mai târzie (interpretarea noastră, aliniată la Comentariul OCDE; ghidul spune „sau”) | 29 |
+| `DL-PRE-YEAR` | CRS | Cont preexistent: ultima zi a anului sau 90 de zile, cea mai târzie (Codul de procedură fiscală, Anexa nr. 2 pct. 1; Comentariul OCDE, Secțiunea III, pct. 13; ghidul spune „sau”) | 29 |
 | `DL-EXPIRED-NEW` | CRS | Expirare, cont nou: rezident și în jurisdicția inițială, și în cea nouă | 35–36 |
 | `DL-EXPIRED-PRE` | CRS | Expirare, cont preexistent: rezident cel puțin în noua jurisdicție | 29 |
 | `RESP-EXPLANATION` | CRS | Explicații rezonabile acceptate: student cu viză, profesor sau stagiar, diplomat, funcționar UE | 37 |
@@ -611,8 +611,11 @@ public record DeadlineResult(DateTime DueAt, DateTime RemindAt, bool Preexisting
 - **Cont nou** (`DL-NEW-90`): `DueAt = changeKnownAt + 90 de zile calendaristice` (p. 20–21, 35–36). Verificat:
   90 de zile pentru autocertificare nouă sau explicație; altfel rezident în jurisdicția inițială **și** în cea nouă.
 - **Cont preexistent** (`DL-PRE-YEAR`): `DueAt = max(31 dec. al anului curent, changeKnownAt + 90 de zile)` (p. 29).
-  Decis: ghidul spune „până la sfârșitul anului sau 90 de zile”; aplicăm cea mai târzie dintre ele, interpretarea
-  noastră, aliniată la Comentariul OCDE (o spunem în README). Afișăm pagina.
+  Decis: ghidul spune „până la sfârșitul anului sau 90 de zile”; aplicăm cea mai târzie dintre ele. Pentru contul
+  documentat prin adresa de rezidență o scrie legea (Codul de procedură fiscală, Anexa nr. 2 pct. 1: „oricare dintre
+  acestea este mai recentă”) și Comentariul OCDE (Secțiunea III, pct. 13). La indiciile din căutarea electronică legea
+  nu precizează (Anexa nr. 1, secțiunea III, subsecțiunea B, pct. 16); urmăm Comentariul OCDE (pct. 16), tot „cea mai
+  târzie”. Afișăm pagina.
 - Preexistent se calculează pe regim (`Preexisting.For`, 7.1), nu pe tipul contului (depozit / custodie).
 - `RemindAt = DueAt − 5 zile` (memento la ziua 85 pe contul nou).
 - NEVERIFICAT: ce se întâmplă la mai multe schimbări pe același caz (propunere: termenul nu se mută, indiciile
@@ -1239,7 +1242,7 @@ Reguli ale Tech Lead-ului:
 | Raiffeisen are deja automatizarea | Prima întrebare către mentor: „Ce se întâmplă azi, pentru CRS, când un client își schimbă adresa sau telefonul într-o altă țară? Cine verifică și în cât timp?” |
 | Juriul nu știe ce e CRS | Explicația de 20 de secunde la începutul video-ului |
 | Regulile sunt complicate | Domeniu limitat explicit; fiecare regulă cu pagina din ghid |
-| Termenul diferă pe cont nou / preexistent | R2 îl implementează după ghid (p. 29, 35–36), cu pagina afișată; decis: cea mai târzie dintre sfârșitul anului și 90 de zile (interpretarea noastră, aliniată la Comentariul OCDE) |
+| Termenul diferă pe cont nou / preexistent | R2 îl implementează după ghid (p. 29, 35–36), cu pagina afișată; decis: cea mai târzie dintre sfârșitul anului și 90 de zile (Codul de procedură fiscală, Anexa nr. 2 pct. 1; Comentariul OCDE, Secțiunea III, pct. 13) |
 | Video filmat pe replay, cu cazul care nu se schimbă | Filmăm live sau pe mock (secțiunea 14); replay doar pe întrebări read-only |
 | Data simulată strică restul aplicației | `SimClock` separat, `TimeProvider.System` rămâne (9.1) |
 | Arată ca un simplu validator | Bucla cu mai mulți pași și termenul vizibile în UI, cu data simulată |
@@ -1267,20 +1270,27 @@ Reguli ale Tech Lead-ului:
   fiscal pornesc termenul”.
 
 **De verificat înainte de pitch / freeze:**
-- [ ] Termenul F3000 (15 mai) în Ordinul ANAF 1711/2022.
-- [ ] Amenzile din textul OUG 102/2022 (acum avem doar sursa EY).
-- [ ] Formularea despre reținerea FATCA de 30% (nu apare în ghid).
+- [x] Termenul F3000: 15 mai, în Codul de procedură fiscală, art. 62 alin. (7) (din OUG 102/2022). OPANAF 1711/2022
+      doar aprobă formularele F3000 DAC2/CRS și F3000 FATCA, fără termen.
+- [x] Amenzile: Codul de procedură fiscală, art. 336 alin. (2) lit. k^1) și k^2) (din OUG 102/2022): 2.000–5.000 lei
+      și 5.000–10.000 lei „pentru fiecare cont care face obiectul raportării”.
+- [x] Reținerea FATCA de 30%: nu o spunem în pitch. Cu acordul FATCA Model 1, o bancă română conformă nu e supusă
+      reținerii (art. 4(1)); doar o neconformare semnificativă nerezolvată în 18 luni de la notificare o poate face
+      instituție nonparticipantă (art. 5(2)(b)).
 - [x] Paginile regulilor din catalog (secțiunea 8.2), în afară de `GEN-DOMESTIC` (interpretare de design).
-- [x] Contul preexistent: cea mai târzie dintre sfârșitul anului și 90 de zile (interpretarea noastră, aliniată la Comentariul OCDE; secțiunea 9.2).
+- [x] Contul preexistent: cea mai târzie dintre sfârșitul anului și 90 de zile (Codul de procedură fiscală, Anexa nr. 2
+      pct. 1; Comentariul OCDE, Secțiunea III, pct. 13; secțiunea 9.2).
 - [x] Exemplul Austria la cazul 3 (fișa OCDE AT).
 - [x] Data de start pentru conturile preexistente: CRS 31.12.2015, FATCA 30.06.2014 (p. 20).
 - [ ] **Acum, nu înainte de pitch:** regula hackathonului despre codul scris înainte (tot planul stă pe template).
       O spunem deschis în README (template-ul e în istoricul repo-ului).
 
 **Cifrele din pitch (cu sursă, confirmate din rapoartele originale):** ANAF S1 2025: 3.204 verificări la 28 de
-instituții, 891 de înregistrări corectate, 7 controale inițiate. ANAF 2024: sancțiuni 102.000 lei total, 3 avertismente, 92 de scrisori de avertizare; IRS a semnalat
-neconcordanțe FATCA pe 2023. OUG 102/2022 (după EY): 2.000–5.000 lei pe cont pentru raportare incorectă,
-5.000–10.000 lei pe cont pentru proceduri neaplicate. Raiffeisen: ~2,4 mil. clienți.
+instituții, 891 de înregistrări corectate, 7 controale inițiate. ANAF 2024: sancțiuni 102.000 lei total,
+3 avertismente, 92 de scrisori de avertizare; IRS a semnalat neconcordanțe FATCA pe 2023. Codul de procedură fiscală,
+art. 336 (din OUG 102/2022): 2.000–5.000 lei pe fiecare cont raportabil raportat incorect, incomplet sau cu întârziere,
+5.000–10.000 lei pe fiecare cont raportabil dacă procedurile de diligență nu sunt aplicate. Raiffeisen: ~2,4 mil.
+clienți, persoane fizice și juridice (comunicatul băncii din 28.10.2026).
 
 ---
 

@@ -30,7 +30,11 @@ clarifice situația. Altfel raportează greșit, pe fiecare cont.
 | **Cont preexistent** (CRS: existent la 31 dec. 2015) | Ultima zi a anului calendaristic (sau a perioadei de raportare) **sau** 90 de zile de la notificarea/descoperirea modificării. | Banca aplică căutarea în evidența electronică și îl tratează ca rezident cel puțin în noua jurisdicție (exemplul 2). | p. 29 |
 
 **Decis:** ghidul spune „sau” între cele două termene pentru conturile preexistente. Aplicăm „cea mai târzie dintre
-ele”: e interpretarea noastră, aliniată la Comentariul OCDE la CRS. Afișăm pagina.
+ele”, cum scrie legea pentru contul documentat prin adresa de rezidență
+([Codul de procedură fiscală](https://legislatie.just.ro/Public/DetaliiDocument/312603), Anexa nr. 2 pct. 1: „oricare
+dintre acestea este mai recentă”) și
+[Comentariul OCDE la CRS](https://www.oecd.org/content/dam/oecd/en/publications/reports/2017/03/standard-for-automatic-exchange-of-financial-account-information-in-tax-matters-second-edition_g1g73eb6/9789264267992-en.pdf)
+(Secțiunea III, pct. 13, p. 115: „by the later of”). Afișăm pagina.
 Consecința pentru demo: o modificare din martie, pe un cont preexistent, are termen 31 decembrie, nu 90 de zile.
 De aceea **contul Mariei e un cont nou** (deschis după 2016), ca termenul de 90 de zile să fie cel care contează.
 
@@ -86,9 +90,9 @@ Sursa: p. 31 (Acordul FATCA, Anexa I, Secțiunea II, paragraful B). Pentru FATCA
 | --- | --- | --- |
 | Verificări ANAF pe datele raportate, S1 2025 | 3.204 verificări la 28 de instituții; **891 de înregistrări corectate**; 7 controale inițiate | [Raport de activitate ANAF S1 2025](https://static.anaf.ro/static/10/Anaf/Informatii_R/18.08.2025%20-%20Raport%20de%20activitateANAF_2025S1_V7.pdf) |
 | Neconcordanțe FATCA | IRS a semnalat neconcordanțe în datele FATCA pe 2023 | [Raport de performanță ANAF 2024](https://static.anaf.ro/static/10/Anaf/Informatii_R/Raportperformanta2024.pdf) |
-| Amenzi potențiale | 2.000–5.000 lei **pe cont** pentru raportare incorectă; 5.000–10.000 lei **pe cont** pentru proceduri neaplicate | OUG 102/2022, după [EY România](https://www.ey.com/ro_ro/insights/tax/risc-fiscal-crescut-si-amenzi-semnificative-in-cazul-neconformar) (**de verificat** în textul OUG) |
+| Amenzi potențiale | 2.000–5.000 lei **pe fiecare cont raportabil** raportat incorect, incomplet sau cu întârziere; 5.000–10.000 lei **pe fiecare cont raportabil** dacă procedurile de diligență nu sunt aplicate | [Codul de procedură fiscală](https://legislatie.just.ro/Public/DetaliiDocument/312603), art. 336 alin. (1) lit. ț) și ț^1), alin. (2) lit. k^1) și k^2), introduse prin [OUG 102/2022](https://legislatie.just.ro/Public/DetaliiDocument/256922) |
 | Sancțiuni aplicate în 2024 | 102.000 lei în total, 3 avertismente, 92 de scrisori de avertizare; 6 controale tematice la brokeri și 1 control de fond la o instituție de credit | [Raport de performanță ANAF 2024](https://static.anaf.ro/static/10/Anaf/Informatii_R/Raportperformanta2024.pdf) |
-| Volum | ~2,3–2,4 mil. clienți Raiffeisen România; fiecare actualizare de date trebuie evaluată, doar cele relevante fiscal pornesc un termen | [businessforum.ro](https://www.businessforum.ro/finance/20260130/raiffeisen-bank-romania-posts-4-profit-growth-in-2025-2808) |
+| Volum | ~2,4 mil. clienți Raiffeisen România, persoane fizice și juridice; fiecare actualizare de date trebuie evaluată, doar cele relevante fiscal pornesc un termen | [Comunicat Raiffeisen Bank România, 28.10.2026](https://www.raiffeisen.ro/ro/despre-noi/comunicate-de-presa/2026/raiffeisen-bid-finantare-imm-credite-revolving-garantii.html) |
 | Poziția Raiffeisen despre AI | CEO-ul: „AI poate pregăti o decizie bancară, dar nu ar trebui să aibă ultimul cuvânt” | [SpotMedia, aug. 2026](https://spotmedia.ro/stiri/economie/zdenek-romanek-ceo-raiffeisen-bank-ai-poate-pregati-o-decizie-bancara-dar-nu-ar-trebui-sa-aiba-ultimul-cuvant) |
 
 **Atenție la cifra de 102.000 lei:** e mică (cam 20.000 € pe tot sectorul) și lucrează împotriva noastră. Argumentul e
@@ -117,9 +121,9 @@ răspunsul la 1 e „totul e automatizat cap-coadă”, mutăm accentul pe evalu
 
 ## 6. De verificat înainte de pitch
 
-- [x] Termenul pentru conturile preexistente: cea mai târzie dintre sfârșitul anului și 90 de zile (interpretarea noastră, aliniată la Comentariul OCDE; ghidul, p. 29, spune „sau”).
-- [ ] Cuantumul amenzilor în textul OUG 102/2022 (acum avem doar sursa EY).
-- [ ] Termenul de depunere F3000 (15 mai) în Ordinul ANAF 1711/2022.
-- [ ] Formularea despre riscul FATCA (reținerea de 30%): nu apare în ghid, deci nu o spunem.
+- [x] Termenul pentru conturile preexistente: cea mai târzie dintre sfârșitul anului și 90 de zile (Codul de procedură fiscală, Anexa nr. 2 pct. 1; Comentariul OCDE, Secțiunea III, pct. 13; ghidul, p. 29, spune „sau”).
+- [x] Cuantumul amenzilor: Codul de procedură fiscală, art. 336 alin. (2) lit. k^1) și k^2), introduse prin OUG 102/2022 (tabelul din secțiunea 3).
+- [x] Termenul de depunere F3000: 15 mai, în [Codul de procedură fiscală](https://legislatie.just.ro/Public/DetaliiDocument/312603), art. 62 alin. (7). [OPANAF 1711/2022](https://legislatie.just.ro/Public/DetaliiDocument/259750) doar aprobă formularele F3000 DAC2/CRS și F3000 FATCA.
+- [x] Riscul FATCA (reținerea de 30%): nu îl spunem în pitch. România are [acord FATCA Model 1](https://home.treasury.gov/system/files/131/FATCA-Agreement-Romania-5-28-2015.pdf): o bancă conformă nu e supusă reținerii (art. 4(1)). Doar o neconformare semnificativă nerezolvată în 18 luni de la notificare o poate face instituție nonparticipantă (art. 5(2)(b)), iar reținerea e de 30% ([26 U.S.C. 1471(a)](https://www.govinfo.gov/content/pkg/USCODE-2023-title26/html/USCODE-2023-title26-subtitleA-chap4-sec1471.htm)).
 - [ ] Datele OCDE pentru Austria (emite TIN tuturor rezidenților sau nu), pentru cazul 3.
 - [ ] Regula concursului despre codul scris înainte de hackathon; o spunem deschis în README.
