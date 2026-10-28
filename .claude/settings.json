@@ -15,15 +15,28 @@
       "Bash(git diff*)",
       "Bash(git log*)",
       "Bash(git show*)",
-      "Bash(git branch*)",
-      "Bash(git fetch*)",
       "Bash(python3 tools/agents/sync.py)",
-      "Bash(tools/setup-dev.sh)"
+      "Bash(tools/setup-dev.sh)",
+      "Bash(git fetch)",
+      "Bash(git fetch origin)",
+      "Bash(git branch)",
+      "Bash(git branch -a)",
+      "Bash(git branch --list*)"
     ],
     "deny": [
       "Bash(git push --force*)",
       "Bash(git push -f*)",
-      "Bash(git push origin main*)"
+      "Bash(git push origin main*)",
+      "Bash(git *--output*)",
+      "Bash(git *--ext-diff*)",
+      "Bash(git -c *)",
+      "Bash(git *--upload-pack*)",
+      "Bash(git *--exec*)",
+      "Bash(git branch -D*)",
+      "Bash(git branch -d*)",
+      "Bash(git branch -f*)",
+      "Bash(git branch -m*)",
+      "Bash(git branch -M*)"
     ]
   },
   "env": {

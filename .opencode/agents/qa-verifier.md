@@ -8,7 +8,7 @@ permission:
     "dotnet build*": allow
     "dotnet test*": allow
     "dotnet run*": allow
-    "curl -s http://localhost*": allow
+    "curl -s http://localhost:5000/*": allow
     "git commit*": deny
     "git push*": deny
     "gh *": deny

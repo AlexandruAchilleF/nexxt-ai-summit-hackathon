@@ -14,6 +14,9 @@ permission:
     "git diff*": allow
     "git status*": allow
     "git log*": allow
+    "git *--output*": deny
+    "git *--ext-diff*": deny
+    "git -c *": deny
     "git commit*": deny
     "git push*": deny
     "gh *": deny
