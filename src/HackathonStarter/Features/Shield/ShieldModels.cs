@@ -4,6 +4,10 @@ namespace HackathonStarter.Features.Shield;
 
 public enum ShieldVerdict { NotScanned, Clean, HiddenTextRemoved }
 
+/// <summary>Why a letter was kept away from the model; <see cref="HiddenFragment.Reason"/> holds it as text ("WhiteText, TinyFont").</summary>
+[Flags]
+public enum HiddenReason { None = 0, WhiteText = 1, TinyFont = 2, OffPage = 4, Invisible = 8 }
+
 /// <summary>The text a person sees on one page. Only this ever reaches a model.</summary>
 public record ShieldedPage(int Number, string VisibleText);
 
@@ -12,7 +16,12 @@ public record HiddenFragment(int Page, string Text, string Reason);
 
 /// <param name="Pages">Visible text only: the only part a model may receive.</param>
 /// <param name="Hidden">Never sent to a model (readDocument returns <see cref="Pages"/> only).</param>
-public record ShieldResult(ShieldVerdict Verdict, IReadOnlyList<ShieldedPage> Pages, IReadOnlyList<HiddenFragment> Hidden);
+public record ShieldResult(ShieldVerdict Verdict, IReadOnlyList<ShieldedPage> Pages, IReadOnlyList<HiddenFragment> Hidden)
+{
+    /// <summary>The only document text that reaches the model: visible text, numbered by page.</summary>
+    public string ModelText(int? page = null) => string.Join("\n\n",
+        Pages.Where(p => page is null || p.Number == page).Select(p => $"[Page {p.Number}]\n{p.VisibleText}"));
+}
 
 /// <summary>Runs on every PDF before any model reads it (docs/PLAN.md 10.1). Pure code over PdfPig letters. Owner: R3.</summary>
 public interface IHiddenTextShield
