@@ -354,6 +354,24 @@ public class AgentRunnerTests
     }
 
     [Fact]
+    public async Task Approving_twice_at_once_runs_the_action_once()
+    {
+        var agent = new NotesAgent();
+        var model = new FakeChatClient().CallTool("publish", new { }).Reply("proposed");
+        await using var host = await TestHost.CreateAsync(model, extraAgents: agent);
+        var run = await host.RunAsync("notes-agent", "Publish the notes");
+        var approval = run.Steps.Single(s => s.Kind == StepKind.Approval);
+        var runner = host.Get<AgentRunner>();
+
+        // A double click (or a second tab): the second decision arrives while the first still runs the action.
+        var decisions = Enumerable.Range(0, 2).Select(_ => Task.Run(() => runner.DecideAsync(agent, run.Id, approval.Id, approved: true))).ToList();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => Task.WhenAll(decisions));
+
+        Assert.Equal(1, agent.Published);
+        Assert.Equal(1, decisions.Count(d => d.IsCompletedSuccessfully));
+    }
+
+    [Fact]
     public async Task Cancelling_marks_the_run_cancelled()
     {
         var model = new FakeChatClient { Delay = TimeSpan.FromSeconds(10) }.Reply("too late");
@@ -538,6 +556,7 @@ public class AgentRunnerTests
     private sealed class NotesAgent : ToolAgent
     {
         public int Notes;
+        public int Published;
         public override string Name => "notes-agent";
         public override string Label => "Notes";
         public override string Description => "Adds a note, then proposes to publish it.";
@@ -545,7 +564,12 @@ public class AgentRunnerTests
         public override IEnumerable<AgentTool> Tools(ToolContext ctx) =>
         [
             AgentTool.Create("addNote", "Adds a note.", () => ++Notes),
-            AgentTool.Create("publish", "Publishes the notes.", () => "published", needsApproval: true),
+            AgentTool.Create("publish", "Publishes the notes.", async () =>
+            {
+                Interlocked.Increment(ref Published);
+                await Task.Delay(100);
+                return "published";
+            }, needsApproval: true),
         ];
         public override async Task MockAsync(MockContext mock)
         {

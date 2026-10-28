@@ -200,6 +200,7 @@
 
     private async Task Decide(AgentStep step, bool approved)
     {
+        if (_deciding) return; // a second click that arrived before the buttons were disabled
         _deciding = true;
         try { await OnDecide.InvokeAsync((step, approved)); }
         finally { _deciding = false; }

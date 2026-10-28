@@ -347,10 +347,20 @@ public class AgentRunner(
     /// <summary>Why <see cref="DecideAsync"/> refuses a run that is still executing (shown translated).</summary>
     public const string StillRunning = "The agent is still running: approve or reject once it has finished.";
 
+    /// <summary>One decision at a time: a double click or a second tab must not run an approved action twice.</summary>
+    private static readonly SemaphoreSlim Deciding = new(1, 1);
+
     /// <summary>Human-in-the-loop decision. On approval the tool runs now (no model call) and the run is updated.</summary>
     public async Task<AgentRun> DecideAsync(AgentDefinition agent, string runId, string approvalId, bool approved)
     {
         var user = await currentUser.Require(Roles.Admin, Roles.Member);
+        await Deciding.WaitAsync();
+        try { return await DecideOnceAsync(agent, runId, approvalId, approved, user); }
+        finally { Deciding.Release(); }
+    }
+
+    private async Task<AgentRun> DecideOnceAsync(AgentDefinition agent, string runId, string approvalId, bool approved, DemoUser user)
+    {
         var run = await store.GetAsync(runId) ?? throw new KeyNotFoundException("Run not found");
         // The run saves itself once more when it finishes, which would undo a decision taken now.
         if (run.Status == RunStatus.Running) throw new InvalidOperationException(StillRunning);
