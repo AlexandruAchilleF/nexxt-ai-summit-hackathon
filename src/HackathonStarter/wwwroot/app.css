@@ -567,7 +567,7 @@ a.app-list-row:active, .dense-row:active { background: var(--app-fill-strong); }
 
 /* The case queue (Pages/Cases/CasesPage.razor): one row per case, the deadline column carries the urgency. */
 .crs-queue-row { display: grid; grid-template-columns: minmax(170px, 1fr) minmax(0, 1.3fr) 150px 150px 20px; gap: 12px; min-height: 64px; }
-.crs-queue-head { min-height: 38px; font-size: 12px; font-weight: 600; color: var(--mud-palette-text-secondary); }
+.crs-queue-head { min-height: 38px; padding: 0 16px; align-items: center; font-size: 12px; font-weight: 600; color: var(--mud-palette-text-secondary); }
 @media (max-width: 959.98px) { .crs-queue-head { display: none; } }
 .crs-queue-row + .crs-queue-row::before { left: 16px; }
 .crs-queue-main, .crs-queue-rules { min-width: 0; }

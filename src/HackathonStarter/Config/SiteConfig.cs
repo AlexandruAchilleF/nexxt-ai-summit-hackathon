@@ -162,8 +162,8 @@ public static class SiteConfig
         new("Metrics", "/metrics", Icons.Material.Rounded.Insights, "CRS"),
         // Assistant, Arena, Scenarios, Items and Calculators stay reachable by URL (E2E tests and the Docker CI check use them).
         // @gen:nav (the feature generator inserts new pages above this line)
-        new("Agent runs", "/runs", Icons.Material.Rounded.History, "Agents"),
-        new("Architecture", "/architecture", Icons.Material.Rounded.AccountTree, "Agents"),
+        new("Agent runs", "/runs", Icons.Material.Rounded.History, "How it works"),
+        new("Architecture", "/architecture", Icons.Material.Rounded.AccountTree, "How it works"),
         new("Settings", "/settings", Icons.Material.Rounded.Settings, "Account"),
     ];
 
