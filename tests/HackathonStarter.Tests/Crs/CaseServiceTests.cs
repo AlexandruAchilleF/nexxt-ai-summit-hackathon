@@ -156,6 +156,89 @@ public class CaseServiceTests
     }
 
     [Fact]
+    public async Task A_case_on_a_self_certification_check_has_no_deadline_until_a_crs_indicium_joins_it()
+    {
+        // Golden case 2, decided like FATCA (GOLDEN-CASES I1): the 90 days follow a change of circumstances with indicia
+        // (p. 29, 35-36), not a check of the declaration. A TIN in the wrong format for IT (SC-TIN-FORMAT, p. 36-37).
+        await using var host = await CreateAsync();
+        await host.SeedClientAsync("CL-0002", new DateOnly(2026, 10, 27));
+        host.Engine.OnEvaluateSelfCertification = (_, _) => Outcome([Hit("SC-TIN-FORMAT", "IT")]);
+        var cases = host.As(Viewer).Cases;
+
+        var declared = await host.As(Member).Changes.RecordAsync(new ChangeRequest("CL-0002", ChangeKind.SelfCertSubmitted, "online",
+            SelfCertification: new SelfCertificationSnapshot(Base.AddDays(-1), [new("IT", "DBRCST90A41Z129")], DeclaresUsPerson: false)));
+
+        Assert.Equal(Decision.Clarification, declared.Outcome.Decision);
+        var item = (await cases.GetAsync(declared.CaseCode!))!;
+        Assert.Equal((Regime.Crs, CaseStatus.Open, false), (item.Regime, item.Status, item.IsPreexisting));
+        Assert.Equal(["SC-TIN-FORMAT:IT"], item.Indicia.Select(i => $"{i.RuleId}:{i.Jurisdiction}"));
+        Assert.Null(item.DueAt);
+        Assert.Null(item.RemindAt);
+        Assert.Equal(("SC-TIN-FORMAT", "36-37"), (item.DeadlineRuleId, item.DeadlineGuidePage));
+        Assert.Contains("\"dueAt\":null", Assert.Single(host.Audit.OfKind(AuditKinds.CaseOpened)).PayloadJson);
+        Assert.Equal(("No deadline in the guide for a self-certification check (NEVERIFICAT).",
+                      "Fără termen legal în ghid pentru verificarea autocertificării (NEVERIFICAT)."), CaseTexts.NoDeadlineForSelfCertificationCheck);
+
+        var draft = await host.As(Member).Cases.DraftRequestAsync(item.Code, "ro", "Buna ziua");
+        await host.As(Admin).Cases.ApproveRequestAsync(item.Code, draft.Id, "email");
+        Assert.Equal(new DeadlineTick(0, 0, 0), await cases.TickAsync(Base.AddDays(85))); // the reminder day and expiry of 90 days
+        Assert.Equal(new DeadlineTick(0, 0, 0), await cases.TickAsync(Base.AddDays(91)));
+        host.AdvanceDays(100);
+        Assert.Equal(new DeadlineTick(0, 0, 0), await cases.TickAsync(host.Clock.UtcNow));
+        Assert.Equal(CaseStatus.AwaitingClient, (await cases.GetAsync(item.Code))!.Status);
+
+        // A change of circumstances on the same client: its CRS indicium starts the CRS deadline, from that change.
+        var move = await host.MoveAsync("CL-0002", "ES");
+
+        Assert.Equal(item.Code, move.CaseCode);
+        item = (await cases.GetAsync(item.Code))!;
+        Assert.Equal(["SC-TIN-FORMAT:IT", "CRS-IND-ADDR:ES"], item.Indicia.Select(i => $"{i.RuleId}:{i.Jurisdiction}"));
+        Assert.Equal(move.Change.ReceivedAt.AddDays(90), item.DueAt);
+        Assert.Equal((Base.AddDays(190), Base.AddDays(185)), (item.DueAt, item.RemindAt));
+        Assert.Equal(("DL-NEW-90", "20-21, 35-36", false), (item.DeadlineRuleId, item.DeadlineGuidePage, item.IsPreexisting));
+        Assert.Contains("\"deadlineStarted\":true", Assert.Single(host.Audit.OfKind(AuditKinds.CaseIndiciumAdded)).PayloadJson);
+        Assert.Equal(new DeadlineTick(0, 0, 0), await cases.TickAsync(Base.AddDays(185).AddSeconds(-1)));
+        Assert.Equal(new DeadlineTick(1, 1, 0), await cases.TickAsync(Base.AddDays(185)));
+    }
+
+    [Fact]
+    public async Task A_self_certification_check_never_gives_a_deadline_and_preexisting_stays_on_the_crs_cutoff()
+    {
+        // Opened in 2015: preexisting for CRS (up to 31.12.2015), new for FATCA (up to 30.06.2014), p. 20.
+        await using var host = await CreateAsync();
+        foreach (var code in new[] { "CL-0007", "CL-0008", "CL-0009" }) await host.SeedClientAsync(code, new DateOnly(2015, 3, 2));
+        host.Engine.OnEvaluateSelfCertification = (client, _) => client.Code switch
+        {
+            "CL-0007" => Outcome([Hit("FATCA-IND-CIT", "US", Coverage.SelfCertification), Hit("SC-TIN-FORMAT", "IT")]),
+            "CL-0008" => Outcome([Hit("FATCA-IND-CIT", "US"), Hit("SC-TIN-FORMAT", "IT")]),
+            _ => Outcome([Hit("SC-TIN-FORMAT", "IT")]),
+        };
+        var changes = host.As(Member).Changes;
+        Task<ChangeResult> Declare(string clientCode, string? caseCode = null) => changes.RecordAsync(new ChangeRequest(clientCode,
+            ChangeKind.SelfCertSubmitted, "online", CaseCode: caseCode,
+            SelfCertification: new SelfCertificationSnapshot(Base, [new("IT", "BADFORMAT")], DeclaresUsPerson: false)));
+
+        // A FATCA case (no deadline, p. 38; preexisting on the FATCA cutoff) gains a check; a FATCA indicium with a check; a check alone.
+        var fatca = (await changes.RecordAsync(new ChangeRequest("CL-0007", ChangeKind.PersonalDataChanged, "branch", Citizenships: ["RO", "US"]))).CaseCode!;
+        Assert.False((await host.As(Viewer).Cases.GetAsync(fatca))!.IsPreexisting);
+        Assert.Equal(fatca, (await Declare("CL-0007", fatca)).CaseCode);
+        var both = (await Declare("CL-0008")).CaseCode!;
+        var check = (await Declare("CL-0009")).CaseCode!;
+
+        var cases = host.As(Viewer).Cases;
+        foreach (var (code, regime, rule, page) in new[] { (fatca, Regime.Both, "FATCA-SC", "38"), (both, Regime.Both, "FATCA-SC", "38"), (check, Regime.Crs, "SC-TIN-FORMAT", "36-37") })
+        {
+            var item = (await cases.GetAsync(code))!;
+            Assert.Equal((code, regime, rule, page, true), (item.Code, item.Regime, item.DeadlineRuleId, item.DeadlineGuidePage, item.IsPreexisting));
+            Assert.Null(item.DueAt);
+            Assert.Null(item.RemindAt);
+        }
+        Assert.Contains("\"deadlineStarted\":false", Assert.Single(host.Audit.OfKind(AuditKinds.CaseIndiciumAdded)).PayloadJson);
+        Assert.Equal(new DeadlineTick(0, 0, 0), await cases.TickAsync(Base.AddDays(400)));
+        Assert.Equal(3, (await cases.QueueAsync()).Count);
+    }
+
+    [Fact]
     public async Task Several_accounts_give_the_earliest_deadline()
     {
         await using var host = await CreateAsync();
@@ -397,9 +480,9 @@ public class CaseServiceTests
         Assert.Equal(CaseStatus.Closed, closed.Status);
         Assert.Equal(now.AddDays(1), closed.ClosedAt);
         Assert.Equal(["DE"], closed.ReportableFor);
-        Assert.Equal("SC-CONSISTENT", closed.OutcomeRuleId);
-        Assert.Contains("reportable for DE", closed.Outcome);
-        Assert.Contains("raportabil pentru DE", closed.OutcomeRo);
+        Assert.Equal("SC-VALID", closed.OutcomeRuleId); // golden case 4: a valid new self-certification (p. 34)
+        Assert.Contains("reportable for DE (SC-VALID, p. 34)", closed.Outcome);
+        Assert.Contains("raportabil pentru DE (SC-VALID, p. 34)", closed.OutcomeRo);
 
         await using var db = await host.DbAsync();
         var selfCert = await db.SelfCertifications.SingleAsync(s => s.Id == selfCertId);
@@ -623,6 +706,7 @@ public class CaseServiceTests
         var closed = await admin.CloseAsync(code, ConfirmationChannel.InPerson, ConfirmationEvidenceKind.SignedDocument, "Signed at the branch, checked by the clerk.");
 
         Assert.Equal(CaseStatus.Closed, closed.Status);
+        Assert.Equal("SC-VALID", closed.OutcomeRuleId);
         Assert.Equal(["ES"], closed.ReportableFor);
         Assert.Equal("Signed at the branch, checked by the clerk.", closed.Proof!.CollectionSteps);
         // No document: the hash is over the canonical JSON of the self-certification.

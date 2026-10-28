@@ -22,7 +22,9 @@ change public signatures in `ICaseService` / `IChangeService` / records without 
 Require editors. Load the client by code (tracked, with the same includes as `ClientService.Full`); `before =
 ClientSnapshot.From(client)`. Apply the change to the entity:
 - AddressChanged: mark current addresses of the same `Kind` not current, add the new one (ValidFrom = today from the clock).
-  AddressAdded: add it. PhoneAdded: add. PhoneChanged: replace the current phones with the new one. PhoneRemoved: mark
+  Design choice (golden case 12): a new `InCareOf` or `HoldMail` address marks ALL current addresses not current, since the
+  bank then has only that address (`CRS-IND-CO` "no other address", p. 29 f; `FATCA-IND-CO` "the only address", p. 31).
+  AddressAdded: add it (it never replaces, a c/o neither). PhoneAdded: add. PhoneChanged: replace the current phones with the new one. PhoneRemoved: mark
   the matching number not current.
 - StandingOrderCreated: add to the account with `AccountIban` (first account if null).
 - PowerOfAttorneyGranted: add. PersonalDataChanged: set BirthCountry / Citizenships when given.
@@ -47,11 +49,15 @@ IChangeService.
 ## CaseService
 - `OpenAsync(change, outcome)`: if the client has an open case (status not Closed/Expired), add the uncovered indicia not
   already there (same RuleId + Jurisdiction), widen Regime (Crs + Fatca = Both), keep the deadline (design choice,
-  NEVERIFICAT), audit `case.indicium-added`, return it. Otherwise create: Code `CRS-{year}-{seq:0000}` (year and seq per year
+  NEVERIFICAT), audit `case.indicium-added`, return it. A case without a deadline (FATCA only, or self-certification checks
+  only) gets the CRS deadline from the change that brings its first `CRS-IND-*` indicium. Otherwise create: Code `CRS-{year}-{seq:0000}` (year and seq per year
   from the clock), ClientId/ClientCode, TriggerChangeId, Regime = outcome.Regime, Status Open, OpenedAt = now, AssignedTo =
-  "operator". Deadline: for each account of the client compute `IDeadlineCalculator.Compute(new(change.ReceivedAt, regimeForDeadline,
-  account.OpenedOn))` where regimeForDeadline = Crs when the case has any CRS indicium (Both uses the CRS deadline), else Fatca;
-  take the earliest non-null DueAt (I4); no accounts = a new account opened today. Set DueAt, RemindAt, IsPreexisting,
+  "operator". Deadline: only the uncovered indicia of a change of circumstances (`*-IND-*`, p. 29, 31) set it. Any `CRS-IND-*`
+  gives the CRS deadline (a Both case too): for each account `IDeadlineCalculator.Compute(new(change.ReceivedAt, Regime.Crs,
+  account.OpenedOn))`, the earliest non-null DueAt (I4); no accounts = a new account opened today. `FATCA-IND-*` alone gives
+  none (`FATCA-SC`, p. 38). Self-certification checks alone (`SC-*`, e.g. `SC-TIN-FORMAT`, golden case 2) give none either
+  (decided 28.10, as for FATCA, GOLDEN-CASES I1: the 90 days follow a change of circumstances, p. 29, 35-36): DueAt and RemindAt
+  null, DeadlineRuleId = the SC rule, text `CaseTexts.NoDeadlineForSelfCertificationCheck`. Set DueAt, RemindAt, IsPreexisting,
   DeadlineRuleId, DeadlineGuidePage. Indicia from `outcome.Uncovered` (with ExplanationRo, ChangeEventId, AddedAt).
   Audit `case.opened` (code, regime, rule IDs, due).
 - `QueueAsync(filter)`: open first, then by DueAt ascending, cases with DueAt null last (order explicitly by
@@ -92,8 +98,9 @@ IChangeService.
   SignerCapacity AccountHolder; ApprovedBy = user name; CollectionSteps = given or a default code text (times in the
   invariant culture); TransactionOrDocumentId = "DOC-{id}" or "SC-{id}".
   For an explanation save one `AcceptedExplanation` per jurisdiction (the only write to client data).
-  Case -> Closed, ClosedAt, ReportableFor = outcome.ReportableFor, Outcome/OutcomeRo (code text), OutcomeRuleId
-  ("RESP-EXPLANATION", or "SC-CONSISTENT" for CRS, "FATCA-SC" for FATCA). Audit `case.closed`.
+  Case -> Closed, ClosedAt, ReportableFor = outcome.ReportableFor, Outcome/OutcomeRo (code text citing the rule), OutcomeRuleId:
+  "RESP-EXPLANATION" for an explanation; for a new self-certification "SC-VALID" (p. 34; decided 28.10 after the validated
+  card of case 4) on a CRS or Both case, "FATCA-SC" on a FATCA case. Audit `case.closed`.
 - `EscalateAsync`: editors; from Open, AwaitingClient or Reminded -> Escalated, EscalatedAt, `Case.EscalationReason` = the
   reason masked with `PiiVault.ForStorage().Mask` (the watcher writes a code text); audit `case.escalated` (no free text).
 - `TickAsync(now)`: no role check (system actor). Idempotent.
@@ -108,7 +115,7 @@ IChangeService.
     only indicia with Regime != Fatca count. Design choice (the guide is silent on a case with both regimes): a Both case
     expires on its CRS deadline with the CRS consequence, and the same tick opens a FATCA-only case for the client with the
     FATCA indicia (DueAt null, FATCA-SC, p. 38), audit `case.opened` with "fatca follow-up of <code>"; the outcome text says so.
-  - DueAt null (FATCA) never reminds or expires. ResponseReceived is not expired (the answer came in time).
+  - DueAt null (FATCA, self-certification checks) never reminds or expires. ResponseReceived is not expired (the answer came in time).
   - A second tick at the same time changes nothing.
 
 ## DeadlineWatcher (Features/Cases/DeadlineWatcher.cs)
