@@ -1,9 +1,9 @@
 using HackathonStarter.Features.Rules;
 using AddressKind = HackathonStarter.Features.Clients.AddressKind;
 using NoTinReason = HackathonStarter.Features.Clients.NoTinReason;
-using static HackathonStarter.Tests.Crs.Rules.Subjects;
+using static HackathonStarter.Tests.Crs.RuleEngine.Subjects;
 
-namespace HackathonStarter.Tests.Crs.Rules;
+namespace HackathonStarter.Tests.Crs.RuleEngine;
 
 /// <summary>EvaluateSelfCertification: validity, TIN per jurisdiction, reasonableness (guide p. 33-37). Golden cases 2 and 3.</summary>
 public class SelfCertRulesTests

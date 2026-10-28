@@ -1,9 +1,9 @@
 using HackathonStarter.Features.Rules;
 using AccountType = HackathonStarter.Features.Clients.AccountType;
 using AddressKind = HackathonStarter.Features.Clients.AddressKind;
-using static HackathonStarter.Tests.Crs.Rules.Subjects;
+using static HackathonStarter.Tests.Crs.RuleEngine.Subjects;
 
-namespace HackathonStarter.Tests.Crs.Rules;
+namespace HackathonStarter.Tests.Crs.RuleEngine;
 
 /// <summary>The US indicia (IGA Anexa I, Sec. II.B.1; guide p. 31) and the CRS exceptions FATCA must not inherit.</summary>
 public class FatcaIndiciaTests

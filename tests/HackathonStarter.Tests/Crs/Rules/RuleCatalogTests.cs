@@ -1,7 +1,7 @@
 using System.Reflection;
 using HackathonStarter.Features.Rules;
 
-namespace HackathonStarter.Tests.Crs.Rules;
+namespace HackathonStarter.Tests.Crs.RuleEngine;
 
 /// <summary>The catalog is what the UI, the audit log and the agent cite: every rule needs its source.</summary>
 public class RuleCatalogTests

@@ -1,9 +1,9 @@
 using HackathonStarter.Features.Rules;
 using AccountType = HackathonStarter.Features.Clients.AccountType;
 using AddressKind = HackathonStarter.Features.Clients.AddressKind;
-using static HackathonStarter.Tests.Crs.Rules.Subjects;
+using static HackathonStarter.Tests.Crs.RuleEngine.Subjects;
 
-namespace HackathonStarter.Tests.Crs.Rules;
+namespace HackathonStarter.Tests.Crs.RuleEngine;
 
 /// <summary>An expected indicium; SourceField is checked only when the spec states it.</summary>
 public sealed record ExpectedHit(string RuleId, string Jurisdiction, Coverage CoveredBy = Coverage.None, string? SourceField = null);

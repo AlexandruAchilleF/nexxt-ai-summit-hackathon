@@ -1,9 +1,9 @@
 using HackathonStarter.Features.Rules;
 using AccountType = HackathonStarter.Features.Clients.AccountType;
 using AddressKind = HackathonStarter.Features.Clients.AddressKind;
-using static HackathonStarter.Tests.Crs.Rules.Subjects;
+using static HackathonStarter.Tests.Crs.RuleEngine.Subjects;
 
-namespace HackathonStarter.Tests.Crs.Rules;
+namespace HackathonStarter.Tests.Crs.RuleEngine;
 
 /// <summary>One hit test and one cleared test per CRS indicium (CPF Anexa 1, Sec. III.B pct. 12-13; guide p. 29).</summary>
 public class CrsIndiciaTests

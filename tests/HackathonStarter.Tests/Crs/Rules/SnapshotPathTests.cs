@@ -1,11 +1,12 @@
 using HackathonStarter.Features.Changes;
 using HackathonStarter.Features.Clients;
+using HackathonStarter.Features.Evaluation;
 using HackathonStarter.Features.Rules;
 using HackathonStarter.Features.Tin;
 using Microsoft.Extensions.DependencyInjection;
-using static HackathonStarter.Tests.Crs.Rules.Subjects;
+using static HackathonStarter.Tests.Crs.RuleEngine.Subjects;
 
-namespace HackathonStarter.Tests.Crs.Rules;
+namespace HackathonStarter.Tests.Crs.RuleEngine;
 
 /// <summary>
 /// The shared contract: entities, then <see cref="ClientSnapshot.From"/> (what ClientService does), then
@@ -146,17 +147,26 @@ public class SnapshotPathTests
     }
 
     [Fact]
-    public void Wired_like_program_cs_the_phase_0_tin_placeholder_means_not_checked_never_wrong_format()
+    public void Wired_like_program_cs_r3s_tin_format_gives_golden_2_and_a_country_without_a_rule_is_not_checked()
     {
         var provider = new ServiceCollection().AddRules().AddTin().BuildServiceProvider();
         var engine = provider.GetRequiredService<ICrsRuleEngine>();
         Assert.Same(provider.GetRequiredService<CrsRuleEngine>(), engine);
+        var client = Snapshots.From(RoResident());
+        RuleOutcome Check(string country, string tin) =>
+            engine.EvaluateSelfCertification(client, new SelfCertificationSnapshot(ChangeAt, [new TaxResidenceSnapshot(country, tin)], false));
 
-        var form = new SelfCertificationSnapshot(ChangeAt, [new TaxResidenceSnapshot("IT", "DBRCST90A41Z129")], false);
-        var o = engine.EvaluateSelfCertification(Snapshots.From(RoResident()), form);
+        // Golden 2 (Cristina): the Italian TIN of the card has no check letter.
+        var golden = GoldenCases.Get("2");
+        var cristina = Check("IT", "DBRCST90A41Z129");
+        Assert.Equal(golden.ExpectedDecision, cristina.Decision);
+        Assert.Equal(golden.ExpectedHits, cristina.Uncovered.Select(h => $"{h.RuleId}:{h.Jurisdiction}"));
+        Assert.Equal(Decision.NoCase, Check("IT", "DBRCST90A41Z129T").Decision);
 
-        Assert.Equal(Decision.NoCase, o.Decision);
-        Assert.Contains("format not checked", Assert.Single(o.Cleared, x => x.RuleId == RuleIds.TinFormat).Explanation);
+        // R3 has no rule for NL: format not checked, never a wrong format.
+        var dutch = Check("NL", "123456782");
+        Assert.Equal(Decision.NoCase, dutch.Decision);
+        Assert.Contains("format not checked", Assert.Single(dutch.Cleared, x => x.RuleId == RuleIds.TinFormat).Explanation);
     }
 }
 

@@ -2,9 +2,9 @@ using System.Text.Json;
 using HackathonStarter.Features.Rules;
 using HackathonStarter.Features.Tin;
 using Microsoft.Extensions.DependencyInjection;
-using static HackathonStarter.Tests.Crs.Rules.Subjects;
+using static HackathonStarter.Tests.Crs.RuleEngine.Subjects;
 
-namespace HackathonStarter.Tests.Crs.Rules;
+namespace HackathonStarter.Tests.Crs.RuleEngine;
 
 /// <summary>Non-discrimination, determinism and the contract with R2 / R4.</summary>
 public class EngineInvariantTests

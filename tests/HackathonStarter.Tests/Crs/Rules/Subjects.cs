@@ -2,7 +2,7 @@ using HackathonStarter.Features.Rules;
 using AccountType = HackathonStarter.Features.Clients.AccountType;
 using AddressKind = HackathonStarter.Features.Clients.AddressKind;
 
-namespace HackathonStarter.Tests.Crs.Rules;
+namespace HackathonStarter.Tests.Crs.RuleEngine;
 
 /// <summary>
 /// Test data builder for the engine. "Standard RO resident" as in docs/GOLDEN-CASES.md 1: current RO residence, a current

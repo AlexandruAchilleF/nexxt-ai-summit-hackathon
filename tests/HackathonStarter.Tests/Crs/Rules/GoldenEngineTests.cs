@@ -1,9 +1,9 @@
 using HackathonStarter.Features.Rules;
 using AccountType = HackathonStarter.Features.Clients.AccountType;
 using HackathonStarter.Features.Tin;
-using static HackathonStarter.Tests.Crs.Rules.Subjects;
+using static HackathonStarter.Tests.Crs.RuleEngine.Subjects;
 
-namespace HackathonStarter.Tests.Crs.Rules;
+namespace HackathonStarter.Tests.Crs.RuleEngine;
 
 /// <summary>Golden cases, engine layer (docs/GOLDEN-CASES.md): hits compared exactly, Cleared as a superset.</summary>
 public class GoldenEngineTests
