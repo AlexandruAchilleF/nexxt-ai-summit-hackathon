@@ -1,0 +1,172 @@
+[
+  {
+    "input": "Client: CL-0003\n\nWhy is there no case? Please answer in English.",
+    "steps": [
+      {
+        "kind": "ToolCall",
+        "id": "tooluse_8LTg3fHdMhIu7K4oxRtNXI",
+        "text": "",
+        "tool": "getClientSnapshot",
+        "input": "{\"clientCode\":\"CL-0003\"}"
+      },
+      {
+        "kind": "ToolResult",
+        "id": "tooluse_8LTg3fHdMhIu7K4oxRtNXI",
+        "text": "",
+        "tool": "getClientSnapshot",
+        "output": "{\n  \"code\": \"CL-0003\",\n  \"fullName\": \"Bogdan Lazăr\",\n  \"birthDate\": \"1987-05-22\",\n  \"birthCountry\": \"RO\",\n  \"citizenships\": [\n    \"RO\"\n  ],\n  \"addressCountry\": \"RO\",\n  \"phoneCountry\": \"RO\",\n  \"ibanCountry\": \"RO\",\n  \"addresses\": [\n    {\n      \"kind\": \"Residence\",\n      \"line\": \"Str. Republicii 27, ap. 2\",\n      \"city\": \"500030 Brașov\",\n      \"country\": \"RO\",\n      \"isCurrent\": true,\n      \"validFrom\": \"2026-10-26\"\n    }\n  ],\n  \"phones\": [\n    {\n      \"number\": \"[PHONE-1]\",\n      \"country\": \"RO\",\n      \"isCurrent\": true\n    }\n  ],\n  \"accounts\": [\n    {\n      \"iban\": \"[IBAN-1]\",\n      \"ibanCountry\": \"RO\",\n      \"type\": \"Depository\",\n      \"product\": \"Cont curent\",\n      \"openedOn\": \"2026-10-26\",\n      \"currency\": \"RON\",\n      \"standingOrders\": []\n    }\n  ],\n  \"powersOfAttorney\": [],\n  \"selfCertification\": {\n    \"id\": 25,\n    \"signedAt\": \"2026-10-26T00:00:00Z\",\n    \"channel\": \"branch\",\n    \"declaresUsPerson\": false,\n    \"residences\": [\n      {\n        \"country\": \"AT\",\n        \"noTinReason\": \"B_UnableToObtain\"\n      }\n    ]\n  },\n  \"acceptedExplanations\": []\n}"
+      },
+      {
+        "kind": "ToolCall",
+        "id": "tooluse_fTLHQOqwf0AkstD4fI1yqB",
+        "text": "",
+        "tool": "evaluateRules",
+        "input": "{\"clientCode\":\"CL-0003\"}"
+      },
+      {
+        "kind": "ToolResult",
+        "id": "tooluse_fTLHQOqwf0AkstD4fI1yqB",
+        "text": "",
+        "tool": "evaluateRules",
+        "output": "{\n  \"decision\": \"NoCase\",\n  \"hits\": [],\n  \"cleared\": [\n    {\n      \"ruleId\": \"GEN-DOMESTIC\",\n      \"jurisdiction\": \"RO\",\n      \"guidePage\": \"NEVERIFICAT\",\n      \"explanation\": \"Datele din lista închisă de indicii rămân în România: nicio regulă nu se aplică.\"\n    }\n  ],\n  \"reportableFor\": [\n    \"AT\"\n  ],\n  \"explanation\": \"Nu se deschide caz: nicio regulă de indiciu nu se aplică. Verificat și neaplicat: GEN-DOMESTIC (RO). Raportabil pentru: AT.\",\n  \"engineVersion\": \"crs-rules/1.2\"\n}"
+      },
+      {
+        "kind": "ToolCall",
+        "id": "tooluse_5Anq19T3hnXlM7UkboczGg",
+        "text": "",
+        "tool": "listDocuments",
+        "input": "{\"clientCode\":\"CL-0003\"}"
+      },
+      {
+        "kind": "ToolResult",
+        "id": "tooluse_5Anq19T3hnXlM7UkboczGg",
+        "text": "",
+        "tool": "listDocuments",
+        "output": "{\n  \"clientCode\": \"CL-0003\",\n  \"documents\": [\n    {\n      \"id\": 3,\n      \"fileName\": \"autocertificare-bogdan-2026.pdf\",\n      \"kind\": \"SelfCertForm\",\n      \"pages\": 1,\n      \"shieldVerdict\": \"Clean\",\n      \"uploadedAt\": \"2026-10-28T22:17:52.570571Z\",\n      \"hiddenFragmentsRemoved\": 0,\n      \"hiddenPages\": [],\n      \"hiddenReasons\": []\n    }\n  ]\n}"
+      },
+      {
+        "kind": "Text",
+        "id": "82f2813801e2",
+        "text": "There is no case for CL-0003 (Bogdan Lazăr) because evaluateRules returns NoCase. No indicium rule applies.\n\n- **Bank data:** The address (RO), phone (RO), IBAN (RO), birth country (RO) and citizenship (RO) are all in Romania. The engine checked GEN-DOMESTIC (RO) and found nothing to apply. The guide page for that rule is NEVERIFICAT in the tool result.\n- **US person:** The self-certification (signed at the branch on 2026-10-26) does not declare US person status.\n- **Self-certification:** It lists tax residence in AT with no TIN, and the reason given is B_UnableToObtain. The engine marks the client as reportable for AT. That comes from the self-certification, not from an indicium, so it does not open a case.\n- **Documents:** There is one document, the self-certification form (id 3). The shield verdict is Clean. I did not read it.\n\n**Next step:** No action is needed to open a case. If you want, I can read the form and check the AT residence and the missing TIN. Reporting for AT is a decision for the team."
+      }
+    ],
+    "recordedAt": "2026-10-28T22:19:26.517402Z"
+  },
+  {
+    "input": "Client: CL-0009\n\nDe ce nu e caz?",
+    "steps": [
+      {
+        "kind": "ToolCall",
+        "id": "tooluse_prZjcPiGXWk78hfHkvlDD9",
+        "text": "",
+        "tool": "getClientSnapshot",
+        "input": "{\"clientCode\":\"CL-0009\"}"
+      },
+      {
+        "kind": "ToolResult",
+        "id": "tooluse_prZjcPiGXWk78hfHkvlDD9",
+        "text": "",
+        "tool": "getClientSnapshot",
+        "output": "{\n  \"code\": \"CL-0009\",\n  \"fullName\": \"Sorin Matei\",\n  \"birthDate\": \"1984-09-30\",\n  \"birthCountry\": \"RO\",\n  \"citizenships\": [\n    \"RO\"\n  ],\n  \"addressCountry\": \"RO\",\n  \"phoneCountry\": \"RO\",\n  \"ibanCountry\": \"RO\",\n  \"addresses\": [\n    {\n      \"kind\": \"Residence\",\n      \"line\": \"Str. Lungă 40\",\n      \"city\": \"500035 Brașov\",\n      \"country\": \"RO\",\n      \"isCurrent\": true,\n      \"validFrom\": \"2019-01-21\"\n    },\n    {\n      \"kind\": \"Residence\",\n      \"line\": \"Kastanienallee 30\",\n      \"city\": \"10435 Berlin\",\n      \"country\": \"DE\",\n      \"isCurrent\": true,\n      \"validFrom\": \"2026-09-25\"\n    }\n  ],\n  \"phones\": [\n    {\n      \"number\": \"[PHONE-1]\",\n      \"country\": \"RO\",\n      \"isCurrent\": true\n    }\n  ],\n  \"accounts\": [\n    {\n      \"iban\": \"[IBAN-1]\",\n      \"ibanCountry\": \"RO\",\n      \"type\": \"Depository\",\n      \"product\": \"Cont curent\",\n      \"openedOn\": \"2019-01-21\",\n      \"currency\": \"RON\",\n      \"standingOrders\": []\n    }\n  ],\n  \"powersOfAttorney\": [],\n  \"selfCertification\": {\n    \"id\": 6,\n    \"signedAt\": \"2025-02-03T00:00:00Z\",\n    \"channel\": \"online\",\n    \"declaresUsPerson\": false,\n    \"residences\": [\n      {\n        \"country\": \"RO\",\n        \"tin\": \"[CNP-1]\",\n        \"noTinReason\": \"None\"\n      },\n      {\n        \"country\": \"DE\",\n        \"tin\": \"47302619546\",\n        \"noTinReason\": \"None\"\n      }\n    ]\n  },\n  \"acceptedExplanations\": []\n}"
+      },
+      {
+        "kind": "ToolCall",
+        "id": "tooluse_IH5c2StRgw0fKp12nmd2CO",
+        "text": "",
+        "tool": "evaluateRules",
+        "input": "{\"clientCode\":\"CL-0009\"}"
+      },
+      {
+        "kind": "ToolResult",
+        "id": "tooluse_IH5c2StRgw0fKp12nmd2CO",
+        "text": "",
+        "tool": "evaluateRules",
+        "output": "{\n  \"decision\": \"Compliant\",\n  \"hits\": [\n    {\n      \"ruleId\": \"CRS-IND-ADDR\",\n      \"jurisdiction\": \"DE\",\n      \"guidePage\": \"29\",\n      \"coveredBy\": \"SelfCertification\",\n      \"explanation\": \"Adresă de reședință actuală în Germania (DE): indiciu CRS (pct. 12 lit. b). Cont nou: indiciul e folosit ca «motiv să știe» că autocertificarea e contrazisă (GEN-NEW-ACCOUNT, interpretare de design). Acoperit: autocertificarea din 2025-02-03 declară Germania (DE).\"\n    }\n  ],\n  \"cleared\": [\n    {\n      \"ruleId\": \"SC-CONSISTENT\",\n      \"jurisdiction\": \"DE\",\n      \"guidePage\": \"33-34, 36-37\",\n      \"explanation\": \"Autocertificarea din 2025-02-03 declară Germania (DE): indiciile sunt consecvente cu ea, iar contul e raportabil pentru DE (Sec. IV.B pct. 1).\"\n    }\n  ],\n  \"reportableFor\": [\n    \"DE\"\n  ],\n  \"explanation\": \"Indicii găsite, toate acoperite: CRS-IND-ADDR (DE). Autocertificarea e consecventă cu dosarul (SC-CONSISTENT). Raportabil pentru: DE.\",\n  \"engineVersion\": \"crs-rules/1.2\"\n}"
+      },
+      {
+        "kind": "ToolCall",
+        "id": "tooluse_E18u4ipWyQZrkMHirGNcVa",
+        "text": "",
+        "tool": "listDocuments",
+        "input": "{\"clientCode\":\"CL-0009\"}"
+      },
+      {
+        "kind": "ToolResult",
+        "id": "tooluse_E18u4ipWyQZrkMHirGNcVa",
+        "text": "",
+        "tool": "listDocuments",
+        "output": "{\n  \"clientCode\": \"CL-0009\",\n  \"documents\": []\n}"
+      },
+      {
+        "kind": "Text",
+        "id": "77286d1bfbb2",
+        "text": "Pentru CL-0009 (Sorin Matei) nu există caz, pentru că evaluateRules returnează decizia Compliant.\n\n- **Indiciu găsit:** CRS-IND-ADDR (p. 29). Clientul are o adresă de reședință actuală în DE, la Berlin. Adresa e valabilă din 2026-09-25.\n- **De ce nu cere acțiune:** indiciul este acoperit de autocertificare (coveredBy: SelfCertification). Autocertificarea din 2025-02-03 declară ambele jurisdicții de reședință, RO și DE. Pentru DE este trecut un TIN.\n- **Consecvență:** regula SC-CONSISTENT (p. 33-34, 36-37) confirmă că indiciile sunt consecvente cu autocertificarea.\n- **Raportare:** contul este raportabil pentru DE. Asta înseamnă raportare, nu un caz deschis.\n- **Alte date:** telefonul, IBAN-ul și cetățenia sunt toate din RO. Clientul nu declară statut de persoană americană. Nu există documente încărcate pentru acest client.\n\nNu am verificat formatul TIN-ului pentru DE, pentru că nu mi l-ai cerut.\n\nPasul următor: dacă vrei, pot verifica formatul TIN-ului german cu checkTin. Altfel nu e nimic de făcut pe acest client acum."
+      }
+    ],
+    "recordedAt": "2026-10-28T22:19:19.520928Z"
+  },
+  {
+    "input": "Caz: CRS-2026-0006\n\nRezumă cazul.",
+    "steps": [
+      {
+        "kind": "ToolCall",
+        "id": "tooluse_VsKg5sadcfxUS7dRJb9ZPc",
+        "text": "",
+        "tool": "getCase",
+        "input": "{\"caseCode\":\"CRS-2026-0006\"}"
+      },
+      {
+        "kind": "ToolResult",
+        "id": "tooluse_VsKg5sadcfxUS7dRJb9ZPc",
+        "text": "",
+        "tool": "getCase",
+        "output": "{\n  \"code\": \"CRS-2026-0006\",\n  \"clientCode\": \"CL-0006\",\n  \"status\": \"Open\",\n  \"regime\": \"Fatca\",\n  \"isPreexisting\": false,\n  \"openedAt\": \"2026-10-28T22:17:53.184193Z\",\n  \"deadline\": \"fără termen legal în ghid (p. 38)\",\n  \"deadlineRuleId\": \"FATCA-SC\",\n  \"deadlineGuidePage\": \"38\",\n  \"indicia\": [\n    {\n      \"ruleId\": \"FATCA-IND-POB\",\n      \"jurisdiction\": \"US\",\n      \"guidePage\": \"31\",\n      \"explanation\": \"Locul nașterii în SUA: indiciu FATCA (lit. b). Cont nou FATCA: indiciul e folosit ca «motiv să știe» la schimbarea de situație (IGA Anexa I, III.B.2; GEN-NEW-ACCOUNT, interpretare de design).\",\n      \"coveredBy\": \"None\"\n    }\n  ],\n  \"cleared\": [],\n  \"evidence\": [],\n  \"signals\": [],\n  \"requests\": [],\n  \"responses\": [],\n  \"requiredDocuments\": [\n    \"A new FATCA self-certification\"\n  ],\n  \"reportableFor\": []\n}"
+      },
+      {
+        "kind": "ToolCall",
+        "id": "tooluse_r07h6sp5TnbTu9p0ge56xI",
+        "text": "",
+        "tool": "evaluateRules",
+        "input": "{\"clientCode\":\"CL-0006\"}"
+      },
+      {
+        "kind": "ToolResult",
+        "id": "tooluse_r07h6sp5TnbTu9p0ge56xI",
+        "text": "",
+        "tool": "evaluateRules",
+        "output": "{\n  \"decision\": \"FatcaAlert\",\n  \"regime\": \"Fatca\",\n  \"hits\": [\n    {\n      \"ruleId\": \"FATCA-IND-POB\",\n      \"jurisdiction\": \"US\",\n      \"guidePage\": \"31\",\n      \"coveredBy\": \"None\",\n      \"explanation\": \"Locul nașterii în SUA: indiciu FATCA (lit. b). Cont nou FATCA: indiciul e folosit ca «motiv să știe» la schimbarea de situație (IGA Anexa I, III.B.2; GEN-NEW-ACCOUNT, interpretare de design).\"\n    }\n  ],\n  \"cleared\": [],\n  \"reportableFor\": [],\n  \"explanation\": \"Alertă FATCA: FATCA-IND-POB (US) nu e acoperit. Cont nou: se cere o autocertificare nouă validă care stabilește dacă titularul e persoană SUA (IGA Anexa I, III.B.2); fără ea, contul e raportabil SUA. Acordul nu dă un termen.\",\n  \"engineVersion\": \"crs-rules/1.2\"\n}"
+      },
+      {
+        "kind": "Text",
+        "id": "ddaf71419633",
+        "text": "**Cazul CRS-2026-0006** (client CL-0006, regim FATCA, cont nou, status: deschis)\n\n- **Indiciu:** FATCA-IND-POB (p. 31). Locul nașterii este în SUA și nu este acoperit de nicio autocertificare sau altă probă.\n- **Decizie evaluateRules:** alertă FATCA. Pentru un cont nou, este nevoie de o autocertificare nouă valabilă, care să stabilească dacă titularul este persoană SUA. Fără ea, contul este raportabil SUA.\n- **Termen:** ghidul nu prevede un termen legal (FATCA-SC, p. 38).\n- **Document cerut:** o nouă autocertificare FATCA.\n- **Probe, semnale, cereri, răspunsuri:** nu există încă.\n\n**Pasul următor:** pregătirea cazului (Run 1). Aș citi documentele clientului, aș salva probele și aș trimite clientului cererea de autocertificare. Nu am început încă. Spune-mi dacă vrei să continui."
+      }
+    ],
+    "recordedAt": "2026-10-28T22:18:34.434114Z"
+  },
+  {
+    "input": "Case: CRS-2026-0005\n\nSummarize the case.",
+    "steps": [
+      {
+        "kind": "ToolCall",
+        "id": "tooluse_moLlFyn8K3bPXijQIPiqyk",
+        "text": "",
+        "tool": "getCase",
+        "input": "{\"caseCode\":\"CRS-2026-0005\"}"
+      },
+      {
+        "kind": "ToolResult",
+        "id": "tooluse_moLlFyn8K3bPXijQIPiqyk",
+        "text": "",
+        "tool": "getCase",
+        "output": "{\n  \"code\": \"CRS-2026-0005\",\n  \"clientCode\": \"CL-0014\",\n  \"status\": \"Open\",\n  \"regime\": \"Fatca\",\n  \"isPreexisting\": false,\n  \"openedAt\": \"2026-10-23T22:00:25.993431Z\",\n  \"deadline\": \"fără termen legal în ghid (p. 38)\",\n  \"deadlineRuleId\": \"FATCA-SC\",\n  \"deadlineGuidePage\": \"38\",\n  \"indicia\": [\n    {\n      \"ruleId\": \"FATCA-IND-PHONE\",\n      \"jurisdiction\": \"US\",\n      \"guidePage\": \"31\",\n      \"explanation\": \"Telefon actual din SUA: indiciu FATCA (lit. d), chiar dacă există și un telefon în România: excepția CRS nu se aplică la FATCA. Cont nou FATCA: indiciul e folosit ca «motiv să știe» la schimbarea de situație (IGA Anexa I, III.B.2; GEN-NEW-ACCOUNT, interpretare de design).\",\n      \"coveredBy\": \"None\"\n    }\n  ],\n  \"cleared\": [\n    {\n      \"ruleId\": \"CRS-IND-PHONE\",\n      \"jurisdiction\": \"US\",\n      \"guidePage\": \"29\",\n      \"explanation\": \"Telefon din SUA (US), dar există și un telefon actual în România: nu e indiciu CRS (pct. 12 lit. c); în plus, SUA nu e jurisdicție CRS raportabilă (SUA intră doar la FATCA) (interpretare: listele ANAF nu sunt în sursele noastre).\"\n    },\n    {\n      \"ruleId\": \"FATCA-IND-POB\",\n      \"jurisdiction\": \"US\",\n      \"guidePage\": \"31\",\n      \"explanation\": \"Locul nașterii la dosar e România (RO), nu SUA: nu e indiciu FATCA (lit. b). Cont nou FATCA: lista de indicii e citită ca «motiv să știe» (GEN-NEW-ACCOUNT, interpretare de design).\"\n    }\n  ],\n  \"evidence\": [],\n  \"signals\": [],\n  \"requests\": [],\n  \"responses\": [],\n  \"requiredDocuments\": [\n    \"A new FATCA self-certification\"\n  ],\n  \"reportableFor\": []\n}"
+      },
+      {
+        "kind": "Text",
+        "id": "ccbbfbcb3167",
+        "text": "Case CRS-2026-0005 (client CL-0014)\n\n- **Status:** Open. The regime is FATCA and the account is new (not preexisting).\n- **Deadline:** There is no legal deadline in the guide (FATCA-SC, p. 38). No dueAt is set.\n- **Indicium:** FATCA-IND-PHONE (p. 31). The client has a current phone number in the US. For FATCA, the CRS exception for a Romanian phone does not apply, so this stays an indicium. Nothing covers it yet.\n- **Cleared:**\n  - CRS-IND-PHONE (p. 29): the client also has a current Romanian phone, and the US is not a reportable CRS jurisdiction.\n  - FATCA-IND-POB (p. 31): the place of birth on file is RO, not the US.\n- **Evidence, signals, requests and responses:** None yet.\n- **Required document:** A new FATCA self-certification.\n\n**Next step:** Prepare the case (run 1). That means reading the client's documents, saving evidence, and drafting the request for the FATCA self-certification. I have not done any of this because you only asked for a summary."
+      }
+    ],
+    "recordedAt": "2026-10-28T22:00:49.224441Z"
+  }
+]

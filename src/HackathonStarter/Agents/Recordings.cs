@@ -22,6 +22,7 @@ public class Recordings(IHostEnvironment env, IOptions<AiOptions> options, IOpti
     /// <summary>
     /// The recording to replay for this question: an exact match, or the most similar one if its similarity
     /// reaches AI:ReplayMinSimilarity. Below that it returns null (better a mock than an answer to another question).
+    /// A similar question with other codes or numbers (another case, client or amount) is another question: never replayed.
     /// </summary>
     public (Recording Recording, bool Exact)? Find(string agent, string input)
     {
@@ -32,7 +33,11 @@ public class Recordings(IHostEnvironment env, IOptions<AiOptions> options, IOpti
         var exact = list.FirstOrDefault(r => Normalize(r.Input) == Normalize(input));
         if (exact is not null) return (exact, true);
 
-        var best = list.Select(r => (Recording: r, Score: Similarity(r.Input, input))).MaxBy(x => x.Score);
+        var codes = Codes(input);
+        var candidates = list.Where(r => Codes(r.Input).SetEquals(codes)).ToList();
+        if (candidates.Count == 0) return null;
+
+        var best = candidates.Select(r => (Recording: r, Score: Similarity(r.Input, input))).MaxBy(x => x.Score);
         return best.Score >= options.Value.ReplayMinSimilarity ? (best.Recording, false) : null;
     }
 
@@ -90,4 +95,6 @@ public class Recordings(IHostEnvironment env, IOptions<AiOptions> options, IOpti
     private static string Normalize(string s) => string.Join(' ', TextMatch.Words(s));
 
     private static HashSet<string> Words(string s) => TextMatch.Words(s).ToHashSet();
+
+    private static HashSet<string> Codes(string s) => TextMatch.Words(s).Where(w => w.Any(char.IsDigit)).ToHashSet();
 }
