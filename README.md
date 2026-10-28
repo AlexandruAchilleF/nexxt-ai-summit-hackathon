@@ -76,7 +76,7 @@ cu toți participanții: [`docs/PLAN.md` §6.3](docs/PLAN.md#63-fluxul-mariei-tr
 
 Acesta e traseul-țintă. Pe `main`, pașii 1–3 și 6 sunt cod cu teste (`ChangeService`, `CrsRuleEngine`, `CaseService`,
 `DeadlineWatcher`), iar serviciile pentru dovezi, cerere, aprobare și închidere există în `CaseService`. Uneltele agentului
-de la pașii 4, 5, 7 și 8 și paginile de caz nu sunt încă pe `main`; starea exactă e în [§11](#11-stare).
+de la pașii 4, 5, 7 și 8 nu sunt încă pe `main`, iar paginile de caz sunt doar schelete („Vine în faza următoare”); starea exactă e în [§11](#11-stare).
 
 ### Capcanele (fără alarme false)
 
@@ -164,7 +164,8 @@ Săgețile agentului sunt ținta din [`docs/PLAN.md` §13](docs/PLAN.md#13-agent
 - **Servicii** (`ChangeService`, `CaseService`, `ClientService`, `EvaluationService`): validare, roluri, tranzacții, jurnal.
   Tranzițiile cazului sunt doar aici, fiecare cu verificare de rol și cu intrare în jurnal.
 - **Agentul** e un agent cu unelte, orchestrat de cod, cu omul la decizie: nu atinge baza de date direct, iar cine
-  deschide cazul, regulile și termenele sunt în cod. Uneltele care schimbă ceva (`sendClientRequest`, `closeCase`) cer aprobarea omului; după aprobare rulează fără model.
+  deschide cazul, regulile și termenele sunt în cod. Runtime-ul cere aprobarea omului pentru uneltele marcate `needsApproval`
+  și, după aprobare, le rulează fără model; `sendClientRequest` și `closeCase` nu sunt încă pe `main`.
 - **Data simulată** (`SimClock`) e un serviciu separat, cu decalaj setabil („+85 de zile”). Codul CRS nu citește ora din
   altă parte; restul aplicației rămâne pe ceasul real.
 - Entitățile, interfețele și structura folderelor: [`docs/PLAN.md` §6–13](docs/PLAN.md#6-arhitectura).
@@ -177,7 +178,7 @@ Săgețile agentului sunt ținta din [`docs/PLAN.md` §13](docs/PLAN.md#13-agent
 | `EvidenceVerifier` | Un citat există în textul vizibil al paginii indicate. Un citat inventat sau luat din textul ascuns apare „citat negăsit” |
 | `TinFormat` + TIN on Europa | Formatul TIN pe țară (DE, IT, AT, ES, FR, US, RO); pentru statele UE, verificare la serviciul Comisiei Europene, care confirmă tot doar structura și sintaxa. Spunem „format valid”, niciodată „TIN valid” |
 | `AuditLog` | Fiecare pas e o intrare cu `Hash = SHA-256(hash-ul anterior + conținut)`; „Verifică” găsește exact intrarea modificată |
-| `PiiVault` | CNP, IBAN, card, e-mail și telefoane (românești și străine) sunt mascate înainte de model; uneltele lucrează cu valorile reale; ce se salvează rămâne mascat |
+| `PiiVault` | CNP, IBAN, card, e-mail și telefoane (românești și internaționale, cu `+` sau `00`) sunt mascate înainte de model; uneltele lucrează cu valorile reale; ce se salvează rămâne mascat |
 | Verificări pe răspuns (`Features/Checks`) | `pii-leak` (fără date personale scăpate); în `CrsChecks`: `evidence-quoted` (citatele sunt printre rezultatele uneltelor), `signals-never-alert`, `rule-cited` (fiecare indiciu are regula și pagina), `no-tin-valid-claim`. Pe `main`, agentul CRS are activă doar `pii-leak` |
 
 ### Modelele și fallback-ul
@@ -203,7 +204,7 @@ secundar).
 - existența unui TIN (verificăm doar formatul);
 - conturile preexistente cu valoare mare (peste 1.000.000 USD): acolo Comentariul OCDE (Secțiunea III, pct. 49, p. 125)
   vorbește doar de cele 90 de zile de la identificarea indiciului;
-- integrarea reală cu core banking, ONRC sau ANAF și trimiterea reală a mesajelor către client.
+- integrarea reală cu sistemele băncii, ONRC sau ANAF.
 
 ## 8. Cazurile-etalon și metricile
 
@@ -267,10 +268,10 @@ Nicio cifră fără rulare: la fiecare rulare nouă, tabelul se refă cu commit-
   (art. 62 alin. (11)).
 - **Art. 22 GDPR nu se aplică:** nicio decizie nu se ia exclusiv automat. Codul aplică regulile, omul aprobă cererea și
   închiderea.
-- **Mascarea** CNP-urilor, IBAN-urilor, numerelor de card, e-mailurilor și telefoanelor românești înainte de model ține
+- **Mascarea** CNP-urilor, IBAN-urilor, numerelor de card, e-mailurilor și telefoanelor (românești și internaționale, cu `+` sau `00`) înainte de model ține
   de reducerea la minimum a datelor (art. 5 alin. (1) lit. (c) GDPR) și de securitatea prelucrării, prin pseudonimizare
   și criptare (art. 32 alin. (1) lit. (a) GDPR).
-- Numele, adresele, datele de naștere, TIN-urile străine și telefoanele străine nu sunt mascate înainte de model (datele
+- Numele, adresele, datele de naștere și TIN-urile străine nu sunt mascate înainte de model (datele
   sunt sintetice). Pagina `/privacy` arată, din configurația live, ce ajunge la care model, ce se salvează și cât timp.
 
 ## 10. Pornire rapidă
@@ -283,7 +284,7 @@ dotnet test tests/HackathonStarter.E2E          # teste în browser; pornesc sin
 ```
 
 Pe macOS, pasul Chromium din `tools/setup-dev.sh` pică (scriptul cheamă driverul `linux-x64`). După build, rulează:
-`tests/HackathonStarter.E2E/bin/Debug/net10.0/.playwright/node/darwin-arm64/node tests/HackathonStarter.E2E/bin/Debug/net10.0/.playwright/package/cli.js install chromium`.
+`tests/HackathonStarter.E2E/bin/Debug/net10.0/.playwright/node/darwin-arm64/node tests/HackathonStarter.E2E/bin/Debug/net10.0/.playwright/package/cli.js install chromium` (pe Mac cu Intel: `darwin-x64`).
 
 Sau deschide `HackathonStarter.slnx` în Visual Studio, Rider sau VS Code și pornește proiectul `HackathonStarter`.
 Baza de date SQLite se creează la pornire, cu datele demo. Utilizatori demo (meniul din bara de sus): Ana (operator,
@@ -301,7 +302,7 @@ IAM), niciodată din repo. În `appsettings.Local.json` (ignorat de git): `"AI":
 Lucrăm în paralel, pe module; fiecare PR intră doar cu CI verde (build cu 0 warnings, teste unitare și E2E).
 
 Starea de pe `main` la commit-ul `bbe131e`, verificată în cod pe 28.10.2026, la 21:25: `dotnet build -warnaserror` fără
-warnings, testele unitare 1051 din 1051, E2E 21 trecute și 1 sărit (vezi „Jurnalul” mai jos).
+warnings, testele unitare 1051 din 1051, E2E 21 trecute și 1 sărit (testul sărit: rândul `/audit` de mai jos).
 
 | Modul | Rol | Pe `main` | În lucru | Lipsește |
 | --- | --- | --- | --- | --- |
