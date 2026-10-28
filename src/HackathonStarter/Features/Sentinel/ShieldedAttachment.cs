@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.RegularExpressions;
 using HackathonStarter.Agents;
 using HackathonStarter.Features.Shield;
@@ -33,10 +34,12 @@ public static partial class ShieldedAttachment
         var file = await DocumentText.ExtractAsync(new MemoryStream(bytes), fileName, ct);
         if (file.Image is not null) return (file, 0);
 
-        // A comment (closed or not) or a tag can hide text from a reader once rendered: refuse rather than guess what shows.
-        if (Markup().IsMatch(file.Text)) throw new NotSupportedException(MarkupRefused);
+        // Normalize first, then check what the model will get: full-width "＜" becomes "<" under NFKC, and an invisible
+        // character inside a tag ("<\u200Bspan") must not hide it from the markup check.
         var hidden = 0;
-        var text = Invisible().Replace(file.Text, _ => { hidden++; return ""; }).Trim();
+        var text = Invisible().Replace(file.Text.Normalize(NormalizationForm.FormKC), _ => { hidden++; return ""; }).Trim();
+        // A comment, a declaration or a tag, closed or not, can hide text from a reader once rendered: refuse rather than guess.
+        if (Markup().IsMatch(text)) throw new NotSupportedException(MarkupRefused);
         if (text.Length == 0) throw new InvalidOperationException("No visible text found in the file.");
         return (file with { Text = text }, hidden);
     }
@@ -54,8 +57,8 @@ public static partial class ShieldedAttachment
         return (new AgentFile(Guid.NewGuid().ToString("N")[..12], fileName, text, scan.Pages.Count), scan.Hidden.Count);
     }
 
-    // An HTML comment, or an opening or closing tag with its name right after "<" ("Sold < 5000" is no tag).
-    [GeneratedRegex(@"<!--|</?[A-Za-z][A-Za-z0-9-]*(?:\s[^<>]*)?/?>")]
+    // "<" right before "!", "?", "/" or a letter starts markup ("<!--", "<?xml", "</p", "<span"); "Sold < 5000" does not.
+    [GeneratedRegex(@"<[!?/A-Za-z]")]
     private static partial Regex Markup();
 
     // Format characters (zero-width, joiners, direction marks, soft hyphen, BOM), variation selectors and the Unicode tag

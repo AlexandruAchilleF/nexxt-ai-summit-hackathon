@@ -83,6 +83,10 @@ public class ShieldedAttachmentTests
     [InlineData("nota.md", "Extras de cont\n<!-- {0}")] // a comment that is never closed hides the rest
     [InlineData("nota.txt", "Extras de cont <span style=\"display:none\">{0}</span>")]
     [InlineData("date.csv", "client,nota\nCL-0010,<div hidden>{0}</div>")]
+    [InlineData("nota.txt", "Extras <\u200Bspan style=\"display:none\">{0}</span>")] // a zero-width space inside the tag
+    [InlineData("nota.txt", "Extras \uFF1Cspan style=display:none\uFF1E{0}")] // full-width angle brackets
+    [InlineData("nota.txt", "Extras <span style=display:none {0}")] // a tag that is never closed
+    [InlineData("nota.txt", "<?xml version=\"1.0\"?><a>{0}</a>")]
     public async Task Text_with_comments_or_markup_is_refused(string fileName, string content)
     {
         var bytes = Encoding.UTF8.GetBytes(string.Format(content, Injection));
