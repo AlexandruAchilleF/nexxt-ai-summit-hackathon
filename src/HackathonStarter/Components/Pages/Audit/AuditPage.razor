@@ -1,7 +1,134 @@
 @page "/audit"
+@using HackathonStarter.Features.Audit
+@inject IAuditLog Audit
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+@inject CurrentUser CurrentUser
 
 <PageTitle>@T("Audit log") · @SiteConfig.Name</PageTitle>
 
-<PageHeader Title="@T("Audit log")" Description="@T("Every step, rule and human decision in a hash chain.")" />
+<PageHeader Title="@T("Audit log")" Description="@T("The bank keeps a record that can credibly prove each confirmation, for audit purposes, and its electronic system must ensure that the information received is the information sent (ANAF guide, p. 34-35). Each entry is chained to the previous one with SHA-256: a change breaks the chain exactly there.")">
+    <Actions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.Verified" OnClick="VerifyAsync"
+                   Disabled="@(_entries is null || _verifying)">@T("Verify")</MudButton>
+    </Actions>
+</PageHeader>
 
-<EmptyState Icon="@Icons.Material.Rounded.VerifiedUser" Title="@T("Coming in the next phase")" Description="@T("The backend for this page is being built.")" />
+@if (_verification is { } v)
+{
+    <MudAlert Severity="@(v.Ok ? Severity.Success : Severity.Error)" Class="mb-4">
+        @(v.Ok ? T("Chain intact: {0} entries checked", v.Checked) : T("Chain broken at entry #{0}", v.FirstBrokenSeq))
+    </MudAlert>
+}
+
+@if (_error is not null)
+{
+    <ErrorState Message="@_error" OnRetry="LoadAsync" />
+}
+else if (_entries is null)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_entries.Count == 0)
+{
+    <EmptyState Title="@T("No entries yet")" Description="@T("Every change, rule, case step, evidence check and approval is written here.")" Icon="@Icons.Material.Rounded.Verified" />
+}
+else
+{
+    <div class="audit-table">
+        <MudTable T="AuditEntry" Items="_entries" Breakpoint="Breakpoint.Sm" Dense="true" Hover="true" Outlined="true" Elevation="0" RowStyleFunc="RowStyle">
+            <HeaderContent>
+                <MudTh>#</MudTh>
+                <MudTh>@T("When")</MudTh>
+                <MudTh>@T("Actor")</MudTh>
+                <MudTh>@T("Case")</MudTh>
+                <MudTh>@T("Kind")</MudTh>
+                <MudTh>@T("Payload")</MudTh>
+                <MudTh>@T("Hash")</MudTh>
+                @if (_isAdmin)
+                {
+                    <MudTh></MudTh>
+                }
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="#">
+                    <span class="audit-seq mono">@context.Seq</span>
+                    @if (context.Seq == _verification?.FirstBrokenSeq)
+                    {
+                        <Pill Tone="danger" Icon="@Icons.Material.Rounded.LinkOff">@T("broken here")</Pill>
+                    }
+                    else if (context.Seq > _verification?.FirstBrokenSeq)
+                    {
+                        <Pill>@T("after a break")</Pill>
+                    }
+                </MudTd>
+                <MudTd DataLabel="@T("When")"><span style="white-space:nowrap">@Format.DateTime(DateTime.SpecifyKind(context.At, DateTimeKind.Utc))</span></MudTd>
+                <MudTd DataLabel="@T("Actor")">@context.Actor</MudTd>
+                <MudTd DataLabel="@T("Case")">@(context.CaseId?.ToString() ?? "—")</MudTd>
+                <MudTd DataLabel="@T("Kind")"><span class="mono">@context.Kind</span></MudTd>
+                <MudTd DataLabel="@T("Payload")" Class="audit-payload"><span class="mono audit-ellipsis" title="@context.PayloadJson">@context.PayloadJson</span></MudTd>
+                <MudTd DataLabel="@T("Hash")"><span class="mono" title="@context.Hash">@context.Hash[..Math.Min(12, context.Hash.Length)]</span></MudTd>
+                @if (_isAdmin)
+                {
+                    <MudTd>
+                        <MudIconButton Icon="@Icons.Material.Rounded.EditNote" Size="Size.Small" Color="Color.Error" aria-label="@T("Tamper")"
+                                       title="@T("Tamper")" OnClick="() => TamperAsync(context)" />
+                    </MudTd>
+                }
+            </RowTemplate>
+        </MudTable>
+    </div>
+}
+
+@code {
+    private IReadOnlyList<AuditEntry>? _entries;
+    private AuditVerification? _verification;
+    private string? _error;
+    private bool _isAdmin, _verifying;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _isAdmin = (await CurrentUser.GetAsync()).Role == Roles.Admin; // the service checks it again
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            _error = null;
+            _entries = await Audit.ListAsync();
+        }
+        catch (Exception ex) { _error = ex.Message; }
+    }
+
+    private async Task VerifyAsync()
+    {
+        _verifying = true;
+        try
+        {
+            _verification = await Audit.VerifyAsync();
+            await LoadAsync();
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        finally { _verifying = false; }
+    }
+
+    private async Task TamperAsync(AuditEntry entry)
+    {
+        if (!await Dialogs.ConfirmAsync(T("Tamper with entry #{0}?", entry.Seq),
+                T("Demo only: the payload is changed directly in the database, without recomputing its hash. Verify then finds this entry."),
+                T("Tamper"), destructive: true)) return;
+        try
+        {
+            await Audit.TamperAsync(entry.Seq);
+            _verification = null;
+            Snackbar.Add(T("Entry #{0} was edited outside the application", entry.Seq), Severity.Warning);
+            await LoadAsync();
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+
+    private string RowStyle(AuditEntry entry, int _) =>
+        entry.Seq == _verification?.FirstBrokenSeq ? "background: var(--app-danger-tint)" : "";
+}

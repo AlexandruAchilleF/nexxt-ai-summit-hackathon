@@ -1,0 +1,44 @@
+@using HackathonStarter.Features.Shield
+@* What the hidden-text shield removed from a PDF before the model read it. The fragments are masked. *@
+@if (Verdict == ShieldVerdict.NotScanned)
+{
+    <Pill Icon="@Icons.Material.Rounded.Schedule">@T("Not scanned yet")</Pill>
+}
+else if (Verdict == ShieldVerdict.Clean)
+{
+    <Pill Tone="success" Icon="@Icons.Material.Rounded.Shield" Title="@T("Covered text is not detected")">@T("No hidden text")</Pill>
+}
+else
+{
+    <MudExpansionPanels Elevation="0" Outlined="true">
+        <MudExpansionPanel>
+            <TitleContent>
+                <Pill Tone="danger" Icon="@Icons.Material.Rounded.GppMaybe">@T("Red flag from the shield: {0} hidden fragment(s) removed", Hidden.Count)</Pill>
+            </TitleContent>
+            <ChildContent>
+                @foreach (var fragment in Hidden)
+                {
+                    <div class="mb-3">
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">@T("Page {0}", fragment.Page) · @Reasons(fragment.Reason)</MudText>
+                        <MudText Typo="Typo.body2" Class="mono" Style="overflow-wrap:anywhere">@fragment.Text</MudText>
+                    </div>
+                }
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">@T("Covered text is not detected")</MudText>
+            </ChildContent>
+        </MudExpansionPanel>
+    </MudExpansionPanels>
+}
+
+@code {
+    [Parameter, EditorRequired] public ShieldVerdict Verdict { get; set; }
+    [Parameter] public IReadOnlyList<HiddenFragment> Hidden { get; set; } = [];
+
+    /// <summary>HiddenFragment.Reason holds the flags as text ("WhiteText, TinyFont").</summary>
+    private static string Reasons(string reason) => !Enum.TryParse<HiddenReason>(reason, out var reasons) ? reason : string.Join(", ", new[]
+    {
+        (HiddenReason.WhiteText, T("white text")),
+        (HiddenReason.TinyFont, T("font under 2 pt")),
+        (HiddenReason.OffPage, T("outside the page")),
+        (HiddenReason.Invisible, T("invisible text")),
+    }.Where(r => reasons.HasFlag(r.Item1)).Select(r => r.Item2));
+}
