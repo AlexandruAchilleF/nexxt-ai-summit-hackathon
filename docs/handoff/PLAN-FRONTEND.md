@@ -1,6 +1,8 @@
 # Planul frontend: CRS Sentinel, noaptea de 28 spre 29.10.2026
 
 > Scris la 01:05, pe `main` la `f109121` (cu #68 și #69), cu PR-ul #71 deschis.
+> **Actualizare 01:25:** `main` = `31bdbc8`. #71 e intrat (pașii „merge #71” sunt făcuți). #72 a închis gap-ul R3 cu
+> `ConnectionCheck` din secțiunea 7.
 > Surse:
 > - trei audituri pe cod și pe aplicația pornită în EN, la 1536x864 (adică 1080p cu zoom 125%): dashboard, `/changes/new`, conectori. Sunt în `docs/handoff/audits/`.
 > - verificările mele pe `f109121`;

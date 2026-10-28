@@ -72,8 +72,8 @@ ce se vede pe ecran nu contrazice „Code decides, AI explains, a person approve
   cu un timeout de 5 s, se întoarce tăcut pe regulile locale.
 - În Development, cu `AI:Record = true`, rulează o dată verificarea pentru `DE 86095174223` și confirmă că EC răspunde
   „validStructure” și „validSyntax”. Altfel rularea 2 spune „format invalid”. Salvează înregistrarea și fă commit pe ea.
-- Spune-i lui R3 că `ConnectionCheck` trimite „Hello, are you there?” la ținta SOAP; ar trebui să cheme
-  `TinOnEuropaClient.CheckAsync`.
+- `ConnectionCheck` e reparat în #72: trimite acum o sondă SOAP reală. Rămâne doar înregistrarea:
+  `Recordings/targets/` nu există pe `31bdbc8`.
 
 **R4-5. Configurația de filmare, scrisă pentru Persoana 5** (în PR-ul tău, ca secțiune nouă în `docs/PITCH.md` §4,
 dacă Persoana 5 e de acord, sau în body-ul PR-ului):

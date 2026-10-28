@@ -21,11 +21,12 @@ făcut; tu îl execuți, îl verifici pe cod și îl duci pe main fără să str
 
    Auditurile cu dovezi `fișier:linie` sunt în `docs/handoff/audits/*.json`. Citește din ele doar punctul la care lucrezi.
 3. Starea reală, acum: `git log --oneline -8 origin/main`, `gh pr list --state open`, `gh pr view 71`. Planul a fost
-   scris pe `f109121`, iar liniile din el sunt pe `655ebee`. Dacă #71 sau altceva a intrat între timp, ajustezi.
+   scris pe `f109121`, iar liniile din el sunt pe `655ebee`. La 01:25, `main` era `31bdbc8`, cu #71 și #72 intrate.
+   Dacă a mai intrat ceva între timp, ajustezi.
    Înainte să atingi o linie din plan, verifici în cod că problema mai există.
 4. Întreabă-mă o singură dată: „Ce lane-uri au luat colegii?” (planul, secțiunea 6.1: L1 Case, L2 Changes,
    L3 Architecture, L4 Dashboard). Până răspund, începi cu ce nu se calcă cu nimeni: P0-A pe fișierele lane-urilor
-   libere, apoi B1, după merge-ul #71.
+   libere, apoi B1 (#71 e deja pe `main`).
 
 ## 1. Reguli care nu se negociază
 

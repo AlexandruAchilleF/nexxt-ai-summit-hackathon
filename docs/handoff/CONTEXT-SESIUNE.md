@@ -3,6 +3,13 @@
 > Pentru chatul care preia munca, pe alt laptop. Citește întâi `PLAN-FRONTEND.md` (planul) și `HANDOFF-FRONTEND.md` (gustul de
 > design, kit-ul CRS, capcanele). Fișierul ăsta spune ce s-a întâmplat, ce e decis și ce rămâne.
 
+> **Actualizare 01:25, `main` = `31bdbc8`:**
+> - #70 și #71 sunt pe `main` (01:04). L1 și L3 pot porni direct din `main`.
+> - #72 (shers0a, 01:16): „Testează conexiunile” trimite acum o sondă SOAP reală la TIN on Europa. Gap-ul R3 din plan,
+>   secțiunea 7, e închis. `tools/setup-dev.sh` merge pe Linux și macOS (x64 și arm64); pe Windows doar prin WSL.
+> - #73 (README, codul de acces pentru Render) e deschis.
+> - O clonă curată de pe `31bdbc8` trece `tools/setup-dev.sh`, build-ul și testele (rezultatul e în raportul din chat).
+
 ## Cine și ce
 
 - **Utilizatorul:** WEX75, rolul R4 (agent și AI), care a preluat și frontend-ul. Scrie în română, fără diacritice uneori.
@@ -90,7 +97,7 @@
 
 ## Ce rămâne (în ordine)
 
-1. Merge #71, apoi lane-urile L1–L5 din plan (secțiunea 6).
+1. Lane-urile L1–L5 din plan (secțiunea 6). #71 e deja pe `main`.
 2. P0-A (~2 h), apoi P0-B: B1 `/architecture`, B2 o singură aprobare, B3 verdictul în cadru, B4 banda „Screened by code”, B5 trace-ul pe înțeles.
 3. Gap-urile de backend la proprietari. Cel mai urgent: R1, „depository account (depository account)”, care e pe cadrul din S5.
 4. Vocea EN în `docs/PITCH.md` (Persoana 5) și checklist-urile de filmare trecute pe EN (`PITCH.md` §4, `SUBMISSION.md:34`).
