@@ -55,7 +55,8 @@ public class CaseWorkflowEngineTests
         await host.As(Member).Cases.RegisterResponseAsync(code, Answer(selfCertId));
         var closed = await host.As(Admin).Cases.CloseAsync(code, ConfirmationChannel.Online);
 
-        Assert.Equal((CaseStatus.Closed, "SC-CONSISTENT"), (closed.Status, closed.OutcomeRuleId));
+        // Closing on a new self-certification cites SC-VALID (p. 34; human decision 28.10, golden case 4).
+        Assert.Equal((CaseStatus.Closed, "SC-VALID"), (closed.Status, closed.OutcomeRuleId));
         Assert.Equal(["DE"], closed.ReportableFor);
     }
 
