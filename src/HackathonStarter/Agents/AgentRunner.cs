@@ -10,7 +10,7 @@ namespace HackathonStarter.Agents;
 /// <summary>
 /// Runs agents and keeps the demo safe. Fallback chain:
 ///
-///   live model ──fails / timeout / rate limit──▶ recorded run (replay) ──none or not similar──▶ scripted mock (real tools)
+///   live model ──fails / timeout / rate limit──> recorded run (replay) ──none or not similar──> scripted mock (real tools)
 ///
 /// Models without native tool calling are handled by a JSON mode (the model replies with a JSON decision
 /// each step), so any model works, including open-weight ones (Featherless, Ollama…).
@@ -108,7 +108,7 @@ public class AgentRunner(
             w.Insert(0, new AgentStep
             {
                 Kind = StepKind.Reasoning,
-                Text = $"🖼️ {images} image(s) were sent to the model as-is: masking only applies to text.",
+                Text = $"Privacy: {images} image(s) were sent to the model as-is; masking only applies to text.",
             });
         }
         if (vault is { Count: > 0 })
@@ -117,7 +117,7 @@ public class AgentRunner(
             w.Insert(0, new AgentStep
             {
                 Kind = StepKind.Reasoning,
-                Text = $"🔒 {vault.Count} personal data item(s) ({string.Join(", ", vault.Types)}) were masked before anything was sent to the model; it only saw placeholders like [{vault.Types.First()}_1].",
+                Text = $"Privacy: {vault.Count} personal data item(s) ({string.Join(", ", vault.Types)}) were masked before anything was sent to the model; it only saw placeholders like [{vault.Types.First()}_1].",
             });
         }
         if ((run.InputTokens > 0 || run.OutputTokens > 0) && (Options.InputPricePerMillion > 0 || Options.OutputPricePerMillion > 0))
@@ -167,8 +167,10 @@ public class AgentRunner(
         var tools = agent.Tools(ctx).ToList();
         var options = new ChatOptions { Tools = [.. tools.Select(t => (AITool)t.Function)], ToolMode = ChatToolMode.Auto };
         var messages = BuildMessages(SystemPrompt(agent, ctx), history, vault, ctx.Files);
+        var proposed = false;
 
-        for (var step = 0; step < (agent.MaxSteps ?? Options.MaxSteps); step++)
+        // After a proposal the model gets exactly one more turn, even past the step limit, to tell the user about it.
+        for (var step = 0; step < (agent.MaxSteps ?? Options.MaxSteps) || proposed; step++)
         {
             var updates = new List<ChatResponseUpdate>();
             AgentStep? text = null;
@@ -190,6 +192,11 @@ public class AgentRunner(
             w.AddUsage(response.Usage);
             messages.AddRange(response.Messages);
             var calls = response.Messages.SelectMany(m => m.Contents).OfType<FunctionCallContent>().ToList();
+            if (proposed)
+            {
+                if (string.IsNullOrWhiteSpace(text?.Text)) await w.TypeAsync(ProposedAnswer);
+                return; // tool calls in the turn after a proposal are never run
+            }
             if (calls.Count == 0) return;
 
             var results = new List<AIContent>();
@@ -197,9 +204,12 @@ public class AgentRunner(
             {
                 var args = Unmask(ToJsonArgs(call.Arguments ?? new Dictionary<string, object?>()), vault);
                 var result = await InvokeToolAsync(tools, call.Name, args, call.CallId, ctx, w, ct);
+                proposed |= result == AwaitingApproval;
                 results.Add(new FunctionResultContent(call.CallId, vault?.Mask(result) ?? result));
             }
             messages.Add(new ChatMessage(ChatRole.Tool, results));
+            // The tool definitions stay (providers reject tool calls in the history without them), but none may be called.
+            if (proposed) options = new ChatOptions { Tools = options.Tools, ToolMode = ChatToolMode.None };
         }
         await w.TypeAsync("I reached the step limit before finishing. Try a more specific request.");
     }
@@ -223,8 +233,10 @@ public class AgentRunner(
             Call one tool at a time. When you know enough, set "tool" to null and put the final answer in "answer".
             """;
         var messages = BuildMessages(system, history, vault, ctx.Files);
+        var proposed = false;
 
-        for (var step = 0; step < (agent.MaxSteps ?? Options.MaxSteps); step++)
+        // Same rule as native mode: after a proposal, one last turn for the answer, even past the step limit.
+        for (var step = 0; step < (agent.MaxSteps ?? Options.MaxSteps) || proposed; step++)
         {
             var response = await client.GetResponseAsync<Decision>(messages, useJsonSchemaResponseFormat: Options.StructuredOutputs, cancellationToken: ct);
             w.AddUsage(response.Usage);
@@ -234,21 +246,30 @@ public class AgentRunner(
             if (!string.IsNullOrWhiteSpace(decision.Thought))
                 await w.AddAsync(new AgentStep { Kind = StepKind.Reasoning, Text = vault?.Unmask(decision.Thought) ?? decision.Thought });
 
-            if (string.IsNullOrEmpty(decision.Tool))
+            if (string.IsNullOrEmpty(decision.Tool) || proposed) // a tool asked for after a proposal is never run
             {
-                var answer = decision.Answer ?? "I couldn't find an answer.";
+                var answer = decision.Answer ?? (proposed ? ProposedAnswer : "I couldn't find an answer.");
                 await w.TypeAsync(vault?.Unmask(answer) ?? answer);
                 return;
             }
 
             var result = await InvokeToolAsync(tools, decision.Tool, Unmask(decision.Input ?? [], vault), AgentStep.NewId(), ctx, w, ct);
+            proposed = result == AwaitingApproval;
             messages.Add(new ChatMessage(ChatRole.Assistant, JsonSerializer.Serialize(decision, RunStore.Json)));
-            messages.Add(new ChatMessage(ChatRole.User, $"Observation from {decision.Tool}: {vault?.Mask(result) ?? result}"));
+            messages.Add(new ChatMessage(ChatRole.User, $"Observation from {decision.Tool}: {vault?.Mask(result) ?? result}"
+                + (proposed ? "\n\nNo tools are available any more: set \"tool\" to null and put your final answer in \"answer\"." : "")));
         }
         await w.TypeAsync("I reached the step limit before finishing. Try a more specific request.");
     }
 
     // ─── Tools + approvals ────────────────────────────────────────────────────────────────────────
+
+    /// <summary>What the model gets back for a proposed action. Seeing it, the live loops give the model one last turn, without tools.</summary>
+    private const string AwaitingApproval =
+        """{"status":"awaiting_human_approval","message":"This action needs human approval and has NOT been executed. Tell the user what you propose and that they can approve it below. Do not call more tools."}""";
+
+    /// <summary>Shown when the model ends its last turn after a proposal without any text.</summary>
+    private const string ProposedAnswer = "The proposed action needs human approval before it runs.";
 
     /// <summary>Runs a tool (or proposes it, if it needs approval) and records the steps. Returns the JSON result.</summary>
     private async Task<string> InvokeToolAsync(
@@ -267,7 +288,7 @@ public class AgentRunner(
                 Kind = StepKind.Approval, Tool = name, Input = inputJson, State = ApprovalState.Pending,
                 Summary = tool.Summarize?.Invoke(args) ?? $"Run {name}",
             });
-            return """{"status":"awaiting_human_approval","message":"This action needs human approval and has NOT been executed. Tell the user what you propose and that they can approve it below. Do not call more tools."}""";
+            return AwaitingApproval;
         }
 
         await w.AddAsync(new AgentStep { Kind = StepKind.ToolCall, Id = callId, Tool = name, Input = inputJson });
@@ -321,7 +342,7 @@ public class AgentRunner(
             {
                 var output = await ExecuteAsync(tool, args, ctx, CancellationToken.None);
                 run.Steps.Add(new AgentStep { Kind = StepKind.ToolResult, Id = id, Tool = step.Tool, Output = output });
-                run.Steps.Add(new AgentStep { Kind = StepKind.Text, Text = $"✅ Approved by {user.Name}. Done: {step.Summary}." });
+                run.Steps.Add(new AgentStep { Kind = StepKind.Text, Text = $"Approved by {user.Name}. Done: {step.Summary}." });
             }
             catch (Exception ex)
             {
@@ -331,7 +352,7 @@ public class AgentRunner(
         else
         {
             step.State = ApprovalState.Rejected;
-            run.Steps.Add(new AgentStep { Kind = StepKind.Text, Text = $"❌ Rejected by {user.Name}. No changes were made." });
+            run.Steps.Add(new AgentStep { Kind = StepKind.Text, Text = $"Rejected by {user.Name}. No changes were made." });
         }
 
         run.Status = run.Steps.Any(s => s is { Kind: StepKind.Approval, State: ApprovalState.Pending })
@@ -495,11 +516,11 @@ public class AgentRunner(
             var reply = await targets.SendAsync(scenario.Target, conversation, ct);
             if (reply.Source == TargetSource.Unavailable)
             {
-                await w.AddAsync(new AgentStep { Kind = StepKind.Reasoning, Text = $"🔌 {scenario.TargetLabel} is unavailable ({reply.Error}) and has no recorded answer; the conversation stops here." });
+                await w.AddAsync(new AgentStep { Kind = StepKind.Reasoning, Text = $"{scenario.TargetLabel} is unavailable ({reply.Error}) and has no recorded answer; the conversation stops here." });
                 break;
             }
             if (reply.Source == TargetSource.Replay)
-                await w.AddAsync(new AgentStep { Kind = StepKind.Reasoning, Text = $"↺ {scenario.TargetLabel} didn't answer ({reply.Error}); replaying its recorded answer." });
+                await w.AddAsync(new AgentStep { Kind = StepKind.Reasoning, Text = $"{scenario.TargetLabel} didn't answer ({reply.Error}); replaying its recorded answer." });
             await w.AddAsync(new AgentStep { Kind = StepKind.Text, Agent = scenario.TargetLabel, Text = reply.Text });
             conversation.Add(new ChatTurn("assistant", reply.Text));
             replies.Add(reply.Text);
@@ -555,9 +576,13 @@ public class AgentRunner(
         if (agent is ScenarioAgent || agent.Checks.Length == 0 || services.GetService<CheckEngine>() is not { } engine) return;
         try
         {
-            var text = string.Join("\n\n", w.Run.Snapshot().Where(s => s.Kind == StepKind.Text).Select(s => s.Text));
-            // The agent's own instructions, so "prompt-leak" can tell when an answer reveals them.
-            var facts = agent is ToolAgent toolAgent ? new Dictionary<string, string> { ["system-prompt"] = toolAgent.SystemPrompt(ctx) } : null;
+            var steps = w.Run.Snapshot();
+            var text = string.Join("\n\n", steps.Where(s => s.Kind == StepKind.Text).Select(s => s.Text));
+            // The agent's own instructions, so "prompt-leak" can tell when an answer reveals them,
+            // and the data its tools returned, so a check can compare the answer with it.
+            var facts = agent is ToolAgent toolAgent
+                ? new Dictionary<string, string> { ["system-prompt"] = toolAgent.SystemPrompt(ctx), ["tool-results"] = ToolResults(steps) }
+                : null;
             var report = engine.Evaluate(new CheckSubject(text, input, facts), agent.Checks);
             await w.AddAsync(new AgentStep
             {
@@ -570,6 +595,31 @@ public class AgentRunner(
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Checks failed to run for agent {Agent}", agent.Name);
+        }
+    }
+
+    /// <summary>The "tool-results" fact: [{ tool, input, output }] for every tool call that succeeded, JSON embedded as JSON.</summary>
+    private static string ToolResults(List<AgentStep> steps) =>
+        JsonSerializer.Serialize(
+            steps.Where(s => s is { Kind: StepKind.ToolResult, Error: null }).Select(r => new
+            {
+                tool = r.Tool,
+                input = JsonOrText(steps.FirstOrDefault(c => c.Kind == StepKind.ToolCall && c.Id == r.Id)?.Input),
+                output = JsonOrText(r.Output),
+            }),
+            RunStore.Json);
+
+    private static object? JsonOrText(string? json)
+    {
+        if (json is null) return null;
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            return doc.RootElement.Clone();
+        }
+        catch (JsonException)
+        {
+            return json;
         }
     }
 

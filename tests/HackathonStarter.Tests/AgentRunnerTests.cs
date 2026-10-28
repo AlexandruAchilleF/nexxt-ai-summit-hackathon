@@ -1,5 +1,7 @@
+using System.Text.Json;
 using HackathonStarter.Agents;
 using HackathonStarter.Config;
+using HackathonStarter.Features.Checks;
 using HackathonStarter.Features.Items;
 using HackathonStarter.Tests.Support;
 using Microsoft.Extensions.AI;
@@ -105,6 +107,98 @@ public class AgentRunnerTests
     }
 
     [Fact]
+    public async Task A_live_proposal_gets_one_last_turn_without_tools_then_the_run_ends()
+    {
+        var model = new FakeChatClient()
+            .CallTool("updateItem", new { id = 1, title = "Old prototype", status = "Archived" })
+            .Reply("proposed")
+            .CallTool("getStats", new { });
+        await using var host = await TestHost.CreateAsync(model);
+
+        var run = await host.RunAsync("assistant", "Archive the 'Old prototype' item");
+
+        Assert.Equal(RunStatus.AwaitingApproval, run.Status);
+        Assert.Equal(RunSource.Live, run.Source);
+        Assert.Single(run.Steps, s => s is { Kind: StepKind.Approval, State: ApprovalState.Pending });
+        Assert.DoesNotContain(run.Steps, s => s.Kind is StepKind.ToolCall or StepKind.ToolResult); // getStats never ran
+        Assert.Equal("proposed", run.Steps.Last(s => s.Kind == StepKind.Text).Text);
+        Assert.Equal(2, model.Calls.Count);
+        Assert.IsType<NoneChatToolMode>(model.CallOptions[1]!.ToolMode);
+    }
+
+    [Fact]
+    public async Task A_tool_called_in_the_turn_after_a_live_proposal_is_not_run()
+    {
+        var model = new FakeChatClient()
+            .CallTool("updateItem", new { id = 1, title = "Old prototype", status = "Archived" })
+            .CallTool("getStats", new { })
+            .Reply("too late");
+        await using var host = await TestHost.CreateAsync(model);
+
+        var run = await host.RunAsync("assistant", "Archive the 'Old prototype' item");
+
+        Assert.Equal(RunStatus.AwaitingApproval, run.Status);
+        Assert.Equal(RunSource.Live, run.Source);
+        Assert.DoesNotContain(run.Steps, s => s.Kind is StepKind.ToolCall or StepKind.ToolResult);
+        Assert.Equal(2, model.Calls.Count);
+        // The model ended its last turn without text: the run still tells the user what happens next.
+        Assert.Equal("The proposed action needs human approval before it runs.", run.Steps.Last(s => s.Kind == StepKind.Text).Text);
+    }
+
+    [Fact]
+    public async Task A_json_mode_proposal_gets_one_last_turn_then_the_run_ends()
+    {
+        var model = new FakeChatClient()
+            .Json(new { thought = "Propose it", tool = "updateItem", input = new { id = 1, title = "Old prototype", status = "Archived" }, answer = (string?)null })
+            .Json(new { thought = "Tell the user", tool = (string?)null, input = (object?)null, answer = "proposed" })
+            .Json(new { thought = "More data", tool = "getStats", input = new { }, answer = (string?)null });
+        await using var host = await TestHost.CreateAsync(model, ai => ai.ToolMode = "Json");
+
+        var run = await host.RunAsync("assistant", "Archive the 'Old prototype' item");
+
+        Assert.Equal(RunStatus.AwaitingApproval, run.Status);
+        Assert.Equal(RunSource.Live, run.Source);
+        Assert.DoesNotContain(run.Steps, s => s.Kind is StepKind.ToolCall or StepKind.ToolResult);
+        Assert.Equal("proposed", run.Steps.Last(s => s.Kind == StepKind.Text).Text);
+        Assert.Equal(2, model.Calls.Count);
+        Assert.Contains(model.Calls[1], m => m.Role == ChatRole.User && m.Text.Contains("No tools are available"));
+    }
+
+    [Fact]
+    public async Task A_tool_asked_for_after_a_json_mode_proposal_is_not_run()
+    {
+        var model = new FakeChatClient()
+            .Json(new { thought = "Propose it", tool = "updateItem", input = new { id = 1, title = "Old prototype", status = "Archived" }, answer = (string?)null })
+            .Json(new { thought = "More data", tool = "getStats", input = new { }, answer = (string?)null })
+            .Json(new { thought = "Done", tool = (string?)null, input = (object?)null, answer = "too late" });
+        await using var host = await TestHost.CreateAsync(model, ai => ai.ToolMode = "Json");
+
+        var run = await host.RunAsync("assistant", "Archive the 'Old prototype' item");
+
+        Assert.Equal(RunStatus.AwaitingApproval, run.Status);
+        Assert.Equal(RunSource.Live, run.Source);
+        Assert.DoesNotContain(run.Steps, s => s.Kind is StepKind.ToolCall or StepKind.ToolResult);
+        Assert.Contains("needs human approval", run.Steps.Last(s => s.Kind == StepKind.Text).Text);
+        Assert.Equal(2, model.Calls.Count);
+    }
+
+    [Fact]
+    public async Task Checks_get_the_successful_tool_results_of_the_run()
+    {
+        var model = new FakeChatClient().CallTool("lookupClient", new { id = 7 }).CallTool("broken", new { }).Reply("Ana has 1200.50 EUR.");
+        await using var host = await TestHost.CreateAsync(model, extraChecks: [new ToolResultsEcho()], extraAgents: new LookupAgent());
+
+        var run = await host.RunAsync("lookup-agent", "Balance of client 7?");
+
+        var fact = run.Steps.Single(s => s.Kind == StepKind.Check).Checks!.Single().Reason; // the echo check returns the fact
+        using var doc = JsonDocument.Parse(fact);
+        var result = Assert.Single(doc.RootElement.EnumerateArray()); // the failed call is left out
+        Assert.Equal("lookupClient", result.GetProperty("tool").GetString());
+        Assert.Equal(7, result.GetProperty("input").GetProperty("id").GetInt32());
+        Assert.Equal("Ana", result.GetProperty("output").GetProperty("name").GetString()); // embedded as JSON, not as a string
+    }
+
+    [Fact]
     public async Task Viewer_cannot_approve()
     {
         await using var admin = await TestHost.CreateAsync(client: null);
@@ -173,7 +267,7 @@ public class AgentRunnerTests
         Assert.Contains("[IBAN_1]", model.AllUserText);
         Assert.Contains(iban, run.Steps.Last(s => s.Kind == StepKind.Text).Text); // restored in the answer
         Assert.Equal(2, run.MaskedCount);
-        Assert.StartsWith("🔒", run.Steps[0].Text);
+        Assert.StartsWith("Privacy: 2 personal data item(s)", run.Steps[0].Text);
     }
 
     [Fact]
@@ -202,7 +296,7 @@ public class AgentRunnerTests
         var image = Assert.Single(user.Contents.OfType<DataContent>());
         Assert.Equal("image/jpeg", image.MediaType);
         Assert.Contains("What is this?", user.Text);
-        Assert.Contains(run.Steps, s => s.Text.StartsWith("🖼️"));   // privacy note: images aren't masked
+        Assert.Contains(run.Steps, s => s.Text.StartsWith("Privacy: 1 image(s)"));   // privacy note: images aren't masked
         Assert.Equal("A receipt for 42 EUR.", run.Steps.Last(s => s.Kind == StepKind.Text).Text);
     }
 
@@ -272,6 +366,30 @@ public class AgentRunnerTests
         Assert.Equal(3, trimmed.Count);
         Assert.EndsWith("10", trimmed[^1].Content);
         Assert.Single(AgentRunner.TrimHistory([new ChatTurn("user", new string('y', 5000))], maxChars: 10)); // last one always kept
+    }
+
+    private sealed class LookupAgent : ToolAgent
+    {
+        public override string Name => "lookup-agent";
+        public override string Label => "Lookup";
+        public override string Description => "Has a tool that returns an object and one that fails.";
+        public override string[] Checks => ["echo-tool-results"];
+        public override string SystemPrompt(ToolContext ctx) => "Test agent.";
+        public override IEnumerable<AgentTool> Tools(ToolContext ctx) =>
+        [
+            AgentTool.Create("lookupClient", "Returns a client.", (int id) => new { id, name = "Ana", balance = 1200.50m }),
+            AgentTool.Create("broken", "Always fails.", string () => throw new InvalidOperationException("down")),
+        ];
+        public override Task MockAsync(MockContext mock) => mock.SayAsync("mock");
+    }
+
+    /// <summary>Test only: passes, with the "tool-results" fact as its reason.</summary>
+    private sealed class ToolResultsEcho : Check
+    {
+        public override string Id => "echo-tool-results";
+        public override string Title => "Echo tool results";
+        public override string Description => "Returns the tool-results fact.";
+        public override CheckResult Evaluate(CheckSubject subject) => Pass(subject.Fact("tool-results") ?? "missing");
     }
 
     private sealed class SlowAgent : ToolAgent
