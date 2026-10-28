@@ -16,6 +16,8 @@ public sealed class FakeChatClient : IChatClient
 
     /// <summary>Messages received on every call, in order.</summary>
     public List<List<ChatMessage>> Calls { get; } = [];
+    /// <summary>Options received on every call (tools offered, tool mode), in the same order as <see cref="Calls"/>.</summary>
+    public List<ChatOptions?> CallOptions { get; } = [];
     /// <summary>Simulates a model/provider without tool calling: requests with tools throw.</summary>
     public bool RejectTools { get; set; }
     public TimeSpan Delay { get; set; }
@@ -42,6 +44,7 @@ public sealed class FakeChatClient : IChatClient
     {
         var list = messages.ToList();
         Calls.Add(list);
+        CallOptions.Add(options);
         if (Delay > TimeSpan.Zero) await Task.Delay(Delay, cancellationToken);
         if (RejectTools && options?.Tools is { Count: > 0 }) throw new NotSupportedException("tools are not supported by this model");
         if (_script.Count == 0) throw new InvalidOperationException("FakeChatClient: script exhausted");

@@ -83,7 +83,8 @@ public class ChangeServiceTests
         Assert.Equal(["DE"], after.CurrentAddresses.Select(a => a.Country));
         var client = await LoadAsync(host, "CL-0001");
         Assert.False(client.Phones.Single(p => p.Country == "RO").IsCurrent);
-        Assert.Contains("+498945217730", result.Change.NewValueJson);
+        Assert.DoesNotContain("+498945217730", result.Change.NewValueJson); // stored masked, like the RO phone (PLAN 13.1)
+        Assert.Contains("[PHONE-", result.Change.NewValueJson);
         Assert.Contains("Leopoldstrasse 12", result.Change.NewValueJson);
         Assert.Equal("New address in Munich and a German phone that replaces the RO phone", result.Change.Summary);
     }
