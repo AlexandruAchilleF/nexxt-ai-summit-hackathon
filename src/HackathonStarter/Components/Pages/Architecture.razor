@@ -1,136 +1,161 @@
 @page "/architecture"
-@using Microsoft.EntityFrameworkCore
+@using HackathonStarter.Features.Audit
+@using HackathonStarter.Features.Rules
 @using HackathonStarter.Features.Sentinel
 @inject IEnumerable<AgentDefinition> Agents
 @inject ChatClientProvider Ai
-@inject IConfiguration Config
 @inject IServiceProvider Services
 @inject CurrentUser CurrentUser
-@inject RunStore Store
+@inject IAuditLog Audit
 
 <PageTitle>@T("Architecture") · @SiteConfig.Name</PageTitle>
 
-@* "How it works" page, built for the architecture part of the pitch video. Agents and tools are read live. *@
-<PageHeader Title="@T("Architecture")" Description="@T("How a request flows through the system, from the user to the agent, its tools and the data.")" />
+@* "How it works", filmed for the architecture part of the pitch (S7). Every number on it is read live. *@
+<PageHeader Title="@T("How CRS Sentinel decides")" Description="@T("Code decides. AI explains. A person approves.")" />
 
-<div class="d-flex flex-wrap align-center gap-2 mb-6">
-    @for (var i = 0; i < _layers.Count; i++)
+<ol class="arch-flow mb-3" aria-label="@T("Maria's case, step by step")">
+    @foreach (var (step, i) in Flow.Select((s, i) => (s, i)))
     {
-        var layer = _layers[i];
-        <MudPaper Outlined="true" Class="pa-4" Style="flex:1;min-width:170px">
-            <div class="d-flex align-center gap-2 mb-2">
-                <MudAvatar Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined" Rounded="true"><MudIcon Icon="@layer.Icon" Size="Size.Small" /></MudAvatar>
-                <MudText Typo="Typo.subtitle2">@layer.Title</MudText>
-            </div>
-            @foreach (var line in layer.Items)
+        <li class="@($"arch-step arch-{step.Who}")">
+            <span class="arch-num">@(i + 1)</span>
+            <span class="arch-text">@T(step.Text)</span>
+            <span class="arch-who">@WhoLabel(step.Who)</span>
+        </li>
+    }
+</ol>
+
+<div class="arch-chain mb-6">
+    <MudIcon Icon="@Icons.Material.Outlined.Link" Size="Size.Small" />
+    <span>@T("Every step is written to the hash-chained audit log.")</span>
+    @if (_chain is { } v)
+    {
+        <a href="/audit" class="arch-chain-link">
+            @if (v.Ok)
             {
-                <MudText Typo="Typo.caption" Class="mono mud-text-secondary d-block">@line</MudText>
+                <Pill Tone="success" Icon="@Icons.Material.Rounded.Verified">@T("intact · {0} entries", v.Checked)</Pill>
             }
-        </MudPaper>
-        @if (i < _layers.Count - 1)
-        {
-            <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Class="mud-text-secondary" />
-        }
+            else
+            {
+                <Pill Tone="danger" Icon="@Icons.Material.Rounded.LinkOff">@T("broken at entry #{0}", v.FirstBrokenSeq ?? 0)</Pill>
+            }
+        </a>
     }
 </div>
 
-@if (_stats is { } st)
+<div class="arch-cols mb-6">
+    <section class="arch-col arch-code">
+        <h2>@T("Code decides")</h2>
+        <ul>
+            <li>@RulesLine</li>
+            <li>@T("Deadlines by rule: {0} for a new account, {1} for a pre-existing one", RuleIds.DeadlineNew90, RuleIds.DeadlinePreexistingYear)</li>
+            <li>@T("The shield removes hidden text before any model reads a document")</li>
+            <li>@T("Every quote is checked against the document's visible text")</li>
+        </ul>
+        <p class="arch-never"><MudIcon Icon="@Icons.Material.Outlined.Block" Size="Size.Small" />@T("It never asks a model whether a rule applies.")</p>
+    </section>
+
+    <section class="arch-col arch-ai">
+        <h2>@T("AI explains")</h2>
+        <ul>
+            <li>@T("CRS Sentinel: {0} tools, {1} of them wait for a person", _tools.Count, _tools.Count(t => t.NeedsApproval))</li>
+            <li>@T("Reads the documents, quotes the evidence and drafts the letter in the client's language")</li>
+            <li>@ModelLine</li>
+            <li>@T("{0} checks on every answer: no personal data, every quote verified", _checks)</li>
+            <li>@T("National ID, IBAN, card, email and phone are masked before the model")</li>
+        </ul>
+        <p class="arch-never"><MudIcon Icon="@Icons.Material.Outlined.Block" Size="Size.Small" />@T("It never decides and never sends.")</p>
+    </section>
+
+    <section class="arch-col arch-person">
+        <h2>@T("A person approves")</h2>
+        <ul>
+            <li>@T("Sending the letter to the client")</li>
+            <li>@T("Closing the case")</li>
+            <li>@T("A four-eyes warning when the approver also drafted it")</li>
+            <li>@T("Moving the demo date and Tamper are admin only")</li>
+        </ul>
+        <p class="arch-never"><MudIcon Icon="@Icons.Material.Outlined.Block" Size="Size.Small" />@T("Nothing irreversible happens in one click.")</p>
+    </section>
+</div>
+
+@if (_tools.Count > 0)
 {
-    <MudGrid Spacing="3" Class="mb-2">
-        <MudItem xs="6" md="3"><StatCard Label="@T("Agent runs")" Value="@Format.Number(st.Runs)" Icon="@Icons.Material.Outlined.History" /></MudItem>
-        <MudItem xs="6" md="3"><StatCard Label="@T("Avg duration")" Value="@($"{st.AvgSeconds:0.0}s")" Icon="@Icons.Material.Outlined.Timer" /></MudItem>
-        <MudItem xs="6" md="3"><StatCard Label="@T("Avg tokens / run")" Value="@Format.Number((decimal)st.AvgTokens)" Icon="@Icons.Material.Outlined.DataUsage" Hint="@T("live runs")" /></MudItem>
-        <MudItem xs="6" md="3"><StatCard Label="@T("Avg cost / run")" Value="@(st.AvgCost is { } c ? "$" + c.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture) : "–")" Icon="@Icons.Material.Outlined.Paid" Hint="@T(st.AvgCost is null ? "set AI:InputPricePerMillion" : "estimate")" /></MudItem>
-    </MudGrid>
+    <div class="arch-tools mb-6">
+        <span class="arch-tools-label">@T("The agent's tools")</span>
+        @foreach (var t in _tools)
+        {
+            <span class="@(t.NeedsApproval ? "arch-tool arch-tool-gated" : "arch-tool")" title="@t.Description">@t.Name@if (t.NeedsApproval) {<MudIcon Icon="@Icons.Material.Outlined.HowToReg" Size="Size.Small" />}</span>
+        }
+        <span class="arch-tools-note"><MudIcon Icon="@Icons.Material.Outlined.HowToReg" Size="Size.Small" />@T("waits for a person's approval")</span>
+    </div>
 }
 
-<MudGrid Spacing="3">
-    <MudItem xs="12" md="6">
-        <MudPaper Outlined="true" Class="pa-5" Style="height:100%">
-            <MudText Typo="Typo.subtitle1" Style="font-weight:600" Class="mb-3"><MudIcon Icon="@Icons.Material.Outlined.Shield" Size="Size.Small" /> @T("Safe by design")</MudText>
-            <MudText Typo="Typo.body2" Class="mb-2"><b>@T("Human in the loop:")</b> @T("actions that change data are only proposed by the agent; a person approves them.")</MudText>
-            <MudText Typo="Typo.body2" Class="mb-2"><b>@T("Full audit trail:")</b> @T("every run is stored with each tool call, its input and output, and who approved what.")</MudText>
-            <MudText Typo="Typo.body2" Class="mb-2"><b>@T("Privacy:")</b> @T("personal data (CNP, IBAN, card, email, phone) is masked before anything reaches the model and restored in the answer.")</MudText>
-            <MudText Typo="Typo.body2" Class="mb-2"><b>@T("Deterministic finance:")</b> @T("the AI calls tested C# functions for every calculation; it never does the math.")</MudText>
-            <MudText Typo="Typo.body2" Class="mb-3"><b>@T("Model-agnostic:")</b> @T("Microsoft.Extensions.AI with Azure OpenAI, OpenAI-compatible (incl. self-hosted open-weight models) or Anthropic; models without tool calling use a JSON fallback.")</MudText>
-            <div class="d-flex flex-wrap align-center gap-1">
-                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@T("Live model")</MudChip>
-                <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Size="Size.Small" />
-                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@T("Recorded run")</MudChip>
-                <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Size="Size.Small" />
-                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@T("Scripted mock")</MudChip>
-                <MudText Typo="Typo.caption" Class="mud-text-secondary">@T("fallback chain: never a blank screen")</MudText>
-            </div>
-        </MudPaper>
-    </MudItem>
-    <MudItem xs="12" md="6">
-        <MudPaper Outlined="true" Class="pa-5" Style="height:100%">
-            <MudText Typo="Typo.subtitle1" Style="font-weight:600">@T("Agents")</MudText>
-            <MudText Typo="Typo.caption" Class="mud-text-secondary">@T("CRS Sentinel and its tools (the template's example agents are hidden)")</MudText>
-            @foreach (var agent in Shown)
-            {
-                <div class="mt-3">
-                    <div class="d-flex align-center gap-2">
-                        <MudIcon Icon="@(agent switch { PanelAgent => Icons.Material.Outlined.Groups, ScenarioAgent => Icons.Material.Outlined.Forum, _ => Icons.Material.Outlined.SmartToy })" Size="Size.Small" />
-                        <MudText Typo="Typo.body2" Style="font-weight:600">@agent.Label</MudText>
-                        <MudChip T="string" Size="Size.Small">@T(agent switch { PanelAgent => "multi-agent", ScenarioAgent => "scenario", _ => "tool agent" })</MudChip>
-                    </div>
-                    <div class="d-flex flex-wrap gap-1 mt-1">
-                        @if (agent is ToolAgent ta && _ctx is not null)
-                        {
-                            @foreach (var t in ta.Tools(_ctx))
-                            {
-                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="mono">@t.Name@(t.NeedsApproval ? " · " + T("approval") : "")</MudChip>
-                            }
-                        }
-                        else if (agent is PanelAgent pa)
-                        {
-                            @foreach (var p in pa.Participants.Append(pa.Judge))
-                            {
-                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@p.Name: @p.Role</MudChip>
-                            }
-                        }
-                    </div>
-                </div>
-            }
-        </MudPaper>
-    </MudItem>
-</MudGrid>
+<MudPaper Outlined="true" Class="pa-4 d-flex align-start gap-3">
+    <MudIcon Icon="@Icons.Material.Outlined.AccountBalance" Class="mud-text-secondary mt-1" />
+    <div>
+        <MudText Typo="Typo.subtitle2">@T("In a bank")</MudText>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">@T("In the demo, the form simulates each change. In a bank, core banking would send every change to the same service, and the same rules would run.")</MudText>
+    </div>
+</MudPaper>
 
 @code {
-    private record Layer(string Icon, string Title, string[] Items);
-    private record Stats(int Runs, double AvgSeconds, double AvgTokens, decimal? AvgCost);
-    private List<Layer> _layers = [];
-    private ToolContext? _ctx;
-    private Stats? _stats;
+    private record Step(string Text, string Who);
 
-    // The pitch shows the product agent; the template's example agents stay registered but off this page.
-    private IEnumerable<AgentDefinition> Shown => Agents.Any(a => a.Name == SentinelTools.AgentName)
-        ? Agents.Where(a => a.Name == SentinelTools.AgentName)
-        : Agents;
+    // Maria's route (PLAN.md 6.3): who acts at each step is the point of the page.
+    private static readonly Step[] Flow =
+    [
+        new("A change comes in", "code"),
+        new("The rules are applied by code", "code"),
+        new("A case opens with its deadline", "code"),
+        new("The agent reads and quotes the file", "ai"),
+        new("A person approves the letter", "person"),
+        new("Code checks the answer again", "code"),
+        new("A person approves the closing", "person"),
+        new("Closed with the proof", "code"),
+    ];
+
+    private List<AgentTool> _tools = [];
+    private int _checks;
+    private AuditVerification? _chain;
+
+    private static string WhoLabel(string who) => who switch
+    {
+        "ai" => T("AI"),
+        "person" => T("Person"),
+        _ => T("Code"),
+    };
+
+    private static string RulesLine
+    {
+        get
+        {
+            var all = RuleCatalog.All;
+            return T("{0} rules, each with an ID and a source: {1} from the text of the law, {2} our reading, {3} bank policy",
+                all.Count, all.Count(r => r.Basis == RuleBasis.Verified), all.Count(r => r.Basis == RuleBasis.Interpretation),
+                all.Count(r => r.Basis == RuleBasis.Policy));
+        }
+    }
+
+    private string ModelLine
+    {
+        get
+        {
+            if (!Ai.IsConfigured) return T("No model set: the simulation runs the same real tools");
+            var o = Ai.Options;
+            return string.Equals(o.Provider, "Bedrock", StringComparison.OrdinalIgnoreCase)
+                ? T("Model: {0} on Amazon Bedrock, {1}", o.Model, o.BedrockRegion)
+                : T("Model: {0} ({1})", o.Model, o.Provider);
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
-        _ctx = new ToolContext(await CurrentUser.GetAsync(), [], Services);
-        var runs = await Store.ListAsync(100);
-        var finished = runs.Where(r => r.FinishedAt is not null).ToList();
-        var live = runs.Where(r => r.InputTokens + r.OutputTokens > 0).ToList();
-        var priced = runs.Where(r => r.EstimatedCost is not null).ToList();
-        _stats = new Stats(
-            runs.Count,
-            finished.Count == 0 ? 0 : finished.Average(r => (r.FinishedAt!.Value - r.CreatedAt).TotalSeconds),
-            live.Count == 0 ? 0 : live.Average(r => r.InputTokens + r.OutputTokens),
-            priced.Count == 0 ? null : Math.Round(priced.Average(r => r.EstimatedCost!.Value), 6));
-        var tools = Shown.OfType<ToolAgent>().SelectMany(a => a.Tools(_ctx)).Select(t => t.Name).Distinct().ToArray();
-        var db = Config["Database:Provider"] ?? "Sqlite";
-        var model = Ai.IsConfigured ? $"{Ai.Options.Provider}: {Ai.Options.Model}" : T("none (replay / mock)");
-        _layers =
-        [
-            new(Icons.Material.Outlined.Monitor, T("Web app"), ["Blazor Server", "MudBlazor UI", T("Live agent timeline")]),
-            new(Icons.Material.Outlined.Dns, T("Services + API"), ["ASP.NET Core", T("Cookie auth + roles"), "REST API (/api-docs)"]),
-            new(Icons.Material.Outlined.SmartToy, T("Agent runtime"), [T("Tool-calling loop"), T("Human approval"), T("Record / replay")]),
-            new(Icons.Material.Outlined.Build, T("Tools"), tools.Take(6).ToArray()),
-            new(Icons.Material.Outlined.Storage, T("Data & models"), [$"EF Core · {db}", $"LLM: {model}", T("Run history (audit)")]),
-        ];
+        var sentinel = Agents.FirstOrDefault(a => a.Name == SentinelTools.AgentName);
+        if (sentinel is ToolAgent ta)
+        {
+            _tools = ta.Tools(new ToolContext(await CurrentUser.GetAsync(), [], Services)).ToList();
+            _checks = ta.Checks.Length;
+        }
+        _chain = await Audit.VerifyAsync();
     }
 }
