@@ -265,7 +265,7 @@ public sealed class SentinelTools(IServiceProvider services)
             return Error($"Unknown rule {ruleId}: use a rule ID from getCase or evaluateRules.");
         var e = await Cases.AddEvidenceAsync(new NewEvidence(c.ClientCode, c.Code, EvidenceSource.Document, quote, documentId, page,
             string.IsNullOrWhiteSpace(ruleId) ? null : ruleId.Trim(), Actor(user)));
-        return new { e.Id, e.Quote, e.Verified, Note = e.VerificationNote, RuleId = e.LinkedRuleId, e.DocumentId, e.Page };
+        return new { e.Id, e.Quote, e.Verified, Note = e.VerificationNote, RuleId = e.LinkedRuleId, LinkedRule = e.LinkedRuleId, e.DocumentId, e.Page };
     }
 
     public async Task<object> RecordSignalAsync(
@@ -314,10 +314,11 @@ public sealed class SentinelTools(IServiceProvider services)
             return new
             {
                 CaseCode = c.Code, doc.DocumentId, doc.FileName, Source = "recorded", ShieldVerdict = doc.Result.Verdict.ToString(),
+                Fields = Array.Empty<FieldCheck>(), // The saved self-certification does not retain field quotes.
                 Jurisdictions = already.Residences.Select(r => new
                 {
                     r.Country, r.Tin, NoTinReason = r.Tin is null ? r.NoTinReason.ToString() : null, r.NoTinExplanation, Verified = true,
-                    Note = "Recorded earlier from this document, every quote verified then.",
+                    Source = "recorded", Note = "Recorded earlier from this document, every quote verified then.",
                 }),
                 Complete = true, Missing = Array.Empty<string>(), Recorded = true, AlreadyRecorded = true, SelfCertificationId = already.Id,
                 Outcome = Outcome(services.GetRequiredService<ICrsRuleEngine>().EvaluateSelfCertification(ClientSnapshot.From(client), SelfCertificationSnapshot.From(already))),
@@ -348,7 +349,7 @@ public sealed class SentinelTools(IServiceProvider services)
             Jurisdictions = check.Jurisdictions.Select(j => new
             {
                 j.Country, j.Tin, NoTinReason = j.Verified && j.Tin is null ? j.NoTinReason.ToString() : null, j.NoTinExplanation,
-                j.Quote, j.Page, j.Verified, j.Note,
+                j.Quote, j.Page, j.Verified, j.Note, ai.Source,
             }),
             check.Complete, check.Missing,
             Recorded = check.Complete, SelfCertificationId = selfCertificationId, Outcome = outcome,

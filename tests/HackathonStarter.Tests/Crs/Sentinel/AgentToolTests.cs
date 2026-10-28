@@ -190,6 +190,8 @@ public class AgentToolTests
             caseCode = MariaWorld.CaseCode, documentId = MariaWorld.PayslipId, page = 1, quote = "Rezident fiscal în Germania",
         });
 
+        Assert.Equal("CRS-IND-PHONE", ok.GetProperty("linkedRule").GetString());
+        Assert.Equal(ok.GetProperty("ruleId").GetString(), ok.GetProperty("linkedRule").GetString());
         Assert.True(ok.GetProperty("verified").GetBoolean());
         Assert.False(bad.GetProperty("verified").GetBoolean());
         Assert.Equal(2, world.Case.Evidence.Count);

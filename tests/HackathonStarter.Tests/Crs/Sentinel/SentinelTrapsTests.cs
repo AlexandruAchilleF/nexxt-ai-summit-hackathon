@@ -190,6 +190,9 @@ public class SentinelGuardsTests
         var second = await host.ToolAsync("extractSelfCertification", new { caseCode = code, documentId });
 
         Assert.True(first.GetProperty("recorded").GetBoolean());
+        Assert.Equal("recorded", second.GetProperty("source").GetString());
+        Assert.Empty(second.GetProperty("fields").EnumerateArray());
+        Assert.Equal("recorded", Assert.Single(second.GetProperty("jurisdictions").EnumerateArray()).GetProperty("source").GetString());
         Assert.Equal(first.GetProperty("selfCertificationId").GetInt32(), second.GetProperty("selfCertificationId").GetInt32());
         var client = (await host.Get<IClientService>().GetAsync("CL-0001"))!;
         Assert.Single(client.SelfCertifications, s => s.DocumentId == documentId);

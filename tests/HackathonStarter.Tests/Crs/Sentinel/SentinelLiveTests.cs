@@ -41,8 +41,15 @@ public class SentinelLiveTests(ITestOutputHelper output)
 
     [LiveFact]
     public async Task Maria_on_the_live_model_stops_at_both_approvals_and_closes_with_the_proof()
+        => await MariaLiveAsync("ro-RO");
+
+    [LiveFact]
+    public async Task Maria_on_the_live_model_in_English_stops_at_both_approvals_and_closes_with_the_proof()
+        => await MariaLiveAsync("en-US");
+
+    private async Task MariaLiveAsync(string culture)
     {
-        using var _ = new UiLanguage("ro-RO");
+        using var _ = new UiLanguage(culture);
         var (host, clock) = await RealWorld.CreateAsync(Bedrock(SonnetModel),
             profiles: new Dictionary<string, IChatClient> { ["extract"] = Bedrock(HaikuModel) },
             ai: o => { o.Model = SonnetModel; o.TimeoutSeconds = 120; });
@@ -57,11 +64,15 @@ public class SentinelLiveTests(ITestOutputHelper output)
         Assert.Equal(RunStatus.AwaitingApproval, run1.Status);
         Assert.Equal(SentinelTools.SendClientRequest, Assert.Single(run1.Steps, s => s.Kind == StepKind.Approval).Tool);
         run1.ChecksPass();
+        if (culture == "en-US") SentinelMariaTests.AssertEnglish(run1.Answer());
         var prepared = (await host.CaseAsync(CaseCode))!;
         Assert.Equal(CaseStatus.Open, prepared.Status);
         Assert.Contains(prepared.Evidence, e => e.Verified && e.LinkedRuleId == "CRS-IND-PHONE");
         Assert.All(prepared.Evidence, e => Assert.True(e.Verified, e.Quote));
-        Assert.Equal(RequestStatus.Draft, Assert.Single(prepared.Requests).Status);
+        var letter = Assert.Single(prepared.Requests);
+        Assert.Equal(RequestStatus.Draft, letter.Status);
+        Assert.Equal("ro", letter.Language);
+        Assert.True(new[] { "vă", "dumneavoastră", "Stimat", "Bună", "rezidenț" }.Any(w => letter.Body.Contains(w, StringComparison.OrdinalIgnoreCase)), letter.Body);
 
         await host.DecideAsync(run1, SentinelTools.SendClientRequest);
         Assert.Equal(CaseStatus.AwaitingClient, (await host.CaseAsync(CaseCode))!.Status);
@@ -76,6 +87,7 @@ public class SentinelLiveTests(ITestOutputHelper output)
         Assert.Equal(RunStatus.AwaitingApproval, run2.Status);
         Assert.Equal(SentinelTools.CloseCase, Assert.Single(run2.Steps, s => s.Kind == StepKind.Approval).Tool);
         run2.ChecksPass();
+        if (culture == "en-US") SentinelMariaTests.AssertEnglish(run2.Answer());
         Assert.Equal(CaseStatus.ResponseReceived, (await host.CaseAsync(CaseCode))!.Status);
 
         await host.DecideAsync(run2, SentinelTools.CloseCase);

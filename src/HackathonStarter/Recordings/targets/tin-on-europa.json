@@ -1,0 +1,7 @@
+[
+  {
+    "conversation": "user: fingerprint 00e23627390f1298c2bd8ad698ced6996eb193da2ffc15e5918230cd5f6535ca\nuser: soapenv envelope xmlns soapenv http schemas xmlsoap org soap envelope xmlns urn urn ec europa eu taxud tin services checktin types soapenv header soapenv body urn checktin urn countrycode de urn countrycode urn tinnumber 86095174223 urn tinnumber urn checktin soapenv body soapenv envelope",
+    "reply": "\u003Cenv:Envelope xmlns:env=\u0022http://schemas.xmlsoap.org/soap/envelope/\u0022\u003E\u003Cenv:Header/\u003E\u003Cenv:Body\u003E\u003Cns2:checkTinResponse xmlns:ns2=\u0022urn:ec.europa.eu:taxud:tin:services:checkTin:types\u0022\u003E\u003Cns2:countryCode\u003EDE\u003C/ns2:countryCode\u003E\u003Cns2:tinNumber\u003E86095174223\u003C/ns2:tinNumber\u003E\u003Cns2:requestDate\u003E2026-10-29\u002B01:00\u003C/ns2:requestDate\u003E\u003Cns2:validStructure\u003Etrue\u003C/ns2:validStructure\u003E\u003Cns2:validSyntax\u003Etrue\u003C/ns2:validSyntax\u003E\u003C/ns2:checkTinResponse\u003E\u003C/env:Body\u003E\u003C/env:Envelope\u003E",
+    "recordedAt": "2026-10-28T23:40:51.1350249Z"
+  }
+]

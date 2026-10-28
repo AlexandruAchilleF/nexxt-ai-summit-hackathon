@@ -41,6 +41,7 @@ public class AgentExtractionTests
         Assert.Equal("2027-01-21", fields["signatureDate"].GetProperty("value").GetString());
         Assert.Contains("Leopoldstraße 12, 80802 München", fields["residenceAddress"].GetProperty("value").GetString());
         var de = Assert.Single(r.GetProperty("jurisdictions").EnumerateArray());
+        Assert.Equal("mock", de.GetProperty("source").GetString());
         Assert.Equal("DE", de.GetProperty("country").GetString());
         Assert.Equal("86095174223", de.GetProperty("tin").GetString());
         Assert.True(de.GetProperty("verified").GetBoolean());
