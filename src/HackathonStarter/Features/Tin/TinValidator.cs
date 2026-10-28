@@ -8,7 +8,17 @@ public enum TinCheckSource { NotChecked, LocalRules, TinOnEuropaLive, TinOnEurop
 /// <see cref="FormatValid"/> means nothing when <see cref="Source"/> is NotChecked (no rule for that country yet): treat it
 /// as unknown, never as a wrong format.
 /// </summary>
-public record TinCheck(string Country, string Normalized, bool FormatValid, TinCheckSource Source, string Note);
+public record TinCheck(string Country, string Normalized, bool FormatValid, TinCheckSource Source, string Note)
+{
+    /// <summary>Missing (no TIN) and Unsupported (no rule for the country) are never a wrong format.</summary>
+    public TinFormatStatus Status =>
+        Normalized.Length == 0 ? TinFormatStatus.Missing
+        : Source == TinCheckSource.NotChecked ? TinFormatStatus.Unsupported
+        : FormatValid ? TinFormatStatus.Valid
+        : TinFormatStatus.Invalid;
+}
+
+public enum TinFormatStatus { Valid, Invalid, Missing, Unsupported }
 
 /// <summary>
 /// Offline TIN format rules per country (OECD TIN sheets): synchronous and pure, so the rule engine can use it. Owner: R3.
@@ -26,15 +36,6 @@ public interface ITinFormat
 public interface ITinValidator
 {
     Task<TinCheck> CheckAsync(string country, string tin, CancellationToken ct = default);
-}
-
-/// <summary>Phase 0 placeholder: nothing checked yet. R3 replaces it.</summary>
-public sealed class TinFormat : ITinFormat
-{
-    public TinCheck Check(string country, string tin) =>
-        new(country.ToUpperInvariant(), tin.Trim(), false, TinCheckSource.NotChecked, "TIN format rules not implemented yet.");
-
-    public bool? IssuesTinToAllResidents(string country) => null;
 }
 
 /// <summary>Phase 0 placeholder: the format only (no live call yet). R3 adds TIN on Europa.</summary>
