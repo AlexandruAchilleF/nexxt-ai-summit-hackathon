@@ -1,23 +1,24 @@
 # CRS Sentinel: pitch și scenariul video (draft)
 
-> Proprietar: Persoana 5 (cu toată echipa). Video ≤ 3:00, filmat pe `AgentMode = Replay`.
+> Proprietar: Persoana 5 (cu toată echipa). Video ≤ 3:00, filmat live (Bedrock) sau pe mock, **niciodată în `AgentMode = Replay` pe pașii care modifică date**.
 > Regula: orice cifră vine dintr-o rulare reală (`/metrics`, testele) sau dintr-o sursă citată. Ce e NEVERIFICAT nu se spune.
 > Verifică textul final față de `docs/PLAN.md` secțiunea 24 („Ce nu spunem”).
 
 ## Fraza de deschidere (10 secunde)
 
-„Când un client își schimbă adresa, banca are 90 de zile să afle din nou unde plătește el taxe. CRS Sentinel transformă fiecare
-modificare de date într-o decizie CRS/FATCA, înainte să expire termenul.”
+„Când un client își schimbă adresa în altă țară, banca are de obicei 90 de zile să afle din nou unde plătește el taxe.
+CRS Sentinel transformă fiecare modificare de date într-o decizie CRS/FATCA, înainte să expire termenul.”
 
 ## Scenariul (≤ 3:00)
 
 | Timp | Ce se vede | Ce se spune |
 | --- | --- | --- |
-| 0:00–0:20 | Titlul, apoi coada de cazuri | Problema: fiecare modificare trebuie evaluată; doar cele relevante fiscal pornesc un termen de 90 de zile (Ghid ANAF, p. 35–36). Cifrele ANAF despre verificări: doar după ce le citim din sursă (azi NEVERIFICAT). |
-| 0:20–0:50 | Maria se mută la München; caz deschis cu termen | Codul găsește două indicii, fiecare cu regula și pagina. Termenul pornește singur. |
-| 0:50–1:20 | Pagina cazului: dovezi cu „citat verificat”, semnalul „salariu de la o firmă germană” separat | AI-ul citește documentele și citează; codul verifică fiecare citat. Salariul e doar semnal, fără alertă: nu e indiciu legal. |
-| 1:20–1:40 | Cererea către client, butonul de aprobare; data simulată +85 zile, memento și escaladare | Omul aprobă. Sistemul ține minte termenul și escaladează la timp. |
-| 1:40–1:50 | Trei capcane în 10 secunde: Cluj → Iași, ordin din cont curent, telefon străin + RO | Fără alarme false, fiecare cu explicația de ce nu e indiciu. |
+| 0:00–0:20 | Titlul, apoi coada de cazuri | Problema: fiecare modificare trebuie evaluată; doar cele relevante fiscal pornesc un termen (90 de zile pe un cont nou, Ghid ANAF p. 35–36). Cifrele ANAF despre verificări: doar după ce le citim din sursă (azi NEVERIFICAT). |
+| 0:20–0:45 | Maria (cont nou) se mută la München; caz deschis cu termen | Codul găsește două indicii, fiecare cu regula și pagina. Termenul pornește singur. |
+| 0:45–1:05 | Pagina cazului: dovezi cu „citat verificat”, semnalul „salariu de la o firmă germană” separat | AI-ul citește documentele și citează; codul verifică fiecare citat. Salariul e doar semnal, fără alertă. |
+| 1:05–1:20 | Cererea către client, butonul de aprobare; data simulată +85 zile, memento și escaladare | Omul aprobă; abia atunci cererea pleacă. Sistemul ține minte termenul și escaladează la timp. |
+| 1:20–1:35 | Răspunsul Mariei (autocertificare PDF); închiderea cu aprobare | AI-ul extrage autocertificarea cu citate, codul verifică formatul TIN și reevaluează: conform. Omul aprobă închiderea. |
+| 1:35–1:50 | Trei capcane: Cluj → Iași, ordin din cont curent, telefon străin + RO | Fără alarme false, fiecare cu explicația de ce nu e indiciu. |
 | 1:50–2:10 | PDF cu text alb ascuns; semnal roșu de la scut | Un document poate încerca să manipuleze modelul. Scutul scoate textul ascuns înainte ca modelul să-l vadă. |
 | 2:10–2:30 | Diagrama: cod / AI / om; jurnalul, „Tamper”, intrarea ruptă | Codul decide, AI-ul explică, omul aprobă. Orice modificare a jurnalului se vede. |
 | 2:30–2:50 | `/metrics` | Cifrele reale pe cele 18 cazuri-etalon și cei 50 de clienți sintetici: prinse, ratate, alarme false. Ce nu prindem încă. |
@@ -32,7 +33,7 @@ modificare de date într-o decizie CRS/FATCA, înainte să expire termenul.”
 
 1. **Nucleul e după onboarding**: schimbările de situație, unde termenul de 90 de zile se pierde cel mai ușor.
 2. **Deciziile sunt cod verificabil**, cu ID și pagina din Ghidul ANAF; AI-ul nu decide nimic.
-3. **Capcanele sunt testate**: excepția conturilor de depozit, telefonul străin cu telefon RO, mutarea în țară, venitul din străinătate.
+3. **Capcanele sunt testate**: excepția conturilor de depozit, telefonul străin cu telefon RO, mutarea în țară. Alte semnale (venitul din străinătate) sunt testate ca non-indicii, fără alertă.
 4. **Încredere**: scut împotriva textului ascuns, citate verificate, jurnal cu lanț de hash-uri, aprobare umană.
 5. **Merge fără internet**: replay și mock, aceleași unelte reale.
 

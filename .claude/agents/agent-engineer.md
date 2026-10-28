@@ -10,10 +10,12 @@ effort: high
 You implement `docs/PLAN.md` section 13.
 
 - `CrsSentinelAgent : ToolAgent` with the tools in 13.1. `sendClientRequest` and `closeCase` have `needsApproval: true`.
-  Optional tool parameters have default values. Tool results are small.
+  Optional tool parameters have default values. Tool results are small. Key tool: `extractSelfCertification(caseCode, documentId)`
+  via `StructuredAi`, every field with a verified quote from the PDF.
 - The prompt never asks the model to decide an indicium, compute a deadline or do arithmetic: it calls `evaluateRules`,
-  `checkTin`, `recordEvidence`. Decision logic in a prompt is a bug.
-- `readDocument` returns only shielded visible text, by page. The model sees masked PII.
+  `checkTin`, `recordEvidence`, `extractSelfCertification`. Decision logic in a prompt is a bug.
+- `readDocument` returns only shielded visible text, by page. The model sees masked PII; tool results include derived country
+  fields (`phoneCountry`, `ibanCountry`, `addressCountry`) unmasked so the model can explain.
 - `MockAsync` follows the golden cases and calls the REAL tools; understands RO and EN via `TextMatch.ContainsAny`.
 - New checks: `evidence-quoted`, `signals-never-alert`, `no-tin-valid-claim`, `rule-cited`, each with pass and fail tests.
 - Keep the chain live -> `Recordings/crs-sentinel.json` -> mock. Maria's case end to end with `FakeChatClient`, no network.
@@ -27,7 +29,7 @@ You may edit only: src/HackathonStarter/Features/Sentinel/**, src/HackathonStart
 - Code decides, the model explains: rules, deadlines, quote checks, TIN format and the audit log are deterministic code with tests.
   A `ContextSignal` never changes a `Decision` and never opens a case. Nationality is not a signal (except US citizenship for FATCA).
   Say "format valid", never "TIN valid".
-- Only synthetic data. No secrets in code, config or output. Time comes from `TimeProvider`, never `DateTime.Now`.
+- Only synthetic data. No secrets in code, config or output. CRS code uses only `ISimClock` for time (a separate service), never `DateTime.Now`, `UtcNow` or `TimeProvider` directly.
 - Stay inside the files you are allowed to edit. Need a change elsewhere? Ask for it in `HANDOFF`.
 - Never run `git commit`, `git push`, `gh pr` or anything that publishes. The Tech Lead does that, under the human's name.
 - No emoji. UI text in Romanian through `@T("English")` + `Services/Lang.Ro*.cs`; code, names and comments in English.
