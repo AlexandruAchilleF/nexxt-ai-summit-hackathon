@@ -1,0 +1,14 @@
+@using HackathonStarter.Features.Tin
+@* "format valid", never "TIN valid": the label always says where the answer came from. *@
+<Pill Tone="@Tone" Icon="@Icons.Material.Rounded.Badge" Title="@Check.Note">@Check.Label</Pill>
+
+@code {
+    [Parameter, EditorRequired] public TinCheck Check { get; set; } = default!;
+
+    private string? Tone => Check.Status switch
+    {
+        TinFormatStatus.Valid => "success",
+        TinFormatStatus.Invalid => "warning",
+        _ => null,
+    };
+}
