@@ -29,7 +29,7 @@ public class AppTests(AppFixture app)
         await app.GoAsync(page, path);
 
         await Assertions.Expect(page.GetByRole(AriaRole.Heading, new() { Name = heading, Exact = true }).First).ToBeVisibleAsync(); // the app bar repeats the title
-        await Assertions.Expect(page.Locator("footer.app-footer").GetByRole(AriaRole.Link, new() { Name = "Privacy policy" })).ToBeVisibleAsync();
+        await Assertions.Expect(page.Locator("footer.app-footer").GetByRole(AriaRole.Link, new() { Name = "Data and privacy" })).ToBeVisibleAsync();
     }
 
     [Theory]
@@ -42,8 +42,8 @@ public class AppTests(AppFixture app)
         var page = await app.NewPageAsync();
         await app.GoAsync(page, path);
 
-        await Assertions.Expect(page.GetByRole(AriaRole.Heading, new() { Name = heading, Exact = true }).First).ToBeVisibleAsync(); // the footer has a "Contact" column
-        await Assertions.Expect(page.Locator("footer.lp-footer").GetByRole(AriaRole.Link, new() { Name = "Privacy policy" })).ToBeVisibleAsync();
+        await Assertions.Expect(page.GetByRole(AriaRole.Heading, new() { Name = heading, Exact = true }).First).ToBeVisibleAsync();
+        await Assertions.Expect(page.Locator("footer.lp-footer").GetByRole(AriaRole.Link, new() { Name = "Data and privacy" })).ToBeVisibleAsync();
         await Assertions.Expect(page.Locator(".app-topbar")).ToHaveCountAsync(0); // no app shell
     }
 
@@ -206,9 +206,10 @@ public class AppTests(AppFixture app)
 
         await app.GoAsync(page, "/assistant");
         await AskAsync(page, "Archive the 'Old prototype' item");
+        // A viewer sees the proposal as a read-only card; the server refusal is covered by AgentRunnerTests.Viewer_cannot_approve.
         await Assertions.Expect(page.GetByText("Approval needed")).ToBeVisibleAsync();
-        await page.GetByRole(AriaRole.Button, new() { Name = "Approve" }).ClickAsync();
-        await Assertions.Expect(Snackbar(page, "can't do this")).ToBeVisibleAsync();
+        await Assertions.Expect(page.GetByRole(AriaRole.Button, new() { Name = "Approve" })).ToHaveCountAsync(0);
+        await Assertions.Expect(page.GetByRole(AriaRole.Button, new() { Name = "Reject" })).ToHaveCountAsync(0);
     }
 
     [Fact]

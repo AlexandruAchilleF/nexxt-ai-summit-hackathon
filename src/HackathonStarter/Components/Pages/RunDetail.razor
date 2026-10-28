@@ -3,6 +3,7 @@
 @inject AgentRunner Runner
 @inject IEnumerable<AgentDefinition> Agents
 @inject ISnackbar Snackbar
+@inject CurrentUser CurrentUser
 
 <PageTitle>@T("Agent run") · @SiteConfig.Name</PageTitle>
 
@@ -55,10 +56,10 @@ else
         <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">@T("Replay of a recording made for:") “@_run.ReplayOf”</MudAlert>
     }
     <MudPaper Outlined="true" Class="pa-5">
-        <AgentTrace Run="_run" OnDecide="Decide" />
+        <AgentTrace Run="_run" OnDecide="@(_canDecide ? EventCallback.Factory.Create<(AgentStep Step, bool Approved)>(this, Decide) : default)" />
         @if (_run.Error is not null)
         {
-            <MudText Color="Color.Error" Class="mt-4">⚠️ @T(_run.Error)</MudText>
+            <MudText Color="Color.Error" Class="mt-4">@T(_run.Error)</MudText>
         }
     </MudPaper>
     @if (_run.Status is not RunStatus.Running)
@@ -70,10 +71,12 @@ else
 @code {
     [Parameter] public string Id { get; set; } = "";
     private AgentRun? _run;
-    private bool _loading = true;
+    private bool _loading = true, _canDecide;
 
     protected override async Task OnParametersSetAsync()
     {
+        // Approve / reject only for roles that can decide (read-only card otherwise); DecideAsync checks again.
+        _canDecide = (await CurrentUser.GetAsync()).Role is Roles.Admin or Roles.Member;
         _run = await Store.GetAsync(Id);
         _loading = false;
     }

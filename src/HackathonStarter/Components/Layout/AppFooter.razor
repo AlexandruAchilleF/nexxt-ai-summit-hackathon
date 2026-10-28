@@ -1,10 +1,8 @@
-@* Site footer: legal pages and contact, on every page (MainLayout and the landing page). *@
+@* Site footer, on every page (MainLayout and the landing page). Only /privacy: the template's Terms, Privacy policy
+   and Contact pages carry placeholder company data (SiteConfig.Legal). *@
 <footer class="app-footer">
     <span class="mud-text-secondary">© @DateTime.UtcNow.Year @SiteConfig.Legal.CompanyName</span>
     <nav class="d-flex flex-wrap gap-4" aria-label="@T("Legal")">
-        <MudLink Href="/terms" Typo="Typo.caption" Color="Color.Inherit">@T("Terms and conditions")</MudLink>
-        <MudLink Href="/privacy-policy" Typo="Typo.caption" Color="Color.Inherit">@T("Privacy policy")</MudLink>
         <MudLink Href="/privacy" Typo="Typo.caption" Color="Color.Inherit">@T("Data and privacy")</MudLink>
-        <MudLink Href="/contact" Typo="Typo.caption" Color="Color.Inherit">@T("Contact")</MudLink>
     </nav>
 </footer>

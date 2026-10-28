@@ -21,10 +21,10 @@ muta data simulată și folosi „Tamper”.
 | S4 | 1:05–1:24 | Maria: ziua 85, răspunsul, închiderea | 37 | 39 | ≈ 18,0 s | live sau mock |
 | S5 | 1:24–1:46 | Trei capcane | 45 | 45 | ≈ 20,8 s | fără agent (codul) |
 | S6 | 1:46–1:58 | Scutul | 25 | 25 | ≈ 11,5 s | fără agent (codul) |
-| S7 | 1:58–2:20 | Arhitectura și jurnalul | 47 | 47 | ≈ 21,7 s | fără agent |
+| S7 | 1:58–2:20 | Arhitectura și jurnalul | 45 | 45 | ≈ 20,8 s | fără agent |
 | S8 | 2:20–2:46 | Metricile și domeniul MVP | 46 | 56 | ≈ 25,8 s | doar citire |
 | S9 | 2:46–3:00 | Fraza de final | 29 | 29 | ≈ 13,4 s | fără agent |
-| | | **Total** | **351** | **377** | **≈ 2:54** | |
+| | | **Total** | **349** | **375** | **≈ 2:53** | |
 
 Cum am numărat (28.10.2026): cuvintele scrise = `wc -w` pe textul vocii. Cuvintele rostite = aceleași, cu cifrele citite
 în litere: „2,4” = 3 („două virgulă patru”), „2025” = 5, „3.204” = 5, „891” = 5, „85” = 3, „21” = 3, „F3000” = 3 („ef trei
@@ -139,9 +139,9 @@ deschide niciun caz.”, cu motivele „text alb” și „font < 2 pt”.
 
 ### S7 · 1:58–2:20 · Arhitectura și jurnalul
 
-**Vocea** (47 de cuvinte, ≈ 22 s):
+**Vocea** (45 de cuvinte, ≈ 21 s):
 
-> Codul decide, AI-ul explică, omul aprobă. CNP-ul, IBAN-ul, cardul și e-mailul sunt mascate înainte de model. Jurnalul are lanț de hash-uri: modific o intrare și verificarea arată exact unde s-a rupt. Pornim de la un template pregătit înainte; tot ce ține de CRS e scris în hackathon.
+> Un agent cu unelte, orchestrat de cod, cu omul la decizie. CNP-ul, IBAN-ul, cardul și e-mailul sunt mascate înainte de model. Jurnalul are lanț de hash-uri: modific o intrare și verificarea arată exact unde s-a rupt. Template-ul era gata; partea CRS e scrisă în hackathon.
 
 **Ce se vede:** `/architecture` (cod / AI / om). Apoi `/audit`: „Verifică” (după R3) → lanț întreg; „Tamper” (după R3) pe o
 intrare a cazului Mariei → „Verifică” → intrarea ruptă evidențiată, cu `Seq`-ul ei. Supratitrare: „Demo: doar date
@@ -186,6 +186,12 @@ aprobare (`PLAN.md` §6.3); deciziile `NoCase` și `Compliant` merg direct în j
    milioane de clienți, persoane fizice și juridice”.
    <https://www.raiffeisen.ro/ro/despre-noi/comunicate-de-presa/2026/raiffeisen-bid-finantare-imm-credite-revolving-garantii.html>.
    Pagina „Raiffeisen Bank în cifre” spune încă „peste 2,2 milioane”: citați comunicatul, nu pagina.
+   **Clienți noi retail +44% (S1 2026 față de S1 2025).** Capital.ro, 31.07.2026, Iulian Luca, „Raiffeisen Bank România
+   și-a majorat profitul la 849 de milioane de lei în primul semestru”: „segmentul Retail a înregistrat o creștere de 44% a
+   numărului de clienți noi comparativ cu primul semestru din 2025”.
+   <https://www.capital.ro/raiffeisen-bank-romania-si-a-majorat-profitul-la-849-de-milioane-de-lei-in-primul-semestru-creditarea-si-baza-de-clienti-au-continuat-sa-creasca.html>.
+   Nu e în vocea din S1 (cronometrarea are ≈ 6 s rezervă); se poate folosi la întrebări sau în supratitrare. „Aproximativ
+   4.000 de angajați” nu are sursă publică (articolul nu dă numărul): dacă se spune, doar „potrivit mentorului”.
 2. **ANAF, S1 2025.** Raportul de activitate ANAF S1 2025, p. 36: „a soluționat 8 solicitări de feedback din partea statelor
    membre, conform Directivei 2011/16/UE, în urma cărora s-au efectuat 3.204 verificări specifice ale datelor transmise de
    28 instituții financiare raportoare”; p. 37: „au fost primite feedback-uri din 8 state membre” și „au fost efectuate
@@ -214,7 +220,10 @@ aprobare (`PLAN.md` §6.3); deciziile `NoCase` și `Compliant` merg direct în j
    procedură fiscală, Anexa nr. 2 pct. 1 („Modificarea circumstanțelor”, text dat de OUG 102/2022), „În cazul în care
    instituția financiară raportoare se bazează pe adresă de rezidență [...] până cel târziu în ultima zi a anului
    calendaristic relevant sau a altei perioade de raportare adecvate ori în 90 de zile calendaristice de la notificarea sau
-   descoperirea unei astfel de modificări a circumstanțelor, oricare dintre acestea este mai recentă”. La indiciile din
+   descoperirea unei astfel de modificări a circumstanțelor, oricare dintre acestea este mai recentă”. Textul transpune
+   Directiva 2011/16/UE, Anexa II pct. 1 (introdusă prin Directiva 2014/107/UE): „by the later of the last day of the relevant calendar year or other appropriate reporting period, or 90 calendar days following the notice or discovery of such change in circumstances”; <https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32014L0107>, citat verificat pe
+   <https://www.legislation.gov.uk/eudr/2011/16/annex/II> (28.10.2026). Și directiva o leagă de testul adresei de
+   rezidență („has relied on the residence address test”). La indiciile din
    căutarea electronică, Anexa nr. 1, secț. III, subsecț. B, pct. 16 spune doar „până cel mai târziu în ultima zi a anului
    calendaristic relevant sau a altei perioade de raportare adecvate ori în 90 de zile calendaristice de la data la care
    indiciul a fost descoperit”, fără „oricare dintre acestea este mai recentă”: acolo „cea mai târzie” e interpretarea

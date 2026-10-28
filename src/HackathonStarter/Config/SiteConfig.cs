@@ -31,10 +31,11 @@ public static class SiteConfig
 
     /// <summary>
     /// The company behind the app, used by the footer, Terms, Privacy policy and Contact pages.
-    /// Replace every [bracketed] value before going public, and have the legal texts reviewed.
+    /// Hackathon prototype, no company: the footers show the product name and link only to /privacy. Terms, Privacy
+    /// policy and Contact stay reachable by URL with these placeholders; fill them in before linking those pages again.
     /// </summary>
     public static readonly LegalInfo Legal = new(
-        CompanyName: "[Company name SRL]",
+        CompanyName: Name,
         RegistrationNumber: "[J40/0000/2026]",
         FiscalCode: "[RO00000000]",
         Address: "[Street, number, Bucharest, Romania]",
@@ -52,24 +53,24 @@ public static class SiteConfig
     private static readonly Landing LandingRo = new(
         Enabled: true,
         Headline: "Fiecare modificare de date, o decizie CRS/FATCA înainte de termen",
-        Subheadline: "Când un client își schimbă adresa, telefonul sau un ordin permanent, agentul deschide cazul, pornește termenul din Ghidul ANAF, adună dovezile și scrie cererea către client. Omul decide.",
+        Subheadline: "Când un client își schimbă adresa, telefonul sau un ordin permanent, codul evaluează schimbarea și, dacă e relevantă fiscal, deschide cazul și, la CRS, pornește termenul din Ghidul ANAF. Agentul adună dovezile și scrie cererea către client. Omul decide.",
         CtaLabel: "Deschide aplicația",
         CtaHref: "/dashboard",
-        Announcement: new("Nou", "Regulile din Ghidul ANAF, cu pagina lângă fiecare", "/#how"),
+        Announcement: new("Nou", "Regulile din Ghidul ANAF, cu pagina lângă fiecare", "/#product"),
         Preview: new(
-            ItemId: "CRS-0412",
-            ItemTitle: "Schimbare de adresă: Maria Ionescu, München",
+            ItemId: "CRS-2026-0001",
+            ItemTitle: "Schimbare de adresă: Maria Popescu, München",
             ItemDescription: "Adresă nouă în Germania, telefon german și niciun telefon românesc. Cont nou: termen de 90 de zile.",
             Activity:
             [
-                "Modificare de adresă primită din core banking",
-                "Caz deschis · termen 26 ianuarie 2027",
-                "Agentul a găsit 2 indicii și 1 semnal, toate cu citat verificat",
+                "Modificare de adresă primită online",
+                "Termen 26 ianuarie 2027 · caz deschis de cod, 2 indicii",
+                "Agentul a adăugat o dovadă și un semnal, ambele cu citat verificat",
             ],
             Prompt: "Pregătește cererea de clarificare către client",
-            Reply: "Indicii CRS (ghidul, p. 29): adresă în Germania, telefon german fără telefon în România. Salariul de la o firmă germană e doar un semnal, fără alertă. Cererea e gata: autocertificare nouă și TIN-ul german.",
+            Reply: "Indicii CRS (ghidul, p. 29): adresă în Germania, telefon german fără telefon în România. Salariul de la o firmă germană e doar un semnal, fără alertă. Cererea e gata: autocertificare nouă, cu TIN-ul german, sau explicație rezonabilă (p. 35), plus dovada adresei.",
             ResultTitle: "Necesită aprobare",
-            ResultDetail: "Cerere către client · 2 documente de trimis"),
+            ResultDetail: "Cerere către client · 2 documente cerute"),
         Statement: new("Regulile sunt cod, nu păreri.",
             "Fiecare indiciu are ID și pagina din Ghidul ANAF, fiecare citat e verificat în document, iar fiecare termen e urmărit pe caz. Modelul citește și scrie; omul aprobă ce pleacă și ce se închide."),
         Sections:
@@ -78,49 +79,49 @@ public static class SiteConfig
                 "Doar modificările care ating un indiciu din lege pornesc un termen. Restul se opresc la filtru, cu explicație.",
                 [
                     new(Icons.Material.Rounded.Rule, "Filtru în cod", "O mutare din Cluj în Iași nu deschide niciun caz, iar regula spune de ce."),
-                    new(Icons.Material.Rounded.Timer, "Termenul, din ziua în care banca află", "90 de zile calendaristice, cu pagina din ghid; conturile vechi și cele noi au reguli diferite."),
-                    new(Icons.Material.Rounded.FormatQuote, "Dovezi cu citat", "Fiecare dovadă are citatul exact, verificat de cod în document."),
+                    new(Icons.Material.Rounded.Timer, "Termenul, din ziua în care banca află", "90 de zile calendaristice, cu pagina din ghid; conturile preexistente și cele noi au reguli diferite."),
+                    new(Icons.Material.Rounded.FormatQuote, "Dovezi cu citat", "Fiecare citat dintr-un document e verificat de cod în textul vizibil."),
                     new(Icons.Material.Rounded.Lightbulb, "Indicii și semnale", "Un salariu din Germania e semnal, nu indiciu: se arată, dar nu pornește nimic."),
                 ]),
             new("Bucla închisă, cu omul la decizie",
                 "Cererea, răspunsul, reevaluarea și închiderea, cu dovada confirmării. Ce nu se potrivește ajunge la om.",
                 [
                     new(Icons.Material.Rounded.HowToReg, "Aprobare", "Cererea către client și închiderea cazului pleacă doar cu acordul operatorului."),
-                    new(Icons.Material.Rounded.Verified, "TIN verificat", "Formatul, la serviciul Comisiei Europene și după fișele OCDE: „format valid”, nu „TIN valid”."),
-                    new(Icons.Material.Rounded.Shield, "Scut pentru text ascuns", "Textul alb pe alb sau microscopic e scos înainte să ajungă la model și devine semnal roșu."),
+                    new(Icons.Material.Rounded.Verified, "Format TIN verificat", "Formatul, după fișele OCDE (SUA: IRS/SSA) și, pentru statele UE, la serviciul Comisiei Europene: „format valid”, nu „TIN valid”."),
+                    new(Icons.Material.Rounded.Shield, "Scut pentru text ascuns", "Textul alb pe alb sau microscopic e scos înainte să ajungă la model și ridică o alertă."),
                     new(Icons.Material.Rounded.NotificationsActive, "Memento și escaladare", "Înainte de expirare: memento și escaladare; după: consecința exactă din ghid."),
                 ]),
         ],
         Steps:
         [
-            new("Modificarea intră", "Adresă, telefon, ordin permanent sau împuternicire, din core banking."),
-            new("Codul filtrează", "Contează fiscal? Dacă da, cazul se deschide și termenul pornește."),
-            new("Agentul pregătește", "Dovezi cu citat, indiciile din lege, cererea către client."),
+            new("Modificarea intră", "Adresă, telefon, ordin permanent sau împuternicire, din core banking (simulat în demo)."),
+            new("Codul filtrează", "Contează fiscal? Dacă da, cazul se deschide și, la CRS, termenul pornește."),
+            new("Agentul pregătește", "Dovezi cu citat, explicația indiciilor, cererea către client."),
             new("Omul decide", "Aprobă cererea, apoi închiderea cu dovada confirmării."),
         ],
-        Closing: new("Agentul urmărește termenul.", "Omul decide."));
+        Closing: new("Codul urmărește termenul.", "Omul decide."));
 
     private static readonly Landing LandingEn = new(
         Enabled: true,
         Headline: "Every data change, a CRS/FATCA decision before the deadline",
-        Subheadline: "When a customer changes their address, phone or a standing order, the agent opens a case, starts the deadline from the ANAF guide, gathers the evidence and drafts the request to the customer. A person decides.",
+        Subheadline: "When a customer changes their address, phone or a standing order, code assesses the change and, if it matters for tax, opens a case and, for CRS, starts the deadline from the ANAF guide. The agent gathers the evidence and drafts the request to the customer. A person decides.",
         CtaLabel: "Open the app",
         CtaHref: "/dashboard",
-        Announcement: new("New", "The rules of the ANAF guide, each with its page", "/#how"),
+        Announcement: new("New", "The rules of the ANAF guide, each with its page", "/#product"),
         Preview: new(
-            ItemId: "CRS-0412",
-            ItemTitle: "Address change: Maria Ionescu, Munich",
+            ItemId: "CRS-2026-0001",
+            ItemTitle: "Address change: Maria Popescu, Munich",
             ItemDescription: "New address in Germany, a German phone and no Romanian phone. New account: 90-day deadline.",
             Activity:
             [
-                "Address change received from core banking",
-                "Case opened · deadline 26 January 2027",
-                "The agent found 2 indicia and 1 signal, every quote verified",
+                "Address change received online",
+                "Deadline 26 January 2027 · case opened by code, 2 indicia",
+                "The agent added one piece of evidence and one signal, both with a verified quote",
             ],
             Prompt: "Prepare the clarification request to the customer",
-            Reply: "CRS indicia (guide, p. 29): an address in Germany, a German phone and no phone in Romania. The salary from a German company is only a signal, no alert. The request is ready: a new self-certification and the German TIN.",
+            Reply: "CRS indicia (guide, p. 29): an address in Germany, a German phone and no phone in Romania. The salary from a German company is only a signal, no alert. The request is ready: a new self-certification with the German TIN, or a reasonable explanation (p. 35), plus proof of address.",
             ResultTitle: "Approval needed",
-            ResultDetail: "Request to the customer · 2 documents to send"),
+            ResultDetail: "Request to the customer · 2 documents requested"),
         Statement: new("The rules are code, not opinions.",
             "Every indicium has an ID and its page in the ANAF guide, every quote is checked against the document and every deadline is tracked per case. The model reads and writes; a person approves what goes out and what gets closed."),
         Sections:
@@ -130,26 +131,26 @@ public static class SiteConfig
                 [
                     new(Icons.Material.Rounded.Rule, "Filter in code", "A move from Cluj to Iași opens no case, and the rule says why."),
                     new(Icons.Material.Rounded.Timer, "The deadline, from the day the bank knows", "90 calendar days, with the guide page; pre-existing and new accounts follow different rules."),
-                    new(Icons.Material.Rounded.FormatQuote, "Evidence with quotes", "Every piece of evidence has its exact quote, checked by code against the document."),
+                    new(Icons.Material.Rounded.FormatQuote, "Evidence with quotes", "Every quote from a document is checked by code against its visible text."),
                     new(Icons.Material.Rounded.Lightbulb, "Indicia and signals", "A salary from Germany is a signal, not an indicium: it is shown, but triggers nothing."),
                 ]),
             new("The loop closed, with a person deciding",
                 "The request, the reply, the re-assessment and the closing, with proof of confirmation. Anything that doesn't fit goes to a person.",
                 [
                     new(Icons.Material.Rounded.HowToReg, "Approval", "The request to the customer and the closing of the case go out only with the operator's consent."),
-                    new(Icons.Material.Rounded.Verified, "TIN checked", "The format, against the European Commission's service and the OECD sheets: \"valid format\", not \"valid TIN\"."),
-                    new(Icons.Material.Rounded.Shield, "Hidden-text shield", "White-on-white or microscopic text is removed before it reaches the model and becomes a red flag."),
+                    new(Icons.Material.Rounded.Verified, "TIN format checked", "The format, from the OECD sheets (US: IRS/SSA) and, for EU states, via the European Commission's service: \"format valid\", not \"TIN valid\"."),
+                    new(Icons.Material.Rounded.Shield, "Hidden-text shield", "White-on-white or microscopic text is removed before it reaches the model and raises an alert."),
                     new(Icons.Material.Rounded.NotificationsActive, "Reminder and escalation", "Before the deadline: a reminder and an escalation; after it: the exact consequence from the guide."),
                 ]),
         ],
         Steps:
         [
-            new("The change comes in", "Address, phone, standing order or power of attorney, from core banking."),
-            new("Code filters", "Does it matter for tax? If so, the case opens and the deadline starts."),
-            new("The agent prepares", "Evidence with quotes, the legal indicia, the request to the customer."),
+            new("The change comes in", "Address, phone, standing order or power of attorney, from core banking (simulated in the demo)."),
+            new("Code filters", "Does it matter for tax? If so, the case opens and, for CRS, the deadline starts."),
+            new("The agent prepares", "Evidence with quotes, an explanation of the indicia, the request to the customer."),
             new("A person decides", "Approves the request, then the closing with proof of confirmation."),
         ],
-        Closing: new("The agent tracks the deadline.", "A person decides."));
+        Closing: new("Code tracks the deadline.", "A person decides."));
 
     public static readonly NavItem[] Nav =
     [
