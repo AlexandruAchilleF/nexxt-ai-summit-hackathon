@@ -173,6 +173,16 @@ public class CheckPrivacyTests
         Assert.Equal(CheckOutcome.Fail, Assert.Single(new CheckEngine([new PiiLeakCheck()]).Evaluate(subject, ["pii-leak"]).Results).Outcome);
     }
 
+    [Theory]
+    [InlineData("""[{"tool":"readDocument","input":{"documentId":7},"output":{"text":"Telefon: +49 89 4521 7730"}""")] // truncated
+    [InlineData("""{"output":"+49 89 4521 7730"}""")] // not an array of tool calls
+    public void A_tool_results_fact_that_cannot_be_read_allows_nothing_extra(string toolResults)
+    {
+        var subject = new CheckSubject("Telefonul este +49 89 4521 7730.", "Pregătește cazul Mariei", new Dictionary<string, string> { ["tool-results"] = toolResults });
+
+        Assert.Equal(CheckOutcome.Fail, Assert.Single(new CheckEngine([new PiiLeakCheck()]).Evaluate(subject, ["pii-leak"]).Results).Outcome);
+    }
+
     /// <summary>The "tool-results" fact exactly as AgentRunner.ToolResults writes it: each input and output parsed, then serialised with RunStore.Json.</summary>
     private static string ToolResults(params (string Tool, object Input, object Output)[] calls) =>
         JsonSerializer.Serialize(calls.Select(c => new { tool = c.Tool, input = Element(c.Input), output = Element(c.Output) }), RunStore.Json);
