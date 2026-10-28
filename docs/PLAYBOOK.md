@@ -18,7 +18,7 @@ Ideea anterioară (DosarViu, KYC pentru firme) a fost abandonată pe 28 oct.: nu
   țară: p. 29) și raportarea la ANAF iese greșită, pe fiecare cont.
 - **Cine folosește:** operatorii back-office și echipa de conformare fiscală (CRS/FATCA).
 - **Cine plătește:** banca (conformare și operațiuni). Riscul e pe fiecare cont: corecții cerute de ANAF,
-  neconcordanțe semnalate de IRS și amenzi de 2.000–5.000 lei pe fiecare cont raportabil raportat incorect, incomplet
+  inadvertențe semnalate de IRS și amenzi de 2.000–5.000 lei pe fiecare cont raportabil raportat incorect, incomplet
   sau cu întârziere (Codul de procedură fiscală, art. 336, din OUG 102/2022).
 - **De ce nu e un chatbot:** regulile sunt cod, fiecare cu ID și pagina din ghid. Același dosar dă mereu același verdict,
   termenul e urmărit pe fiecare caz, iar omul semnează.
@@ -214,6 +214,7 @@ trebuie să poată porni aplicația fără credențiale AWS.
 ```
 economie pe an = cazuri de schimbare de situație pe an × minute economisite pe caz × cost pe minut de operator
 risc evitat    = conturi raportabile raportate greșit × amenda pe cont (2.000–5.000 lei, art. 336 alin. (2) lit. k^1) din Codul de procedură fiscală)
+                 (din 09.01.2026, fără plafonul general și fără limita de cumul din OG 2/2001: art. 339 alin. (3)–(4), din OUG 71/2025)
 ```
 
 Cifrele de volum și minute vin de la mentor ([`RESEARCH-CRS.md`](RESEARCH-CRS.md#5-întrebări-pentru-mentorul-raiffeisen-prima-oră-înainte-de-cod),
