@@ -140,7 +140,7 @@ written on 28–29 Oct 2026 (README §13).
 
 ## 10. Closing
 
-**CRS Sentinel: code decides, AI explains, the human approves.**
+**CRS Sentinel: code decides, AI explains, a person approves.**
 
 Video (3 min): `[link]` · App: <https://hackathon-starter-k0ym.onrender.com/> · Code:
 <https://github.com/AlexandruAchilleF/nexxt-ai-summit-hackathon>
