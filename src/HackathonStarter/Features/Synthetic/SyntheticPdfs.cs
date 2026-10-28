@@ -53,17 +53,18 @@ public static class SyntheticPdfs
         PayslipMaria => Payslip(PayslipMaria, "CL-0001", "Müller Logistik GmbH", "Fluturaș de salariu / Entgeltabrechnung",
             ["Angajat: Maria Popescu", "Telefon: +49 89 4521 7730", "Angajator: Müller Logistik GmbH", "Data plății: 30.09.2026"],
             [("Salariu brut", "4.850,00 EUR"), ("Impozit pe venit", "712,25 EUR"), ("Contribuții sociale", "989,40 EUR")],
-            "3.148,35 EUR", ["Angajator: Müller Logistik GmbH", "Telefon: +49 89 4521 7730"]),
+            "3.148,35 EUR", [new(1, "Angajator: Müller Logistik GmbH"), new(1, "Telefon: +49 89 4521 7730")],
+            ["Angajat: Maria Popescu"]),
 
         SelfCertMaria => SelfCert(SelfCertMaria, "CL-0001", "Popescu", "Maria", "Leopoldstraße 12, 80802 München, Germania",
             "08/06/1991", "București, România", [("Germania (DE)", "86095174223", null)], null,
-            "Semnătură: Maria Popescu", "21/01/2027",
+            "Semnătură: Maria Popescu", "21/01/2027", [new(1, "Confirm că datele sunt corecte și complete.")],
             ["Nume: Popescu", "Prenume: Maria", "Leopoldstraße 12, 80802 München", "Data nașterii (zz/ll/aaaa): 08/06/1991",
-             "Germania (DE)", "86095174223", "Confirm că datele sunt corecte și complete.", "Semnătură: Maria Popescu", "Data: 21/01/2027"]),
+             "Germania (DE)", "86095174223", "Semnătură: Maria Popescu", "Data: 21/01/2027"]),
 
         SelfCertCristina => SelfCert(SelfCertCristina, "CL-0002", "Dobre", "Cristina", "Via Padova 18, 20127 Milano, Italia",
             "01/01/1990", "București, România", [("Italia (IT)", "DBRCST90A41Z129", null)], null,
-            "Semnătură: confirmată online de titular", "27/10/2026",
+            "Semnătură: confirmată online de titular", "27/10/2026", [],
             ["Nume: Dobre", "Prenume: Cristina", "Via Padova 18, 20127 Milano", "Data nașterii (zz/ll/aaaa): 01/01/1990",
              "Italia (IT)", "DBRCST90A41Z129", "Confirm că datele sunt corecte și complete.", "Semnătură: confirmată online de titular",
              "Data: 27/10/2026"]),
@@ -72,22 +73,24 @@ public static class SyntheticPdfs
             "22/05/1987", "Brașov, România", [("Austria (AT)", null, "B")],
             "Nu sunt încă înregistrat la administrația fiscală austriacă și nu am primit Steuernummer.",
             "Semnătură: Bogdan Lazăr", "26/10/2026",
+            [new(1, "Nu sunt încă înregistrat la administrația fiscală austriacă și nu am primit Steuernummer.")],
             ["Nume: Lazăr", "Prenume: Bogdan", "Annenstraße 24, 8020 Graz", "Data nașterii (zz/ll/aaaa): 22/05/1987",
-             "Austria (AT)", "Nu sunt încă înregistrat la administrația fiscală austriacă și nu am primit Steuernummer.",
-             "Confirm că datele sunt corecte și complete.", "Semnătură: Bogdan Lazăr", "Data: 26/10/2026"]),
+             "Austria (AT)", "Confirm că datele sunt corecte și complete.", "Semnătură: Bogdan Lazăr", "Data: 26/10/2026"]),
 
         PassportAlexandra => Passport(PassportAlexandra, "CL-0006", ["ROMÂNIA / ROMANIA", "PAȘAPORT / PASSPORT"],
             ["Tip / Type: P", "Cod țară / Country code: ROU", "Nr. pașaport / Passport No.: 05173946", "Nume / Surname: VLAD",
              "Prenume / Given names: ALEXANDRA", "Cetățenie / Nationality: ROMÂNĂ / ROU", "Data nașterii / Date of birth: 19.07.1993",
              "CNP / Personal No.: 2930719400974", "Sex / Sex: F", "Locul nașterii / Place of birth: CHICAGO, ILLINOIS, S.U.A.",
              "Data eliberării / Date of issue: 14.03.2024", "Data expirării / Date of expiry: 13.03.2034"],
-            ["Locul nașterii / Place of birth: CHICAGO, ILLINOIS, S.U.A.", "Nume / Surname: VLAD", "Prenume / Given names: ALEXANDRA"]),
+            [new(1, "Locul nașterii / Place of birth: CHICAGO, ILLINOIS, S.U.A.")],
+            ["Nume / Surname: VLAD", "Prenume / Given names: ALEXANDRA", "CNP / Personal No.: 2930719400974"]),
 
         PassportMarius => Passport(PassportMarius, "CL-0007", ["UNITED STATES OF AMERICA", "PASSPORT"],
             ["Type: P", "Code: USA", "Passport No.: A04825139", "Surname: STOICA", "Given Names: MARIUS",
              "Nationality: UNITED STATES OF AMERICA", "Date of birth: 05 MAR 1979", "Place of birth: ROMANIA", "Sex: M",
              "Date of issue: 18 AUG 2026", "Date of expiration: 17 AUG 2036", "Authority: United States Department of State"],
-            ["Nationality: UNITED STATES OF AMERICA", "Place of birth: ROMANIA", "Surname: STOICA", "Given Names: MARIUS"]),
+            [new(1, "Nationality: UNITED STATES OF AMERICA"), new(1, "Place of birth: ROMANIA")],
+            ["Surname: STOICA", "Given Names: MARIUS"]),
 
         PayslipAndrei => Payslip(PayslipAndrei, "CL-0013", "Brenner Software GmbH", "Fluturaș de salariu",
             ["Angajat: Andrei Pop", "CNP: 1950923350125", "Adresa: Str. Mărășești 6, ap. 3, 300086 Timișoara",
@@ -95,7 +98,7 @@ public static class SyntheticPdfs
              "Data plății: 30.09.2026"],
             [("Salariu brut", "4.200,00 EUR"), ("CAS (25%)", "1.050,00 EUR"), ("CASS (10%)", "420,00 EUR"),
              ("Impozit pe venit (10%)", "273,00 EUR")],
-            "2.457,00 EUR", ["Angajator: Brenner Software GmbH", "Sediul angajatorului: Stuttgart, Germania"]),
+            "2.457,00 EUR", [new(1, "Angajator: Brenner Software GmbH")], ["Sediul angajatorului: Stuttgart, Germania"]),
 
         StudentTeodora => Enrolment(),
 
@@ -108,7 +111,7 @@ public static class SyntheticPdfs
     };
 
     private static SyntheticPdf Payslip(string fileName, string client, string employer, string title, string[] details,
-        (string Item, string Amount)[] lines, string net, string[] quotes)
+        (string Item, string Amount)[] lines, string net, PdfQuote[] mockQuotes, string[] expected)
     {
         var sheet = new Sheet(title);
         sheet.Line(employer, 12, bold: true).Line(title, 15, bold: true).Line("Perioada: septembrie 2026").Gap();
@@ -116,13 +119,13 @@ public static class SyntheticPdfs
         sheet.Gap().Rule().Row(true, ("Element", 0), ("Suma", 330));
         foreach (var (item, amount) in lines) sheet.Row(false, (item, 0), (amount, 330));
         sheet.Rule().Row(true, ("Salariu net", 0), (net, 330));
-        return new SyntheticPdf(fileName, client, sheet.Build(), quotes, []);
+        return new SyntheticPdf(fileName, client, sheet.Build(), mockQuotes, expected, []);
     }
 
     /// <summary>Laid out after Annex I of the ANAF guide (p. 52–54), with everything SC-VALID needs (p. 34).</summary>
     private static SyntheticPdf SelfCert(string fileName, string client, string surname, string givenName, string address,
         string birthDate, string birthPlace, (string Country, string? Tin, string? Reason)[] residences, string? reasonB,
-        string signature, string date, string[] quotes)
+        string signature, string date, PdfQuote[] mockQuotes, string[] expected)
     {
         var sheet = new Sheet("Declarație pe propria răspundere privind rezidența fiscală");
         sheet.Line(Bank, 11, bold: true)
@@ -143,10 +146,11 @@ public static class SyntheticPdfs
             .Paragraph("Declar că toate informațiile furnizate în această declarație sunt, după cunoștințele mele, corecte și complete.")
             .Line("[X] Confirm că datele sunt corecte și complete.").Gap()
             .Line(signature).Line($"Nume: {givenName} {surname}").Line($"Data: {date}");
-        return new SyntheticPdf(fileName, client, sheet.Build(), quotes, []);
+        return new SyntheticPdf(fileName, client, sheet.Build(), mockQuotes, expected, []);
     }
 
-    private static SyntheticPdf Passport(string fileName, string client, string[] header, string[] fields, string[] quotes)
+    private static SyntheticPdf Passport(string fileName, string client, string[] header, string[] fields, PdfQuote[] mockQuotes,
+        string[] expected)
     {
         var sheet = new Sheet(header[^1]);
         sheet.Specimen();
@@ -154,7 +158,7 @@ public static class SyntheticPdfs
         sheet.Gap();
         foreach (var field in fields) sheet.Line(field, 11);
         sheet.Gap(24).Specimen();
-        return new SyntheticPdf(fileName, client, sheet.Build(), ["SPECIMEN", .. quotes], []);
+        return new SyntheticPdf(fileName, client, sheet.Build(), mockQuotes, ["SPECIMEN", .. expected], []);
     }
 
     private static SyntheticPdf Enrolment()
@@ -167,8 +171,9 @@ public static class SyntheticPdfs
             .Line("Semesteranschrift: Helene-Mayer-Ring 9, 80809 München").Gap()
             .Line("München, 02.11.2026")
             .Paragraph("Diese Bescheinigung wurde maschinell erstellt und ist ohne Unterschrift gültig.", 9, gray: true);
+        // The golden quote is "Technische Universität München … immatrikuliert im Wintersemester 2026/27": two fragments.
         return new SyntheticPdf(StudentTeodora, "CL-0018", sheet.Build(),
-            ["Technische Universität München", "immatrikuliert im Wintersemester 2026/27", "Frau Teodora Iliescu"], []);
+            [new(1, "Technische Universität München"), new(1, "immatrikuliert im Wintersemester 2026/27")], ["Frau Teodora Iliescu"], []);
     }
 
     private static SyntheticPdf Statement(string fileName, Concealment how)
@@ -197,7 +202,7 @@ public static class SyntheticPdfs
             .Line("Total debit: 4.839,15 RON").Line("Total credit: 7.850,00 RON")
             .Line("Sold final la 30.09.2026: 15.491,20 RON", bold: true).Gap()
             .Paragraph("Pentru orice neconcordanță între acest extras și operațiunile dumneavoastră, contactați banca.");
-        return new SyntheticPdf(fileName, "CL-0010", sheet.Build(),
+        return new SyntheticPdf(fileName, "CL-0010", sheet.Build(), [],
             ["Titular: Victor Neagu", "Sold final la 30.09.2026: 15.491,20 RON"], [new HiddenText(1, Injection, how)]);
     }
 
@@ -299,7 +304,11 @@ public static class SyntheticPdfs
             return Gap();
         }
 
-        /// <summary>Writes text a reader would not see, the way <paramref name="how"/> says.</summary>
+        /// <summary>
+        /// Writes text a reader would not see, the way <paramref name="how"/> says. The builder's own calls cover all four
+        /// concealments; a text matrix, Tz, Tc or a clipping path can be added as raw operations on <c>CurrentStream.Operations</c>.
+        /// Only optional content (a hidden layer) is out of reach: the builder cannot declare an optional content group.
+        /// </summary>
         public void Hide(string text, Concealment how)
         {
             var size = how.HasFlag(Concealment.Tiny) ? 1 : 9;
@@ -346,10 +355,14 @@ public static class SyntheticPdfs
 
 /// <summary>A generated PDF and what tests and metrics need to know about it.</summary>
 /// <param name="ClientCode">The golden-case client the document belongs to.</param>
-/// <param name="Quotes">Visible text quoted verbatim by the mock: DocumentText and EvidenceVerifier must find each one.</param>
+/// <param name="MockQuotes">Exactly the quotes docs/GOLDEN-CASES.md gives the mock, each with its page: EvidenceVerifier must find
+/// each one in the visible text of that page.</param>
+/// <param name="ExpectedText">Other visible text extraction must return (field values, SPECIMEN); the mock does not quote it.</param>
 /// <param name="Hidden">What the shield must remove, and how it is hidden; empty for a clean document.</param>
-public sealed record SyntheticPdf(string FileName, string ClientCode, byte[] Bytes, IReadOnlyList<string> Quotes,
-    IReadOnlyList<HiddenText> Hidden);
+public sealed record SyntheticPdf(string FileName, string ClientCode, byte[] Bytes, IReadOnlyList<PdfQuote> MockQuotes,
+    IReadOnlyList<string> ExpectedText, IReadOnlyList<HiddenText> Hidden);
+
+public sealed record PdfQuote(int Page, string Text);
 
 public sealed record HiddenText(int Page, string Text, Concealment How);
 
