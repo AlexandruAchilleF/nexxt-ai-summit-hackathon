@@ -27,10 +27,12 @@ namespace HackathonStarter.Tests.Crs.Sentinel;
 internal static class RealWorld
 {
     public static DemoUser Ana => SiteConfig.Users.Single(u => u.Role == Roles.Admin);
+    public static DemoUser Mihai => SiteConfig.Users.Single(u => u.Role == Roles.Member);
     public static DemoUser Vera => SiteConfig.Users.Single(u => u.Role == Roles.Viewer);
 
+    /// <param name="history">Also the startup history of main (ChangeHistorySeed): other clients' cases, deadlines and audit entries.</param>
     public static async Task<(TestHost Host, SimClock Clock)> CreateAsync(
-        IChatClient? model = null, DemoUser? user = null, IReadOnlyDictionary<string, IChatClient>? profiles = null)
+        IChatClient? model = null, DemoUser? user = null, IReadOnlyDictionary<string, IChatClient>? profiles = null, bool history = false)
     {
         var clock = new SimClock(new ManualTime(GoldenCases.ChangeMoment));
         var host = await TestHost.CreateAsync(model, user: user ?? Ana, profiles: profiles, configure: s =>
@@ -50,6 +52,7 @@ internal static class RealWorld
         await using var db = await host.Get<IDbContextFactory<AppDbContext>>().CreateDbContextAsync();
         db.Clients.AddRange(ClientSeed.Create(clock.UtcNow));
         await db.SaveChangesAsync();
+        if (history) await ChangeHistorySeed.RunAsync(host.Root, clock.UtcNow);
         return (host, clock);
     }
 

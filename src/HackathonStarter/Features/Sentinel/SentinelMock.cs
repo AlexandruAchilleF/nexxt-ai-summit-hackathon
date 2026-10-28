@@ -65,6 +65,12 @@ internal static partial class SentinelMock
             return;
         }
 
+        // Steps that write (evidence, signals, a draft, a self-certification, a response) run only for the two buttons or a
+        // request in whole words; a question ("Ce conținut are autocertificarea?", "De ce nu e caz?") only reads.
+        var request = action == SentinelActions.Action.None && !m.Input.TrimEnd().EndsWith('?');
+        var prepare = action == SentinelActions.Action.Analyze || (request && HasPhrase(m.Input, PreparePhrases));
+        var verify = action == SentinelActions.Action.Verify || (request && HasPhrase(m.Input, VerifyPhrases));
+
         switch (status)
         {
             case "Open" when c.Arr("requests").Any(r => r.Str("status") == "Draft"):
@@ -73,14 +79,20 @@ internal static partial class SentinelMock
                       $"Case {caseCode}: the request to the client (no. {c.Arr("requests").Last(r => r.Str("status") == "Draft").Int("id")}) is drafted and awaits an operator's approval. Nothing was sent."),
                     L("Termen: ", "Deadline: ") + c.Str("deadline") + "."));
                 break;
-            case "Open":
+            case "Open" when prepare:
                 await PrepareAsync(m, c);
                 break;
+            case "Open":
+                await m.SayAsync(Join(Summary(c, canEdit), Next(SentinelActions.AnalyzeLabel)));
+                break;
             case "AwaitingClient" or "Reminded" or "Escalated":
-                await AnswerAsync(m, c);
+                await AnswerAsync(m, c, verify);
+                break;
+            case "ResponseReceived" when verify:
+                await ProposeClosingAsync(m, c, "");
                 break;
             case "ResponseReceived":
-                await ProposeClosingAsync(m, c, "");
+                await m.SayAsync(Join(Summary(c, canEdit), Next(SentinelActions.VerifyLabel)));
                 break;
             default:
                 await m.SayAsync(Summary(c, canEdit));
@@ -154,7 +166,8 @@ internal static partial class SentinelMock
 
     // ─── Waiting, then run 2: listDocuments, extractSelfCertification, checkTin, registerResponse, evaluateRules, closeCase ─
 
-    private static async Task AnswerAsync(MockContext m, JsonElement c)
+    /// <param name="write">False for a question: say what arrived and stop before reading it into the case.</param>
+    private static async Task AnswerAsync(MockContext m, JsonElement c, bool write)
     {
         var code = c.Str("code")!;
         var openedAt = c.Date("openedAt") ?? DateTime.MinValue;
@@ -173,6 +186,15 @@ internal static partial class SentinelMock
                   $"Case {code} ({StatusText(c.Str("status"))}). We are waiting for the client to send: {documents}. Deadline: {c.Str("deadline")}."),
                 L("Indiciile rămân deschise până la răspuns: ", "The indicia stay open until the answer: ") + IndiciaShort(c) + ".",
                 L("Nu a sosit încă o autocertificare nouă după deschiderea cazului.", "No new self-certification has arrived since the case opened.")));
+            return;
+        }
+
+        if (!write)
+        {
+            await m.SayAsync(Join(
+                L($"Cazul {code} ({StatusText(c.Str("status"))}): a sosit o autocertificare nouă, {form.Str("fileName")}. Nu am citit-o încă în caz.",
+                  $"Case {code} ({StatusText(c.Str("status"))}): a new self-certification arrived, {form.Str("fileName")}. I have not read it into the case yet."),
+                Next(SentinelActions.VerifyLabel)));
             return;
         }
 
@@ -430,6 +452,26 @@ internal static partial class SentinelMock
         var end = start + words[taken - 1].Index + words[taken - 1].Length;
         return (string.Join(" ", words.Take(taken).Select(w => w.Value)), text[label.Index..end]);
     }
+
+    private static readonly string[] PreparePhrases =
+        ["pregătește cazul", "pregătește dosarul", "analizează dosarul", "analizează cazul", "prepare the case", "analyze the file", "analyse the file"];
+
+    // "Maria a trimis autocertificarea nouă." is Ana's sentence in docs/PITCH.md S4.
+    private static readonly string[] VerifyPhrases =
+    [
+        "verifică răspunsul", "verifică autocertificarea", "a trimis autocertificarea", "continuă",
+        "check the answer", "check the self-certification", "sent the self-certification", "sent a new self-certification", "continue",
+    ];
+
+    /// <summary>A phrase in whole words, without case or diacritics: "continuă" is not in "conținut".</summary>
+    private static bool HasPhrase(string text, IEnumerable<string> phrases)
+    {
+        var words = $" {string.Join(' ', TextMatch.Words(text))} ";
+        return phrases.Any(p => words.Contains($" {string.Join(' ', TextMatch.Words(p))} ", StringComparison.Ordinal));
+    }
+
+    private static string Next(string action) =>
+        L($"Pasul următor, când operatorul decide: „{action}”.", $"Next step, when the operator decides: \"{action}\".");
 
     /// <summary>"text alb, font sub 2 pt": why the shield removed the text (HiddenTextShield reasons).</summary>
     private static string Reasons(JsonElement d) => string.Join(", ", d.Arr("hiddenReasons").Select(r => r.GetString() switch

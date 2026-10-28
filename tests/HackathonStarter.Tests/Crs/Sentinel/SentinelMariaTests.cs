@@ -119,6 +119,38 @@ public class SentinelMariaTests
     }
 
     [Fact]
+    public async Task Maria_on_the_mock_over_the_startup_history_closes_her_own_case_only()
+    {
+        using var _ = new UiLanguage("ro-RO");
+        var (host, clock) = await RealWorld.CreateAsync(history: true);
+        await using var __ = host;
+        var others = (await host.Get<ICaseService>().QueueAsync(new CaseQueueFilter(OpenOnly: false))).Select(c => c.Code).ToHashSet();
+        Assert.NotEmpty(others);
+
+        var code = (await host.RecordGoldenChangeAsync("4")).CaseCode!;
+        Assert.DoesNotContain(code, others);
+
+        var run1 = await host.RunAsync(SentinelTools.AgentName, SentinelActions.Analyze(code));
+        Assert.Equal(RunStatus.AwaitingApproval, run1.Status);
+        run1.ChecksPass();
+        await host.DecideAsync(run1, SentinelTools.SendClientRequest);
+        clock.Advance(TimeSpan.FromDays(85));
+        var tick = await host.Get<ICaseService>().TickAsync(clock.UtcNow);
+        Assert.True(tick.Reminded >= 1); // Maria's, and whatever the history has due by then
+        Assert.Equal(CaseStatus.Escalated, (await host.CaseAsync(code))!.Status);
+        clock.Advance(TimeSpan.FromDays(1));
+        await host.Get<IDemoScenarios>().DeliverResponseAsync(code);
+
+        var run2 = await host.RunAsync(SentinelTools.AgentName, SentinelActions.Verify(code));
+        Assert.Equal(RunStatus.AwaitingApproval, run2.Status);
+        run2.ChecksPass();
+        await host.DecideAsync(run2, SentinelTools.CloseCase);
+
+        Assert.Equal(CaseStatus.Closed, (await host.CaseAsync(code))!.Status);
+        Assert.True((await host.VerifyAuditAsync()).Ok);
+    }
+
+    [Fact]
     public async Task Maria_on_a_scripted_model_masks_the_phone_and_the_tools_get_it_back()
     {
         using var _ = new UiLanguage("ro-RO");
