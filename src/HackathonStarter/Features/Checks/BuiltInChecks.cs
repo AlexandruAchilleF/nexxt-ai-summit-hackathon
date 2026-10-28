@@ -56,8 +56,18 @@ public class PiiLeakCheck : Check
             return []; // an unreadable fact allows nothing extra: the check stays as strict as without tools
         }
 
-        static string Text(JsonElement call, string name) => !call.TryGetProperty(name, out var value) ? ""
-            : value.ValueKind == JsonValueKind.String ? value.GetString()! : value.GetRawText();
+        // The values, not the raw JSON: RunStore.Json writes "Telefon:\n\u002B49…" and "\u201E\u002B49…", where the escape
+        // glues the number to a letter and no detector finds it. A blank line, which no detector spans, keeps values apart.
+        static string Text(JsonElement call, string name) => call.TryGetProperty(name, out var value) ? string.Join("\n\n", Values(value)) : "";
+
+        static IEnumerable<string> Values(JsonElement value) => value.ValueKind switch
+        {
+            JsonValueKind.String => [value.GetString()!],
+            JsonValueKind.Number => [value.GetRawText()],
+            JsonValueKind.Object => value.EnumerateObject().SelectMany(p => Values(p.Value)),
+            JsonValueKind.Array => value.EnumerateArray().SelectMany(Values),
+            _ => [],
+        };
     }
 
     /// <summary>"RO49 AAAA 1B31…" and "ro49aaaa1b31…" are the same IBAN.</summary>

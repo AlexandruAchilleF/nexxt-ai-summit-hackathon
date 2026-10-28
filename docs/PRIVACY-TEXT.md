@@ -34,20 +34,18 @@ mascheze numere la întâmplare:
 | CNP | `[CNP_1]` | 13 cifre, cifra de control |
 | Card | `[CARD_1]` | 13–19 cifre, algoritmul Luhn |
 | Telefon **românesc** | `[PHONE_1]` | prefix `+40`, `0040` sau `0`, apoi 2, 3 sau 7 și 8 cifre |
+| Telefon cu indicativul țării, **din orice țară** | `[PHONE_1]` | `+` sau `00`, indicativul țării, 7–15 cifre în total (E.164), în grupuri despărțite de spații, cratime sau puncte |
 
-Nu sunt mascate: numele, adresele, datele de naștere, TIN-urile străine și **numerele de telefon străine**. Am verificat
-expresia `PhoneRegex` pe `+49 151 23456789`, `+4915123456789`, `+43 664 1234567` și `+1 212 555 0100`: niciuna nu e
-recunoscută. Numerele E.164 străine din `SyntheticData.PhoneE164` (PR #8: DE, AT, IT, ES, FR, US) ajung deci la model
-în clar; cele românești (`+407…`) sunt mascate. Textul de mai jos spune asta. Dacă R3 extinde `PiiVault` la numerele
-E.164 străine (PLAN 13.1 presupune deja că modelul vede `[PHONE-1]`, nu `+49 …`; în rulare marcajul e `[PHONE_1]`,
-`[PHONE-1]` e forma de stocare), se scot „numerele de telefon străine” din cheia „Not masked” și „Romanian phone
-numbers” devine „phone numbers”.
+Nu sunt mascate: numele, adresele, datele de naștere, TIN-urile străine și **numerele de telefon străine scrise fără
+indicativul țării** (`089 4521 7730`). Cele cu indicativ (`+49 89 4521 7730`, `0049 89 4521 7730`, `+1 (212) 555-0147`)
+sunt mascate de `InternationalPhoneRegex`, deci și numerele E.164 din `SyntheticData.PhoneE164` (DE, AT, IT, ES, FR,
+US); testele sunt în `PiiVaultInternationalTests`. Textul de mai jos spune asta.
 
 | Cheie EN (@T) | RO (Lang.Ro.cs) | Stare |
 | --- | --- | --- |
 | What reaches a model | Ce ajunge la un model | cheie existentă |
-| CNPs, IBANs, card numbers, emails and Romanian phone numbers are replaced with placeholders such as [CNP_1] before any text leaves the app, and restored only in the answer shown to you. Tools receive the real values; the model never does. | CNP-urile, IBAN-urile, numerele de card, emailurile și numerele de telefon românești sunt înlocuite cu marcaje precum [CNP_1] înainte ca textul să iasă din aplicație și refăcute doar în răspunsul afișat ție. Uneltele primesc valorile reale; modelul, niciodată. | cheie nouă (înlocuiește cheia existentă „CNPs, IBANs, card numbers, emails and phone numbers are replaced…”) |
-| Not masked: names, addresses, dates of birth, foreign TINs and foreign phone numbers. This is why the demo uses synthetic data only. | Nu sunt mascate: numele, adresele, datele de naștere, TIN-urile străine și numerele de telefon străine. De aceea demo-ul folosește doar date sintetice. | cheie nouă |
+| CNPs, IBANs, card numbers, emails and phone numbers (Romanian ones, and foreign ones written with the country code after + or 00) are replaced with placeholders such as [CNP_1] before any text leaves the app, and restored only in the answer shown to you. Tools receive the real values; the model never does. | CNP-urile, IBAN-urile, numerele de card, emailurile și numerele de telefon (cele românești și cele străine scrise cu indicativul țării după + sau 00) sunt înlocuite cu marcaje precum [CNP_1] înainte ca textul să iasă din aplicație și refăcute doar în răspunsul afișat ție. Uneltele primesc valorile reale; modelul, niciodată. | cheie nouă (înlocuiește cheia existentă „CNPs, IBANs, card numbers, emails and phone numbers are replaced…”) |
+| Not masked: names, addresses, dates of birth, foreign TINs and foreign phone numbers written without the country code. This is why the demo uses synthetic data only. | Nu sunt mascate: numele, adresele, datele de naștere, TIN-urile străine și numerele de telefon străine scrise fără indicativul țării. De aceea demo-ul folosește doar date sintetice. | cheie nouă |
 | Masking is off | Mascarea e oprită | cheie existentă |
 | text is sent to the model as typed. | textul ajunge la model exact cum a fost scris. | cheie existentă |
 | From uploaded PDFs, only the visible text reaches the model: white, tiny, invisible or off-page text is set aside and shown to the operator. Text covered by a shape is not detected yet. | Din PDF-urile încărcate ajunge la model doar textul vizibil: textul alb, microscopic, invizibil sau din afara paginii e pus deoparte și arătat operatorului. Textul acoperit de o formă nu e detectat încă. | cheie nouă · după R3 (scutul, PLAN 10.1) |
@@ -65,8 +63,8 @@ Note:
 
 - Coloana „Runs on” vine din `DataFlows.Models`. Pe `main`, un model Bedrock fără `Endpoint` ar apărea ca
   `api.openai.com`; PR #5 adaugă gazda `bedrock-runtime.<regiune>.amazonaws.com`. Rândul Bedrock are sens doar după #5.
-- Exemplul cu țara folosește `ibanCountry`, nu `phoneCountry`: telefonul străin nu e mascat azi, deci nu are o valoare
-  mascată lângă care să stea țara.
+- Exemplul cu țara folosește `ibanCountry`; `phoneCountry` merge la fel, pentru că și telefonul străin cu indicativ e
+  mascat.
 
 ## 2. Ce se salvează
 
@@ -264,8 +262,9 @@ Rândurile marcate „după R1”–„după R5” sau „după #5” intră doa
 
 1. **Antet:** nimic.
 2. **Ce ajunge la un model:** în ramura `MaskPii`, cheia veche „CNPs, IBANs, card numbers, emails and phone numbers…”
-   devine cheia nouă (cu „Romanian phone numbers”), urmată de `<span>` cu „Not masked: …”. Sub ea, propoziția despre
-   scut (după R3) și cea despre țara derivată (după uneltele R4). Sub tabelul modelelor, propoziția Bedrock, afișată doar
+   devine cheia nouă (cu „foreign ones written with the country code after + or 00”), urmată de `<span>` cu „Not
+   masked: …”. Sub ea, propoziția despre scut (după R3) și cea despre țara derivată (după uneltele R4). Sub tabelul
+   modelelor, propoziția Bedrock, afișată doar
    dacă `_models.Any(m => m.Provider.Equals("Bedrock", StringComparison.OrdinalIgnoreCase))` (după #5).
 3. **Ce se salvează:** două rânduri noi la finalul tabelului: „Audit log (hash chain)” (după R3) și „Clients and cases”
    (după R5 și R2).

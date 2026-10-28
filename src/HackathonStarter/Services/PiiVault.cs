@@ -130,7 +130,7 @@ public partial class PiiVault
     {
         var prefix = run.AsSpan(start, numberStart - start);
         var number = run.AsSpan(numberStart, end - numberStart);
-        if (Digits(number, max: 20) is > 15 and < 20 && IsLuhnValid(number.ToString()) && !number.ContainsAnyExcept("0123456789 -   "))
+        if (Digits(number, max: 20) is > 15 and < 20 && IsLuhnValid(number.ToString()) && !number.ContainsAnyExcept("0123456789 -\u00A0\u202F"))
         {
             output.Append(prefix).Append(Token("CARD", number.ToString()));
             return end;
@@ -198,7 +198,7 @@ public partial class PiiVault
     }
 
     /// <summary>Check if character is a phone separator: space, non-breaking space (U+00A0), or narrow non-breaking space (U+202F).</summary>
-    private static bool IsPhoneSeparator(char c) => c is ' ' or ' ' or ' ';
+    private static bool IsPhoneSeparator(char c) => c is ' ' or '\u00A0' or '\u202F';
 
     /// <summary>Find first occurrence of a phone separator.</summary>
     private static int FindFirstPhoneSeparator(ReadOnlySpan<char> text)

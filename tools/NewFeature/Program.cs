@@ -22,7 +22,7 @@ var featureDir = Path.Combine(app, "Features", plural);
 var pagesDir = Path.Combine(app, "Components", "Pages", plural);
 if (Directory.Exists(featureDir) || Directory.Exists(pagesDir))
 {
-    Console.Error.WriteLine($"❌ {plural} already exists.");
+    Console.Error.WriteLine($"Error: {plural} already exists.");
     return 1;
 }
 
@@ -59,7 +59,7 @@ void InsertBefore(string relativePath, string marker, string line)
     var idx = text.IndexOf(marker, StringComparison.Ordinal);
     if (idx < 0)
     {
-        Console.WriteLine($"⚠️  Marker \"{marker}\" not found in {relativePath}. Add manually:\n   {line}");
+        Console.WriteLine($"Warning: marker \"{marker}\" not found in {relativePath}. Add manually:\n   {line}");
         return;
     }
     var lineStart = text.LastIndexOf('\n', idx) + 1;
@@ -90,7 +90,7 @@ InsertBefore("Config/SiteConfig.cs", "// @gen:nav", $"new(\"{plural}\", \"/{plur
 
 Console.WriteLine($"""
 
-    ✅ Created feature "{plural}"
+    Created feature "{plural}"
        Features/{plural}/              entity, service, seed
        Components/Pages/{plural}/      list, detail, dialog
        + service, DbSet, seed and nav entry registered

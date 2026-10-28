@@ -65,6 +65,30 @@ public class CheckPrivacyTests
     }
 
     [Theory]
+    [InlineData("Tel: +49\u00A089\u00A04521\u00A07730\u00A01985", "Tel: [PHONE_1]\u00A01985")] // a year after the number, as with spaces
+    [InlineData("Tel: +49\u202F89\u202F4521\u202F7730\u202F1985", "Tel: [PHONE_1]\u202F1985")] // narrow non-breaking spaces
+    [InlineData("+43\u00A01\u00A05134567\u00A00049\u00A089\u00A04521\u00A07730", "[PHONE_1]\u00A0[PHONE_2]")] // two numbers side by side
+    [InlineData("+380\u00A044\u00A0123\u00A045\u00A067\u00A02026", "[PHONE_1]\u00A02026")]
+    [InlineData("+380\u00A044\u00A0123\u00A045\u00A067\u00A01985", "+[CARD_1]")] // its 16 digits pass the Luhn check: a card, as with spaces
+    [InlineData("Tel: +1\u00A0(212)\u00A0555\u00A00147", "Tel: [PHONE_1]")]
+    [InlineData("Tel: +1\u00A0(212)\u00A0555\u00A00147\u00A01985", "Tel: [PHONE_1]\u00A01985")]
+    [InlineData("Maria,+49\u00A089\u00A04521\u00A07730,35", "Maria,[PHONE_1],35")]
+    [InlineData("Card +4111\u00A01111\u00A01111\u00A01111", "Card +[CARD_1]")] // over 15 digits with a valid Luhn check: a card
+    public void Groups_split_by_non_breaking_spaces_are_cut_like_groups_split_by_spaces(string text, string expected)
+    {
+        var vault = new PiiVault();
+
+        var masked = vault.Mask(text);
+
+        Assert.Equal(expected, masked);
+        Assert.Equal(text, vault.Unmask(masked));
+        Assert.Equal(expected.Replace('_', '-'), PiiVault.ForStorage().Mask(text));
+        Assert.Equal(new PiiVault().Mask(Spaces(text)), Spaces(masked));
+
+        static string Spaces(string s) => s.Replace('\u00A0', ' ').Replace('\u202F', ' ');
+    }
+
+    [Theory]
     [InlineData("q=CNP+1900515400013", "[CNP-1]")]
     [InlineData("Suma +1900515400013.50", "[CNP-1]")]
     [InlineData("Suma +378282246310005.50", "[CARD-1]")]
@@ -91,6 +115,7 @@ public class CheckPrivacyTests
     [Theory]
     [InlineData("Telefonul +49 89\n4521 7730 al Mariei este și el un indiciu.")] // a phone broken by a line break
     [InlineData("Telefonul \\u002B49 89 4521 7730 al Mariei este și el un indiciu.")] // the JSON escape of "+"
+    [InlineData("Telefonul +49\u00A089\u00A04521\u00A07730\u00A01985 al Mariei este și el un indiciu.")] // non-breaking spaces, then a year
     public void An_excerpt_never_shows_the_digits_of_a_phone(string answer)
     {
         var result = Assert.Single(new CheckEngine([new RuleCitedCheck()]).Evaluate(new CheckSubject(answer, "x"), ["rule-cited"]).Results);
@@ -99,6 +124,23 @@ public class CheckPrivacyTests
         Assert.NotNull(excerpt);
         Assert.DoesNotContain("4521", excerpt);
         Assert.DoesNotContain("7730", excerpt);
+    }
+
+    [Fact]
+    public void An_excerpt_still_shows_the_match_when_masking_shortens_the_text_before_it()
+    {
+        // Eight phones of 16 characters become [PHONE-1]…[PHONE-8] of 9: the match moves 56 characters to the left,
+        // more than the 40 of the window, so a window cut at its unmasked index would miss it.
+        var phones = string.Join(", ", Enumerable.Range(1, 8).Select(i => $"+49 89 4521 773{i}"));
+        var answer = $"Maria are telefoanele {phones}, iar fiecare este un indiciu pe care operatorul il verifica in dosarul clientului.";
+        var result = Assert.Single(new CheckEngine([new RuleCitedCheck()]).Evaluate(new CheckSubject(answer, "x"), ["rule-cited"]).Results);
+
+        var excerpt = Assert.Single(result.Findings).Excerpt;
+
+        Assert.NotNull(excerpt);
+        Assert.Contains("un indiciu pe care", excerpt);
+        Assert.Contains("[PHONE-8]", excerpt);
+        Assert.DoesNotContain("4521", excerpt);
     }
 
     [Theory]
@@ -121,5 +163,50 @@ public class CheckPrivacyTests
         var subject = new CheckSubject("Dovada: „Telefon: +49 89 4521 7730”.", "Pregătește cazul", new Dictionary<string, string> { ["tool-results"] = toolResults });
 
         Assert.Equal(CheckOutcome.Pass, Assert.Single(new CheckEngine([new PiiLeakCheck()]).Evaluate(subject, ["pii-leak"]).Results).Outcome);
+    }
+
+    [Theory]
+    [InlineData("Telefon:\n+49 89 4521 7730", "Documentul spune: +49 89 4521 7730.")] // saved as "Telefon:\n\u002B49…"
+    [InlineData("Telefon: „+49 89 4521 7730”", "Documentul spune: „+49 89 4521 7730”.")] // saved as "\u201E\u002B49…"
+    [InlineData("CNP:\n1900515400013", "CNP-ul din document este 1900515400013.")]
+    [InlineData("IBAN:\nRO49AAAA1B31007593840000", "IBAN-ul din document este RO49AAAA1B31007593840000.")]
+    [InlineData("E-mail:\nmaria.popescu@example.com", "Adresa din document este maria.popescu@example.com.")]
+    public void Personal_data_a_tool_returned_after_an_escaped_character_may_be_quoted(string document, string answer)
+    {
+        var toolResults = ToolResults(("readDocument", new { documentId = 7 }, new { text = document }));
+        var subject = new CheckSubject(answer, "Pregătește cazul Mariei", new Dictionary<string, string> { ["tool-results"] = toolResults });
+
+        Assert.Single(PiiVault.Detect(answer));
+        Assert.Equal(CheckOutcome.Pass, Assert.Single(new CheckEngine([new PiiLeakCheck()]).Evaluate(subject, ["pii-leak"]).Results).Outcome);
+    }
+
+    [Fact]
+    public void A_phone_the_model_wrote_after_an_escaped_character_in_a_tool_input_is_still_an_echo()
+    {
+        // Saved as "Sun\u0103 la:\n\u002B49…": read raw, the input holds no phone and the echo would be allowed.
+        var toolResults = ToolResults(("dial", new { note = "Sună la:\n+49 89 4521 7730" }, new { dialled = "+49 89 4521 7730" }));
+        var subject = new CheckSubject("Am sunat la +49 89 4521 7730.", "Sună-l pe client", new Dictionary<string, string> { ["tool-results"] = toolResults });
+
+        Assert.Equal(CheckOutcome.Fail, Assert.Single(new CheckEngine([new PiiLeakCheck()]).Evaluate(subject, ["pii-leak"]).Results).Outcome);
+    }
+
+    [Theory]
+    [InlineData("""[{"tool":"readDocument","input":{"documentId":7},"output":{"text":"Telefon: +49 89 4521 7730"}""")] // truncated
+    [InlineData("""{"output":"+49 89 4521 7730"}""")] // not an array of tool calls
+    public void A_tool_results_fact_that_cannot_be_read_allows_nothing_extra(string toolResults)
+    {
+        var subject = new CheckSubject("Telefonul este +49 89 4521 7730.", "Pregătește cazul Mariei", new Dictionary<string, string> { ["tool-results"] = toolResults });
+
+        Assert.Equal(CheckOutcome.Fail, Assert.Single(new CheckEngine([new PiiLeakCheck()]).Evaluate(subject, ["pii-leak"]).Results).Outcome);
+    }
+
+    /// <summary>The "tool-results" fact exactly as AgentRunner.ToolResults writes it: each input and output parsed, then serialised with RunStore.Json.</summary>
+    private static string ToolResults(params (string Tool, object Input, object Output)[] calls) =>
+        JsonSerializer.Serialize(calls.Select(c => new { tool = c.Tool, input = Element(c.Input), output = Element(c.Output) }), RunStore.Json);
+
+    private static JsonElement Element(object value)
+    {
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(value, RunStore.Json));
+        return doc.RootElement.Clone();
     }
 }

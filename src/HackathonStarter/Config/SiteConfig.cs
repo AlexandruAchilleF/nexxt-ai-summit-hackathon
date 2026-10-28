@@ -4,7 +4,7 @@ using MudBlazor;
 namespace HackathonStarter.Config;
 
 /// <summary>
-/// ⭐ THE FILE TO EDIT FIRST ⭐
+/// THE FILE TO EDIT FIRST.
 /// App name, colors, landing copy, navigation and demo users all come from here.
 /// Adding a page = create Components/Pages/YourPage.razor with @page "/your-page" + one line in <see cref="Nav"/>.
 /// </summary>
