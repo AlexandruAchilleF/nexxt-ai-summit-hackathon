@@ -31,10 +31,11 @@ public static class SiteConfig
 
     /// <summary>
     /// The company behind the app, used by the footer, Terms, Privacy policy and Contact pages.
-    /// Replace every [bracketed] value before going public, and have the legal texts reviewed.
+    /// Hackathon prototype, no company: the footers show the product name and link only to /privacy. Terms, Privacy
+    /// policy and Contact stay reachable by URL with these placeholders; fill them in before linking those pages again.
     /// </summary>
     public static readonly LegalInfo Legal = new(
-        CompanyName: "[Company name SRL]",
+        CompanyName: Name,
         RegistrationNumber: "[J40/0000/2026]",
         FiscalCode: "[RO00000000]",
         Address: "[Street, number, Bucharest, Romania]",
