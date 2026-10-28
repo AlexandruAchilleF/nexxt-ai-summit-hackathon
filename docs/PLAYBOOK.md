@@ -227,9 +227,9 @@ există deja); nu înlocuiește nimic, adaugă bucla de după semnal. Obligația
 
 | Întrebare | Răspuns |
 | --- | --- |
-| Pe ce temei prelucrați datele? | Obligație legală (art. 6 alin. 1 lit. c GDPR): Legea 207/2015 (Codul de procedură fiscală, Anexa 1) și Acordul FATCA România–SUA din 28 mai 2015. Nu adăugăm date noi; lucrăm cu ce banca are deja obligația să verifice. |
+| Pe ce temei prelucrați datele? | Obligație legală (art. 6 alin. (1) lit. (c) GDPR): Codul de procedură fiscală cere băncii să aplice procedurile de diligență fiscală din anexele nr. 1 și 2 (art. 291 alin. (4)) și să raporteze anual la ANAF (art. 62 alin. (1)); pentru FATCA, Acordul FATCA România–SUA din 28 mai 2015 (art. 62 alin. (3), Legea 233/2015). Nu adăugăm date noi; lucrăm cu ce banca are deja obligația să verifice. |
 | Unde ajung datele? | CNP, IBAN, telefon etc. sunt mascate înainte de model (`PiiVault`). Modelul poate rula pe serverul băncii; `/privacy` citește configurația live. |
-| Cât le păstrați? | Dovezile cazului: cât cere legea pentru documentele de diligență (NEVERIFICAT: termenul de păstrare). Rulările agentului au retenție separată, configurabilă. |
+| Cât le păstrați? | Înregistrările de diligență fiscală și de raportare, și probele pe care s-a bazat: banca trebuie să le păstreze 10 ani de la termenul de raportare de 15 mai (Codul de procedură fiscală, art. 62 alin. (11)). În aplicație, nicio regulă de retenție nu șterge cazurile sau jurnalul; rulările agentului se șterg după `Privacy:RetentionDays` (implicit 30 de zile). |
 | Decide AI-ul? | Nu. Codul aplică regulile, omul aprobă cererea și închiderea (art. 22 GDPR: fără decizii exclusiv automate). |
 | Discriminare? | Naționalitatea nu e semnal (excepție: cetățenia SUA, cerută de FATCA). Semnalele AI nu pornesc nicio acțiune singure. |
 | Ce date ați folosit? | Doar sintetice. Nu ne-a trebuit nicio dată Raiffeisen. |

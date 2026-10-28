@@ -941,13 +941,13 @@ Pagina `/metrics` și o secțiune în README. Cifrele din video vin de aici, nu 
 
 | Întrebare | Răspuns |
 | --- | --- |
-| Temei legal? | Obligație legală (art. 6 alin. (1) lit. (c) GDPR): Legea 207/2015 (art. 62 alin. (7), art. 291 alin. (4), Anexa nr. 1) și Acordul FATCA obligă banca să identifice rezidența fiscală (ghidul, p. 4). |
-| Ce ajunge la model? | Doar textul vizibil (după scut), cu CNP / IBAN / telefon / email mascate (`PiiVault`), plus țara derivată (`phoneCountry`, `ibanCountry`). Numele și adresele nu sunt mascate (date sintetice; o spunem pe `/privacy`). Uneltele lucrează cu valorile reale. |
+| Temei legal? | Obligație legală (art. 6 alin. (1) lit. (c) GDPR): Codul de procedură fiscală (Legea 207/2015) cere băncii să aplice procedurile de diligență fiscală din anexele nr. 1 și 2 (art. 291 alin. (4)) și să raporteze anual conturile la ANAF (art. 62 alin. (1)); pentru FATCA, procedurile din Acordul FATCA (art. 62 alin. (3), Legea 233/2015). Banca informează clientul cel târziu la deschiderea contului (art. 62 alin. (10)). Citatele: `docs/PRIVACY-TEXT.md`. |
+| Ce ajunge la model? | Doar textul vizibil (după scut), cu CNP / IBAN / card / email / telefon românesc mascate (`PiiVault`), plus țara derivată (`phoneCountry`, `ibanCountry`). Numele, adresele, datele de naștere, TIN-urile străine și telefoanele străine nu sunt mascate (date sintetice; o spunem pe `/privacy`). Uneltele lucrează cu valorile reale. |
 | Unde rulează modelul? | În demo: Bedrock **us-west-2** (contul de workshop blochează `eu-central-1`), doar cu date sintetice. În producție: regiune UE sau on-prem (endpoint compatibil OpenAI). Spunem asta deschis în README. |
 | Ce se salvează? | Rulările agentului și jurnalul: mascate. Aprobările în așteptare: argumente criptate (`SealedInput`). |
-| Cât timp? | Rulările: retenție configurabilă (`Privacy:RetentionDays`). Dosarul fiscal: cât cere legea (NEVERIFICAT: termenul de păstrare). |
+| Cât timp? | Rulările agentului: șterse automat după `Privacy:RetentionDays` (implicit 30 de zile; art. 5 alin. (1) lit. (e) GDPR). Nicio regulă de retenție nu șterge clienții, cazurile sau jurnalul. Legea cere băncii să păstreze înregistrările de diligență fiscală și de raportare, și probele pe care s-a bazat, 10 ani de la termenul de raportare de 15 mai (Codul de procedură fiscală, art. 62 alin. (11), și pentru FATCA). |
 | Decide AI-ul? | Nu. Art. 22 GDPR nu se aplică: nicio decizie nu se ia exclusiv automat; codul aplică regulile, omul aprobă cererea și închiderea. |
-| De ce mascarea? | Minimizarea datelor (art. 5 alin. (1) lit. (c) GDPR) și securitatea prelucrării (art. 32 GDPR). |
+| De ce mascarea? | Reducerea la minimum a datelor (art. 5 alin. (1) lit. (c) GDPR) și securitatea prelucrării, prin pseudonimizare și criptare (art. 32 alin. (1) lit. (a) GDPR). |
 | Discriminare? | Naționalitatea nu e semnal (excepție: cetățenia SUA la FATCA); venitul din străinătate nu e indiciu. |
 | Ce date am folosit? | Doar sintetice. |
 
