@@ -2,7 +2,11 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using HackathonStarter.Features.Changes;
+using HackathonStarter.Features.Clients;
 using HackathonStarter.Features.Finance;
+using HackathonStarter.Features.Rules;
 using HackathonStarter.Features.Synthetic;
 using HackathonStarter.Services;
 
@@ -299,4 +303,223 @@ public class SyntheticClientsTests
         try { return action(); }
         finally { (CultureInfo.CurrentCulture, CultureInfo.CurrentUICulture) = (previous, previousUi); }
     }
+
+    // The same clients as the engine takes them (SyntheticSnapshots): the mapping copies, it never decides.
+
+    // The ClientSnapshot properties each change touches, plus "documents" for an upload (golden 4: both of Maria's changes).
+    private static readonly Dictionary<string, string> ChangedValues = new()
+    {
+        ["domestic-move"] = "addresses",
+        ["domestic-phone-changed"] = "phones",
+        ["domestic-phone-added"] = "phones",
+        ["domestic-mailing"] = "addresses",
+        ["domestic-order"] = "accounts",
+        ["domestic-poa"] = "powersOfAttorney",
+        ["crs-move"] = "addresses",
+        ["crs-move-phone"] = "addresses phones",
+        ["crs-phone"] = "phones",
+        ["crs-custodial-order"] = "accounts",
+        ["crs-poa"] = "powersOfAttorney",
+        ["crs-mailing"] = "addresses",
+        ["fatca-phone"] = "phones",
+        ["fatca-order"] = "accounts",
+        ["fatca-citizenship"] = "citizenships documents",
+        ["trap-depository-order"] = "accounts",
+        ["trap-foreign-phone"] = "phones",
+        ["trap-citizenship"] = "citizenships documents",
+        ["trap-foreign-salary"] = "documents",
+    };
+
+    [Fact]
+    public void Each_snapshot_case_keeps_the_label_and_the_decision_set_at_generation()
+    {
+        var snapshots = SyntheticSnapshots.Create();
+
+        Assert.Equal(SyntheticClients.All.Select(c => c.Code), snapshots.Select(s => s.Code));
+        foreach (var s in snapshots)
+        {
+            var (decision, hits, cleared, _) = Outcomes[s.Source.Scenario.Id];
+            Assert.Equal(decision.ToString(), s.Expected.ToString());
+            Assert.Equal(s.Source.Scenario.Label, s.Label);
+            Assert.Equal(s.Source.Scenario.LabelEn, s.LabelEn);
+            Assert.Equal(Rules(hits, s.Source.Jurisdiction), Rules(s.ExpectedHits));
+            Assert.Equal(Rules(cleared, s.Source.Jurisdiction), Rules(s.ExpectedCleared));
+        }
+        Assert.Equal(40, snapshots.Count(s => s.Expected == Decision.NoCase));
+        Assert.Equal(7, snapshots.Count(s => s.Expected == Decision.Clarification));
+        Assert.Equal(3, snapshots.Count(s => s.Expected == Decision.FatcaAlert));
+    }
+
+    [Fact]
+    public void Synthetic_enums_are_subsets_of_the_contract_enums_by_name()
+    {
+        Assert.Subset(Enum.GetNames<ChangeKind>().ToHashSet(), Enum.GetNames<SyntheticChangeKind>().ToHashSet());
+        Assert.Subset(Enum.GetNames<Decision>().ToHashSet(), Enum.GetNames<ScenarioDecision>().ToHashSet());
+        Assert.Subset(Enum.GetNames<AddressKind>().ToHashSet(), Enum.GetNames<SyntheticAddressKind>().ToHashSet());
+        Assert.Subset(Enum.GetNames<AccountType>().ToHashSet(), Enum.GetNames<SyntheticAccountType>().ToHashSet());
+        Assert.Subset(Enum.GetNames<DocumentKind>().ToHashSet(), Enum.GetNames<SyntheticDocumentKind>().ToHashSet());
+    }
+
+    [Theory]
+    [MemberData(nameof(Scenarios))]
+    public void Each_snapshot_carries_the_facts_of_its_scenario(string scenario)
+    {
+        var cases = SyntheticSnapshots.Create().Where(s => s.Source.Scenario.Id == scenario).ToList();
+
+        Assert.NotEmpty(cases);
+        foreach (var s in cases)
+        {
+            Assert.Equal(WithoutDocuments(Standard), State(s.Before));
+            Assert.Equal(WithoutDocuments(Expected(AfterChange[scenario], s.Source.Jurisdiction)), State(s.After));
+            // Only the payslip leaves the bank data as it was: its signal is in the document (golden 8).
+            Assert.Equal(scenario != "trap-foreign-salary", Json(s.Before) != Json(s.After));
+        }
+    }
+
+    [Fact]
+    public void Snapshots_copy_every_field_the_contract_has()
+    {
+        foreach (var s in SyntheticSnapshots.Create())
+        {
+            foreach (var (synthetic, snapshot) in new[] { (s.Source.Before, s.Before), (s.Source.After, s.After) })
+            {
+                Assert.Equal(int.Parse(synthetic.Code[3..], CultureInfo.InvariantCulture), snapshot.ClientId);
+                Assert.Equal(Fields(synthetic), Fields(snapshot));
+            }
+        }
+    }
+
+    [Fact]
+    public void Each_change_event_is_the_synthetic_change_with_the_channel_names_of_the_contract()
+    {
+        var snapshots = SyntheticSnapshots.Create();
+
+        foreach (var s in snapshots)
+        {
+            var (change, e) = (s.Source.Change, s.Change);
+            Assert.Equal(0, e.Id);
+            Assert.Null(e.EvaluationId);
+            Assert.Equal(s.Before.ClientId, e.ClientId);
+            Assert.Equal(change.Kind.ToString(), e.Kind.ToString());
+            Assert.Equal(change.Summary, e.Summary);
+            Assert.Equal(change.ReceivedAt, e.ReceivedAt);
+            Assert.Equal(DateTimeKind.Utc, e.ReceivedAt.Kind);
+            Assert.Equal(change.SourceChannel == "ghișeu" ? "branch" : change.SourceChannel, e.SourceChannel);
+        }
+        Assert.Equal(new[] { "branch", "call center", "online" }, snapshots.Select(s => s.Change.SourceChannel).Distinct().Order(StringComparer.Ordinal));
+    }
+
+    [Theory]
+    [MemberData(nameof(Scenarios))]
+    public void Each_change_event_holds_the_old_and_new_values_of_what_changed(string scenario)
+    {
+        Assert.Equal(AfterChange.Keys.Order(StringComparer.Ordinal), ChangedValues.Keys.Order(StringComparer.Ordinal));
+        var expected = ChangedValues[scenario].Split(' ');
+
+        foreach (var s in SyntheticSnapshots.Create().Where(s => s.Source.Scenario.Id == scenario))
+        {
+            Assert.Equal(List(expected.Where(k => k != "documents")), Keys(s.Change.OldValueJson));
+            Assert.Equal(List(expected), Keys(s.Change.NewValueJson));
+            // Literal, not +-escaped: PiiVault still finds the Romanian phones when the change is masked for storage.
+            foreach (var phone in s.After.Phones.Where(p => p.Country == "RO" && expected.Contains("phones")))
+            {
+                Assert.Contains(phone.Number, s.Change.NewValueJson);
+                Assert.DoesNotContain(phone.Number, PiiVault.Redact(s.Change.NewValueJson));
+            }
+            if (!expected.Contains("documents")) continue;
+
+            // Kind and file name only: the content (KeyLine) is the ground truth for extraction, it never travels with the change.
+            var uploaded = s.Source.After.Documents.Single();
+            var document = JsonNode.Parse(s.Change.NewValueJson!)!["documents"]!.AsArray().Single()!.AsObject();
+            Assert.Equal("fileName,kind", List(document.Select(p => p.Key)));
+            Assert.Equal(uploaded.FileName, (string?)document["fileName"]);
+            Assert.Equal(uploaded.Kind.ToString(), (string?)document["kind"]);
+        }
+    }
+
+    // p. 25 lit. b, p. 20: the engine reads the balance, currency and opening date of the FATCA account from AccountSnapshot
+    // to see it over 50.000 $, so they arrive unchanged, on an account new for both regimes.
+    [Fact]
+    public void Fatca_accounts_reach_the_snapshot_with_balance_currency_and_opening_date()
+    {
+        for (var seed = 0; seed < 1000; seed++)
+        {
+            foreach (var s in SyntheticClients.Generate(seed).Where(c => c.Scenario.Group == ScenarioGroup.Fatca).Select(c => c.ToSnapshotCase()))
+            {
+                foreach (var (synthetic, snapshot) in new[] { (s.Source.Before, s.Before), (s.Source.After, s.After) })
+                {
+                    var fatca = synthetic.Accounts.Where(OverFatcaThreshold).ToList();
+                    Assert.NotEmpty(fatca);
+                    foreach (var account in fatca)
+                    {
+                        var mapped = snapshot.Accounts.Single(a => a.Iban == account.Iban);
+                        Assert.Equal((AccountType.Depository, account.OpenedOn, account.Balance, account.Currency), (mapped.Type, mapped.OpenedOn, mapped.Balance, mapped.Currency));
+                        Assert.True(OverFatcaThreshold(mapped), $"seed {seed} {s.Code} {mapped.OpenedOn} {mapped.Balance} {mapped.Currency}");
+                        Assert.False(Preexisting.For(Regime.Fatca, mapped.OpenedOn), $"seed {seed} {s.Code} {mapped.OpenedOn}");
+                        Assert.False(Preexisting.For(Regime.Crs, mapped.OpenedOn), $"seed {seed} {s.Code} {mapped.OpenedOn}");
+                    }
+                }
+                if (s.Source.Scenario.Id != "fatca-order") continue;
+
+                var source = s.After.Accounts.Single(a => a.StandingOrders.Any(o => o.BeneficiaryCountry == "US"));
+                Assert.True(OverFatcaThreshold(source), $"seed {seed} {s.Code} {source.OpenedOn} {source.Balance} {source.Currency}");
+                // The US account number; its ABA routing number stays in Source (INCOMPLET in the mapping).
+                Assert.Matches(@"^\d{10}$", source.StandingOrders.Single().BeneficiaryAccount);
+            }
+        }
+    }
+
+    [Fact]
+    public void Snapshots_are_built_fresh_on_every_call_and_the_same_in_any_culture()
+    {
+        var (first, second) = (SyntheticSnapshots.Create(), SyntheticSnapshots.Create());
+
+        Assert.All(first.Zip(second), p => Assert.NotSame(p.First.Change, p.Second.Change));
+        var reference = InCulture(CultureInfo.InvariantCulture, () => Json(SyntheticSnapshots.Create()));
+        Assert.Equal(reference, Json(first));
+        Assert.Equal(reference, InCulture(CultureInfo.GetCultureInfo("ro-RO"), () => Json(SyntheticSnapshots.Create())));
+        Assert.NotEqual(reference, Json(SyntheticSnapshots.Create(SyntheticClients.Seed + 1)));
+    }
+
+    private static string State(ClientSnapshot c) => string.Join(' ',
+        "res=" + List(c.CurrentAddresses.Where(a => a.Kind == AddressKind.Residence).Select(a => a.Country)),
+        "mail=" + List(c.CurrentAddresses.Where(a => a.Kind == AddressKind.Mailing).Select(a => a.Country)),
+        "phone=" + List(c.CurrentPhones.Select(p => p.Country)),
+        "order=" + List(c.Accounts.SelectMany(a => a.StandingOrders.Where(o => o.IsActive).Select(o => $"{a.Type}>{o.BeneficiaryCountry}"))),
+        "poa=" + List(c.PowersOfAttorney.Where(p => p.IsActive).Select(p => p.HolderCountry)),
+        "cit=" + List(c.Citizenships));
+
+    private static string WithoutDocuments(string state) => state[..state.IndexOf(" doc=", StringComparison.Ordinal)];
+
+    private static string Fields(SyntheticClient c) => string.Join(" | ",
+        $"{c.Code} {c.FullName} {c.BirthDate:yyyy-MM-dd} {c.BirthCountry} {List(c.Citizenships)}",
+        string.Join("; ", c.Addresses.Select(a => $"{a.Kind} {a.Line} {a.City} {a.Country} {a.IsCurrent}")),
+        string.Join("; ", c.Phones.Select(p => $"{p.Number} {p.Country} {p.IsCurrent}")),
+        string.Join("; ", c.Accounts.Select(a => $"{a.Iban} {a.Type} {a.OpenedOn:yyyy-MM-dd} {a.Balance} {a.Currency} "
+            + $"[{string.Join(", ", a.StandingOrders.Select(o => $"{o.BeneficiaryAccount} {o.BeneficiaryCountry} {o.IsActive}"))}]")),
+        string.Join("; ", c.PowersOfAttorney.Select(p => $"{p.HolderName} {p.HolderCountry} {p.IsActive}")),
+        string.Join("; ", c.SelfCertifications.Select(s => $"{s.SignedAt:O} {s.DeclaresUsPerson} "
+            + string.Join(", ", s.Residences.Select(r => $"{r.Country} {r.Tin} None")))),
+        "explanations=0");
+
+    private static string Fields(ClientSnapshot c) => string.Join(" | ",
+        $"{c.Code} {c.FullName} {c.BirthDate:yyyy-MM-dd} {c.BirthCountry} {List(c.Citizenships)}",
+        string.Join("; ", c.Addresses.Select(a => $"{a.Kind} {a.Line} {a.City} {a.Country} {a.IsCurrent}")),
+        string.Join("; ", c.Phones.Select(p => $"{p.Number} {p.Country} {p.IsCurrent}")),
+        string.Join("; ", c.Accounts.Select(a => $"{a.Iban} {a.Type} {a.OpenedOn:yyyy-MM-dd} {a.Balance} {a.Currency} "
+            + $"[{string.Join(", ", a.StandingOrders.Select(o => $"{o.BeneficiaryAccount} {o.BeneficiaryCountry} {o.IsActive}"))}]")),
+        string.Join("; ", c.PowersOfAttorney.Select(p => $"{p.HolderName} {p.HolderCountry} {p.IsActive}")),
+        c.SelfCertification is { } s ? $"{s.SignedAt:O} {s.DeclaresUsPerson} "
+            + string.Join(", ", s.Residences.Select(r => $"{r.Country} {r.Tin} {r.NoTinReason}{r.NoTinExplanation}")) : "",
+        $"explanations={c.AcceptedExplanations.Count}");
+
+    private static string Keys(string? json) => json is null ? "" : List(JsonNode.Parse(json)!.AsObject().Select(p => p.Key));
+
+    private static bool OverFatcaThreshold(AccountSnapshot a) =>
+        a.Type == AccountType.Depository && a.OpenedOn <= new DateOnly(2025, 12, 31)
+        && (a.Currency, a.Balance) is ("USD", >= 60_000m) or ("EUR", >= 75_000m);
+
+    private static string Json(IReadOnlyList<SyntheticSnapshotCase> cases) => JsonSerializer.Serialize(cases);
+
+    private static string Json(ClientSnapshot snapshot) => JsonSerializer.Serialize(snapshot);
 }
