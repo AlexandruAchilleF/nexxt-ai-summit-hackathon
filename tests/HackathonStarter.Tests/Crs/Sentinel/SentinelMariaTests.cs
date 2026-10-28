@@ -63,6 +63,7 @@ public class SentinelMariaTests
         var signal = Assert.Single(prepared.Signals);
         Assert.Equal("Angajator: Müller Logistik GmbH", prepared.Evidence.Single(e => e.Id == signal.EvidenceId).Quote);
         Assert.Equal(RequestStatus.Draft, Assert.Single(prepared.Requests).Status);
+        Assert.Equal("agent:crs-sentinel for user:admin", Assert.Single(prepared.Requests).DraftedBy); // not "Drafted by Ana Admin"
 
         // Ana approves: the tool runs now, without the model.
         var approved = await host.DecideAsync(run1, SentinelTools.SendClientRequest);

@@ -195,13 +195,14 @@ public sealed class FakeCases : ICaseService
     public Task<List<ContextSignal>> ListSignalsAsync(string clientCode) => Task.FromResult(Case.Signals.ToList());
     public Task<IReadOnlyList<string>> RequiredDocumentsAsync(string caseCode) => Task.FromResult<IReadOnlyList<string>>([RequiredDocument]);
 
-    public Task<ClientRequest> DraftRequestAsync(string caseCode, string language, string body, RequestKind kind = RequestKind.Initial)
+    public Task<ClientRequest> DraftRequestAsync(string caseCode, string language, string body, RequestKind kind = RequestKind.Initial,
+                                                 string? actor = null)
     {
         Expect(caseCode, CaseStatus.Open, CaseStatus.ResponseReceived);
         var request = new ClientRequest
         {
             Id = Case.Requests.Count + 1, CaseId = Case.Id, Kind = kind, Language = language, Body = body, RequestedDocuments = [RequiredDocument],
-            Status = RequestStatus.Draft, DraftedBy = "agent", CreatedAt = MariaWorld.OpenedAt,
+            Status = RequestStatus.Draft, DraftedBy = actor ?? "agent", CreatedAt = MariaWorld.OpenedAt,
         };
         Case.Requests.Add(request);
         return Task.FromResult(request);
