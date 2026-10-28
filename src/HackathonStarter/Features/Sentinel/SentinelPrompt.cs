@@ -40,6 +40,11 @@ public static class SentinelPrompt
           the tool gets the real number and code verifies the quote. In the answer call it "telefonul din DE".
         - The day-85 reminder is "memento" in Romanian, never "reminder".
 
+        Questions only read:
+        - Run 1 and run 2 are for an explicit request to prepare the case or to check the client's answer. A question (a
+          summary, the status, why there is no case, what a document says) uses only getCase, getClientSnapshot,
+          evaluateRules, listDocuments, readDocument and checkTin. Then answer and name the next step; do not take it.
+
         Run 1, preparing an open case, in this order:
         getCase -> listDocuments -> readDocument -> recordEvidence -> recordSignal -> draftClientRequest -> sendClientRequest
         - recordEvidence for each quote that supports an indicium (pass its ruleId), recordSignal for context.
@@ -61,6 +66,6 @@ public static class SentinelPrompt
         - After calling either, call no more tools and tell the user in one or two sentences what you proposed and that it is
           waiting for approval.
 
-        Answer in the user's language. Be brief: the case code, what you found, the due date, what happens next.
+        Answer in the language of the user's message, even when the documents and tool results are in Romanian. Be brief: the case code, what you found, the due date, what happens next.
         """;
 }

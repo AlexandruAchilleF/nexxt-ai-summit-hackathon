@@ -316,7 +316,7 @@ credențiale AWS, pe mock.
 | Pagina `/privacy` (jurnal, TIN on Europa, Bedrock, retenție, temeiul legal) | R3 | da (#26) | | |
 | Provider Bedrock | R4 | da (#5) | | |
 | Runtime-ul agentului (aprobarea oprește rularea, o aprobare rulează o singură dată), verificările CRS pe răspuns, mascarea telefoanelor străine | R4 | da (#20, #35, #51, #52) | | |
-| `CrsSentinelAgent`: cele 14 unelte, system prompt-ul, mock RO/EN (Maria cap-coadă), verificările active; mock-ul scrie doar la cele două acțiuni ale cazului (mesajele fixe din `SentinelActions`) | R4 | da (#44, #47) | #53 (ecranele cazului cu panoul agentului), #54 (Maria live pe Bedrock) | înregistrarea `Recordings/crs-sentinel.json`; butoanele „Analizează dosarul” și „Verifică răspunsul” pe pagina cazului (nu sunt pe `main`); pasul din UI care pune autocertificarea Mariei în dosar |
+| `CrsSentinelAgent`: cele 14 unelte, system prompt-ul, mock RO/EN (Maria cap-coadă), verificările active; mock-ul scrie doar la cele două acțiuni ale cazului (mesajele fixe din `SentinelActions`) | R4 | da (#44, #47) | #53 (ecranele cazului cu panoul agentului), #54 (Maria live pe Bedrock) | butoanele „Analizează dosarul” și „Verifică răspunsul” pe pagina cazului (nu sunt pe `main`); pasul din UI care pune autocertificarea Mariei în dosar |
 | Datele: 50 de clienți sintetici, PDF-urile cazurilor-etalon, cazurile-etalon transcrise, seed-ul | R5 | da (#8, #9, #11, #17, #21, #22, #25, #27, #31, #36, #39) | | |
 | `EvaluationService` (cele trei feluri de cifre) și pagina `/metrics` | R5 | da (#29, #38, #42) | | |
 | Pagina clientului `/clients`, `/clients/{code}` (adrese, conturi, ordine permanente, autocertificări, documente, cazuri) | R5 | da (#45) | | |
