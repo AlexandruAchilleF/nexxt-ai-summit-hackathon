@@ -52,7 +52,7 @@ public static class SiteConfig
     private static readonly Landing LandingRo = new(
         Enabled: true,
         Headline: "Fiecare modificare de date, o decizie CRS/FATCA înainte de termen",
-        Subheadline: "Când un client își schimbă adresa, telefonul sau un ordin permanent, codul evaluează schimbarea și, dacă e relevantă fiscal, deschide cazul și pornește termenul din Ghidul ANAF. Agentul adună dovezile și scrie cererea către client. Omul decide.",
+        Subheadline: "Când un client își schimbă adresa, telefonul sau un ordin permanent, codul evaluează schimbarea și, dacă e relevantă fiscal, deschide cazul și, la CRS, pornește termenul din Ghidul ANAF. Agentul adună dovezile și scrie cererea către client. Omul decide.",
         CtaLabel: "Deschide aplicația",
         CtaHref: "/dashboard",
         Announcement: new("Nou", "Regulile din Ghidul ANAF, cu pagina lângă fiecare", "/#how"),
@@ -78,7 +78,7 @@ public static class SiteConfig
                 "Doar modificările care ating un indiciu din lege pornesc un termen. Restul se opresc la filtru, cu explicație.",
                 [
                     new(Icons.Material.Rounded.Rule, "Filtru în cod", "O mutare din Cluj în Iași nu deschide niciun caz, iar regula spune de ce."),
-                    new(Icons.Material.Rounded.Timer, "Termenul, din ziua în care banca află", "90 de zile calendaristice, cu pagina din ghid; conturile vechi și cele noi au reguli diferite."),
+                    new(Icons.Material.Rounded.Timer, "Termenul, din ziua în care banca află", "90 de zile calendaristice, cu pagina din ghid; conturile preexistente și cele noi au reguli diferite."),
                     new(Icons.Material.Rounded.FormatQuote, "Dovezi cu citat", "Fiecare dovadă are citatul exact, verificat de cod în document."),
                     new(Icons.Material.Rounded.Lightbulb, "Indicii și semnale", "Un salariu din Germania e semnal, nu indiciu: se arată, dar nu pornește nimic."),
                 ]),
@@ -86,15 +86,15 @@ public static class SiteConfig
                 "Cererea, răspunsul, reevaluarea și închiderea, cu dovada confirmării. Ce nu se potrivește ajunge la om.",
                 [
                     new(Icons.Material.Rounded.HowToReg, "Aprobare", "Cererea către client și închiderea cazului pleacă doar cu acordul operatorului."),
-                    new(Icons.Material.Rounded.Verified, "Format TIN verificat", "Formatul, după fișele OCDE și, pentru statele UE, la serviciul Comisiei Europene: „format valid”, nu „TIN valid”."),
-                    new(Icons.Material.Rounded.Shield, "Scut pentru text ascuns", "Textul alb pe alb sau microscopic e scos înainte să ajungă la model și devine semnal roșu."),
+                    new(Icons.Material.Rounded.Verified, "Format TIN verificat", "Formatul, după fișele OCDE (SUA: IRS/SSA) și, pentru statele UE, la serviciul Comisiei Europene: „format valid”, nu „TIN valid”."),
+                    new(Icons.Material.Rounded.Shield, "Scut pentru text ascuns", "Textul alb pe alb sau microscopic e scos înainte să ajungă la model și ridică o alertă."),
                     new(Icons.Material.Rounded.NotificationsActive, "Memento și escaladare", "Înainte de expirare: memento și escaladare; după: consecința exactă din ghid."),
                 ]),
         ],
         Steps:
         [
             new("Modificarea intră", "Adresă, telefon, ordin permanent sau împuternicire, din core banking (simulat în demo)."),
-            new("Codul filtrează", "Contează fiscal? Dacă da, cazul se deschide și termenul pornește."),
+            new("Codul filtrează", "Contează fiscal? Dacă da, cazul se deschide și, la CRS, termenul pornește."),
             new("Agentul pregătește", "Dovezi cu citat, explicația indiciilor, cererea către client."),
             new("Omul decide", "Aprobă cererea, apoi închiderea cu dovada confirmării."),
         ],
@@ -103,7 +103,7 @@ public static class SiteConfig
     private static readonly Landing LandingEn = new(
         Enabled: true,
         Headline: "Every data change, a CRS/FATCA decision before the deadline",
-        Subheadline: "When a customer changes their address, phone or a standing order, code assesses the change and, if it matters for tax, opens a case and starts the deadline from the ANAF guide. The agent gathers the evidence and drafts the request to the customer. A person decides.",
+        Subheadline: "When a customer changes their address, phone or a standing order, code assesses the change and, if it matters for tax, opens a case and, for CRS, starts the deadline from the ANAF guide. The agent gathers the evidence and drafts the request to the customer. A person decides.",
         CtaLabel: "Open the app",
         CtaHref: "/dashboard",
         Announcement: new("New", "The rules of the ANAF guide, each with its page", "/#how"),
@@ -137,15 +137,15 @@ public static class SiteConfig
                 "The request, the reply, the re-assessment and the closing, with proof of confirmation. Anything that doesn't fit goes to a person.",
                 [
                     new(Icons.Material.Rounded.HowToReg, "Approval", "The request to the customer and the closing of the case go out only with the operator's consent."),
-                    new(Icons.Material.Rounded.Verified, "TIN format checked", "The format, from the OECD sheets and, for EU states, at the European Commission's service: \"format valid\", not \"TIN valid\"."),
-                    new(Icons.Material.Rounded.Shield, "Hidden-text shield", "White-on-white or microscopic text is removed before it reaches the model and becomes a red flag."),
+                    new(Icons.Material.Rounded.Verified, "TIN format checked", "The format, from the OECD sheets (US: IRS/SSA) and, for EU states, via the European Commission's service: \"format valid\", not \"TIN valid\"."),
+                    new(Icons.Material.Rounded.Shield, "Hidden-text shield", "White-on-white or microscopic text is removed before it reaches the model and raises an alert."),
                     new(Icons.Material.Rounded.NotificationsActive, "Reminder and escalation", "Before the deadline: a reminder and an escalation; after it: the exact consequence from the guide."),
                 ]),
         ],
         Steps:
         [
             new("The change comes in", "Address, phone, standing order or power of attorney, from core banking (simulated in the demo)."),
-            new("Code filters", "Does it matter for tax? If so, the case opens and the deadline starts."),
+            new("Code filters", "Does it matter for tax? If so, the case opens and, for CRS, the deadline starts."),
             new("The agent prepares", "Evidence with quotes, an explanation of the indicia, the request to the customer."),
             new("A person decides", "Approves the request, then the closing with proof of confirmation."),
         ],
