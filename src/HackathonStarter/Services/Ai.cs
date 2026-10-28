@@ -1,6 +1,8 @@
 using System.ClientModel;
 using System.ClientModel.Primitives;
 using System.Collections.Concurrent;
+using Amazon;
+using Amazon.BedrockRuntime;
 using Anthropic;
 using Azure.AI.OpenAI;
 using Microsoft.Extensions.AI;
@@ -16,13 +18,18 @@ namespace HackathonStarter.Services;
 /// </summary>
 public class AiOptions
 {
-    /// <summary>None | Anthropic | OpenAI (any OpenAI-compatible API: OpenAI, Featherless, Ollama, Groq…) | AzureOpenAI</summary>
+    /// <summary>None | Anthropic | Bedrock | OpenAI (any OpenAI-compatible API: OpenAI, Featherless, Ollama, Groq…) | AzureOpenAI</summary>
     public string Provider { get; set; } = "None";
     /// <summary>Model id (or the deployment name for Azure OpenAI).</summary>
     public string Model { get; set; } = "claude-sonnet-5-5";
     public string? ApiKey { get; set; }
     /// <summary>Base URL for OpenAI-compatible APIs (e.g. https://api.featherless.ai/v1) or the Azure OpenAI endpoint.</summary>
     public string? Endpoint { get; set; }
+    /// <summary>
+    /// AWS region for Bedrock (default us-west-2). Credentials come from the standard AWS chain (environment variables,
+    /// profile, or the IAM role of the container), never from this file.
+    /// </summary>
+    public string? Region { get; set; }
     /// <summary>true if the endpoint enforces JSON schemas (OpenAI, Azure OpenAI). Otherwise the schema goes in the prompt.</summary>
     public bool StructuredOutputs { get; set; }
 
@@ -65,12 +72,16 @@ public class AiOptions
         o.Provider = p.Provider ?? Provider;
         o.Model = p.Model ?? Model;
         o.Endpoint = p.Endpoint ?? Endpoint;
+        o.Region = p.Region ?? Region;
         o.ApiKey = p.ApiKey ?? (sameService ? ApiKey : null);
         o.StructuredOutputs = p.StructuredOutputs ?? StructuredOutputs;
         o.InputPricePerMillion = p.InputPricePerMillion ?? InputPricePerMillion;
         o.OutputPricePerMillion = p.OutputPricePerMillion ?? OutputPricePerMillion;
         return o;
     }
+
+    /// <summary>The Bedrock region actually used: <see cref="Region"/> or us-west-2.</summary>
+    public string BedrockRegion => string.IsNullOrEmpty(Region) ? "us-west-2" : Region;
 
     public AiProfile? FindProfile(string? profile) =>
         string.IsNullOrEmpty(profile) ? null
@@ -84,6 +95,7 @@ public class AiProfile
     public string? Model { get; set; }
     public string? ApiKey { get; set; }
     public string? Endpoint { get; set; }
+    public string? Region { get; set; }
     public bool? StructuredOutputs { get; set; }
     public decimal? InputPricePerMillion { get; set; }
     public decimal? OutputPricePerMillion { get; set; }
@@ -162,6 +174,19 @@ public class ChatClientProvider
                             })
                         .GetChatClient(o.Model)
                         .AsIChatClient(),
+
+                "bedrock" =>
+                    new AmazonBedrockRuntimeClient(new AmazonBedrockRuntimeConfig
+                        {
+                            RegionEndpoint = RegionEndpoint.GetBySystemName(o.BedrockRegion),
+                            // Fail fast: the agent fallback chain is our retry strategy.
+                            MaxErrorRetry = 1,
+                        })
+                        .AsIChatClient(o.Model)
+                        .AsBuilder()
+                        // Same output budget as the Anthropic client above.
+                        .ConfigureOptions(options => options.MaxOutputTokens ??= 4096)
+                        .Build(),
 
                 "azureopenai" when !string.IsNullOrEmpty(o.Endpoint) && !string.IsNullOrEmpty(o.ApiKey) =>
                     new AzureOpenAIClient(new Uri(o.Endpoint), new ApiKeyCredential(o.ApiKey),

@@ -13,6 +13,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="AWSSDK.Extensions.Bedrock.MEAI" Version="4.0.101.8" />
     <PackageReference Include="Anthropic" Version="13.3.0" />
     <PackageReference Include="Azure.AI.OpenAI" Version="2.1.0" />
     <PackageReference Include="Markdig" Version="1.5.0" />
