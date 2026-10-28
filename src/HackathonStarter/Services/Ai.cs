@@ -68,12 +68,13 @@ public class AiOptions
         if (p is null) return this;
         var o = (AiOptions)MemberwiseClone();
         // Another provider or endpoint must not inherit the main API key (it would be sent to the wrong service).
-        var sameService = (p.Provider is null || p.Provider.Equals(Provider, StringComparison.OrdinalIgnoreCase))
-                          && (p.Endpoint is null || p.Endpoint == Endpoint);
+        var sameProvider = p.Provider is null || p.Provider.Equals(Provider, StringComparison.OrdinalIgnoreCase);
+        var sameService = sameProvider && (p.Endpoint is null || p.Endpoint == Endpoint);
         o.Provider = p.Provider ?? Provider;
         o.Model = p.Model ?? Model;
         o.Endpoint = p.Endpoint ?? Endpoint;
-        o.Region = p.Region ?? Region;
+        // The region belongs to the provider (Bedrock): another provider starts from its own default.
+        o.Region = p.Region ?? (sameProvider ? Region : null);
         o.ApiKey = p.ApiKey ?? (sameService ? ApiKey : null);
         o.StructuredOutputs = p.StructuredOutputs ?? StructuredOutputs;
         o.InputPricePerMillion = p.InputPricePerMillion ?? InputPricePerMillion;

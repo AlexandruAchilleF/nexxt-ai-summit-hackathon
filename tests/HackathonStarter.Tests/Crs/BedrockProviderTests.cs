@@ -23,6 +23,15 @@ public class BedrockProviderTests
     }
 
     [Fact]
+    public void A_profile_on_another_provider_does_not_inherit_the_region()
+    {
+        var options = new AiOptions { Provider = "Bedrock", Model = "us.anthropic.claude-sonnet-5-5", Region = "eu-west-1" };
+        options.Profiles["openai"] = new AiProfile { Provider = "OpenAI", Model = "gpt-5" };
+
+        Assert.Null(options.ForProfile("openai").Region);
+    }
+
+    [Fact]
     public void Privacy_page_names_the_bedrock_regional_endpoint_as_an_external_provider()
     {
         var options = new AiOptions { Provider = "Bedrock", Model = "us.anthropic.claude-sonnet-5-5", Region = "us-west-2" };
