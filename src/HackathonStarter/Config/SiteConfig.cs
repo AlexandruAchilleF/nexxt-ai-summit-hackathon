@@ -11,10 +11,10 @@ namespace HackathonStarter.Config;
 public static class SiteConfig
 {
     // Working name: change it here (and in the PWA icons) once the team picks the final one.
-    public const string Name = "DosarViu";
+    public const string Name = "CRS Sentinel";
     public static string Description => Lang.Pick(
-        ro: "Revizuirea KYC a firmelor: certificatul ONRC comparat cu dosarul, beneficiarii reali calculați în cod.",
-        en: "Business KYC reviews: the ONRC certificate compared with the file, beneficial owners computed in code.");
+        ro: "Fiecare modificare de date a clientului devine o decizie CRS/FATCA, înainte să expire termenul legal.",
+        en: "Every change to a customer's data becomes a CRS/FATCA decision before the legal deadline.");
     public const string Logo = "/icons/icon.svg"; // a path in wwwroot like "/logo.svg", or an emoji
 
     /// <summary>Brand color (hex): filled buttons and selection. Keep white text on it at 4.5:1 or more. The MudBlazor theme is derived from it.</summary>
@@ -51,110 +51,110 @@ public static class SiteConfig
 
     private static readonly Landing LandingRo = new(
         Enabled: true,
-        Headline: "Dosarul KYC al firmei, la zi cu fiecare certificat ONRC",
-        Subheadline: "Agentul compară certificatul nou cu dosarul, calculează beneficiarii reali pe fiecare lanț de proprietate și pregătește actualizarea. Analistul aprobă.",
+        Headline: "Fiecare modificare de date, o decizie CRS/FATCA înainte de termen",
+        Subheadline: "Când un client își schimbă adresa, telefonul sau un ordin permanent, agentul deschide cazul, pornește termenul din Ghidul ANAF, adună dovezile și scrie cererea către client. Omul decide.",
         CtaLabel: "Deschide aplicația",
         CtaHref: "/dashboard",
-        Announcement: new("Nou", "Pragul AMLR din iulie 2027, deja configurabil", "/#how"),
+        Announcement: new("Nou", "Regulile din Ghidul ANAF, cu pagina lângă fiecare", "/#how"),
         Preview: new(
-            ItemId: "KYC-2041",
-            ItemTitle: "Revizuire periodică: Alfa Logistic SRL",
-            ItemDescription: "Certificatul ONRC nou diferă de dosar: un asociat nou, prin două firme intermediare.",
+            ItemId: "CRS-0412",
+            ItemTitle: "Schimbare de adresă: Maria Ionescu, München",
+            ItemDescription: "Adresă nouă în Germania, telefon german și niciun telefon românesc. Cont nou: termen de 90 de zile.",
             Activity:
             [
-                "Certificat ONRC încărcat (12 pagini)",
-                "Agentul a extras 4 asociați și 2 administratori · 6 sec",
-                "Diferențe față de dosar: 1 asociat nou, 1 cotă schimbată",
+                "Modificare de adresă primită din core banking",
+                "Caz deschis · termen 26 ianuarie 2027",
+                "Agentul a găsit 2 indicii și 1 semnal, toate cu citat verificat",
             ],
-            Prompt: "Compară certificatul cu dosarul și calculează beneficiarii reali",
-            Reply: "Maria Ionescu: 20% direct + 24% prin Beta Holding (60% × 40%) = 44%, beneficiar real. Elena Radu are exact 25% prin Gamma Invest: la limită, decide un om.",
+            Prompt: "Pregătește cererea de clarificare către client",
+            Reply: "Indicii CRS (ghidul, p. 29): adresă în Germania, telefon german fără telefon în România. Salariul de la o firmă germană e doar un semnal, fără alertă. Cererea e gata: autocertificare nouă și TIN-ul german.",
             ResultTitle: "Necesită aprobare",
-            ResultDetail: "Actualizare dosar · 1 beneficiar real, 1 caz la limită"),
-        Statement: new("Beneficiarii reali se calculează în cod, nu se ghicesc.",
-            "Fiecare procent e produsul cotelor de pe lanț, fiecare caz la limita de 25% ajunge la un om și fiecare decizie rămâne în audit. Modelul poate rula pe serverele băncii: datele nu pleacă din ea."),
+            ResultDetail: "Cerere către client · 2 documente de trimis"),
+        Statement: new("Regulile sunt cod, nu păreri.",
+            "Fiecare indiciu are ID și pagina din Ghidul ANAF, fiecare citat e verificat în document, iar fiecare termen e urmărit pe caz. Modelul citește și scrie; omul aprobă ce pleacă și ce se închide."),
         Sections:
         [
-            new("Certificatul, citit și comparat",
-                "Din PDF-ul ONRC rezultă asociați, cote și administratori, comparați câmp cu câmp cu ce știe deja banca.",
+            new("Modificarea, transformată în caz",
+                "Doar modificările care ating un indiciu din lege pornesc un termen. Restul se opresc la filtru, cu explicație.",
                 [
-                    new(Icons.Material.Rounded.DocumentScanner, "Extragere", "Certificatul ONRC devine câmpuri structurate, fiecare cu pagina din care provine."),
-                    new(Icons.Material.Rounded.CompareArrows, "Diferențe în cod", "Asociați noi sau ieșiți, cote schimbate, administratori: comparația o face codul, nu modelul."),
-                    new(Icons.Material.Rounded.HowToReg, "Aprobare", "Dosarul se actualizează doar după ce analistul confirmă."),
-                    new(Icons.Material.Rounded.History, "Audit", "Cine a aprobat, ce s-a schimbat și pe ce bază rămân în istoric."),
+                    new(Icons.Material.Rounded.Rule, "Filtru în cod", "O mutare din Cluj în Iași nu deschide niciun caz, iar regula spune de ce."),
+                    new(Icons.Material.Rounded.Timer, "Termen pe tipul de cont", "90 de zile la conturile noi; la cele preexistente, sfârșitul anului sau 90 de zile."),
+                    new(Icons.Material.Rounded.FormatQuote, "Dovezi cu citat", "Fiecare dovadă are citatul exact, verificat de cod în document."),
+                    new(Icons.Material.Rounded.Lightbulb, "Indicii și semnale", "Un salariu din Germania e semnal, nu indiciu: se arată, dar nu pornește nimic."),
                 ]),
-            new("Beneficiarul real, calculat",
-                "Procentul indirect e produsul cotelor pe fiecare lanț, adunat pe toate lanțurile aceleiași persoane.",
+            new("Bucla închisă, cu omul la decizie",
+                "Cererea, răspunsul, reevaluarea și închiderea, cu dovada confirmării. Ce nu se potrivește ajunge la om.",
                 [
-                    new(Icons.Material.Rounded.AccountTree, "Lanțuri de proprietate", "Oricâte firme intermediare, cu cicluri detectate și semnalate."),
-                    new(Icons.Material.Rounded.Rule, "Pragul legal", "Peste 25% azi (Legea 129/2019), 25% sau mai mult din iulie 2027 (AMLR): o setare."),
-                    new(Icons.Material.Rounded.Gavel, "Control fără cote", "Acorduri între asociați sau drept de veto: semnalate analistului, nu ignorate."),
-                    new(Icons.Material.Rounded.SupervisorAccount, "Când nu există", "Fără beneficiar real identificat, regula legală: conducerea de rang superior."),
+                    new(Icons.Material.Rounded.HowToReg, "Aprobare", "Cererea către client și închiderea cazului pleacă doar cu acordul operatorului."),
+                    new(Icons.Material.Rounded.Verified, "TIN verificat", "Formatul, la serviciul Comisiei Europene și după fișele OCDE: „format valid”, nu „TIN valid”."),
+                    new(Icons.Material.Rounded.Shield, "Scut pentru text ascuns", "Textul alb pe alb sau microscopic e scos înainte să ajungă la model și devine semnal roșu."),
+                    new(Icons.Material.Rounded.NotificationsActive, "Memento și escaladare", "Înainte de expirare: memento și escaladare; după: consecința exactă din ghid."),
                 ]),
         ],
         Steps:
         [
-            new("Încarci certificatul", "PDF-ul ONRC al firmei, la onboarding sau la revizuirea periodică."),
-            new("Agentul compară", "Extrage datele și le pune față în față cu dosarul existent."),
-            new("Codul calculează", "Beneficiarii reali pe fiecare lanț; cazurile la limită sunt marcate."),
-            new("Analistul aprobă", "Actualizarea dosarului pleacă doar cu acordul lui."),
+            new("Modificarea intră", "Adresă, telefon, ordin permanent sau împuternicire, din core banking."),
+            new("Codul filtrează", "Contează fiscal? Dacă da, cazul se deschide și termenul pornește."),
+            new("Agentul pregătește", "Dovezi cu citat, indiciile din lege, cererea către client."),
+            new("Omul decide", "Aprobă cererea, apoi închiderea cu dovada confirmării."),
         ],
-        Closing: new("Agentul face copy-paste-ul.", "Analistul decide."));
+        Closing: new("Agentul urmărește termenul.", "Omul decide."));
 
     private static readonly Landing LandingEn = new(
         Enabled: true,
-        Headline: "The company's KYC file, current with every ONRC certificate",
-        Subheadline: "The agent compares the new certificate with the file, computes beneficial owners along every ownership chain and prepares the update. The analyst approves.",
+        Headline: "Every data change, a CRS/FATCA decision before the deadline",
+        Subheadline: "When a customer changes their address, phone or a standing order, the agent opens a case, starts the deadline from the ANAF guide, gathers the evidence and drafts the request to the customer. A person decides.",
         CtaLabel: "Open the app",
         CtaHref: "/dashboard",
-        Announcement: new("New", "The July 2027 AMLR threshold, already a setting", "/#how"),
+        Announcement: new("New", "The rules of the ANAF guide, each with its page", "/#how"),
         Preview: new(
-            ItemId: "KYC-2041",
-            ItemTitle: "Periodic review: Alfa Logistic SRL",
-            ItemDescription: "The new ONRC certificate differs from the file: a new shareholder, through two intermediate companies.",
+            ItemId: "CRS-0412",
+            ItemTitle: "Address change: Maria Ionescu, Munich",
+            ItemDescription: "New address in Germany, a German phone and no Romanian phone. New account: 90-day deadline.",
             Activity:
             [
-                "ONRC certificate uploaded (12 pages)",
-                "Agent extracted 4 shareholders and 2 directors · 6 sec",
-                "Differences from the file: 1 new shareholder, 1 changed stake",
+                "Address change received from core banking",
+                "Case opened · deadline 26 January 2027",
+                "The agent found 2 indicia and 1 signal, every quote verified",
             ],
-            Prompt: "Compare the certificate with the file and compute the beneficial owners",
-            Reply: "Maria Ionescu: 20% direct + 24% through Beta Holding (60% × 40%) = 44%, a beneficial owner. Elena Radu holds exactly 25% through Gamma Invest: borderline, a person decides.",
+            Prompt: "Prepare the clarification request to the customer",
+            Reply: "CRS indicia (guide, p. 29): an address in Germany, a German phone and no phone in Romania. The salary from a German company is only a signal, no alert. The request is ready: a new self-certification and the German TIN.",
             ResultTitle: "Approval needed",
-            ResultDetail: "Update file · 1 beneficial owner, 1 borderline case"),
-        Statement: new("Beneficial owners are computed in code, not guessed.",
-            "Every percentage is the product of the stakes along the chain, every case at the 25% line goes to a person and every decision stays in the audit trail. The model can run on the bank's own servers: the data never leaves."),
+            ResultDetail: "Request to the customer · 2 documents to send"),
+        Statement: new("The rules are code, not opinions.",
+            "Every indicium has an ID and its page in the ANAF guide, every quote is checked against the document and every deadline is tracked per case. The model reads and writes; a person approves what goes out and what gets closed."),
         Sections:
         [
-            new("The certificate, read and compared",
-                "Shareholders, stakes and directors come out of the ONRC PDF and are compared field by field with what the bank already knows.",
+            new("A data change, turned into a case",
+                "Only changes that touch an indicium from the law start a deadline. The rest stop at the filter, with an explanation.",
                 [
-                    new(Icons.Material.Rounded.DocumentScanner, "Extraction", "The ONRC certificate becomes structured fields, each with the page it came from."),
-                    new(Icons.Material.Rounded.CompareArrows, "Differences in code", "New or departed shareholders, changed stakes, directors: code compares, not the model."),
-                    new(Icons.Material.Rounded.HowToReg, "Approval", "The file is updated only after the analyst confirms."),
-                    new(Icons.Material.Rounded.History, "Audit", "Who approved, what changed and on what basis stay in the history."),
+                    new(Icons.Material.Rounded.Rule, "Filter in code", "A move from Cluj to Iași opens no case, and the rule says why."),
+                    new(Icons.Material.Rounded.Timer, "Deadline by account type", "90 days for new accounts; for pre-existing ones, the end of the year or 90 days."),
+                    new(Icons.Material.Rounded.FormatQuote, "Evidence with quotes", "Every piece of evidence has its exact quote, checked by code against the document."),
+                    new(Icons.Material.Rounded.Lightbulb, "Indicia and signals", "A salary from Germany is a signal, not an indicium: it is shown, but triggers nothing."),
                 ]),
-            new("The beneficial owner, computed",
-                "The indirect percentage is the product of the stakes along each chain, summed over every chain of the same person.",
+            new("The loop closed, with a person deciding",
+                "The request, the reply, the re-assessment and the closing, with proof of confirmation. Anything that doesn't fit goes to a person.",
                 [
-                    new(Icons.Material.Rounded.AccountTree, "Ownership chains", "Any number of intermediate companies, with cycles detected and flagged."),
-                    new(Icons.Material.Rounded.Rule, "The legal threshold", "Over 25% today (Romanian Law 129/2019), 25% or more from July 2027 (AMLR): one setting."),
-                    new(Icons.Material.Rounded.Gavel, "Control without shares", "Shareholder agreements or veto rights: flagged to the analyst, not ignored."),
-                    new(Icons.Material.Rounded.SupervisorAccount, "When there is none", "No beneficial owner found: the legal fallback is senior management."),
+                    new(Icons.Material.Rounded.HowToReg, "Approval", "The request to the customer and the closing of the case go out only with the operator's consent."),
+                    new(Icons.Material.Rounded.Verified, "TIN checked", "The format, against the European Commission's service and the OECD sheets: \"valid format\", not \"valid TIN\"."),
+                    new(Icons.Material.Rounded.Shield, "Hidden-text shield", "White-on-white or microscopic text is removed before it reaches the model and becomes a red flag."),
+                    new(Icons.Material.Rounded.NotificationsActive, "Reminder and escalation", "Before the deadline: a reminder and an escalation; after it: the exact consequence from the guide."),
                 ]),
         ],
         Steps:
         [
-            new("Upload the certificate", "The company's ONRC PDF, at onboarding or at the periodic review."),
-            new("The agent compares", "It extracts the data and puts it side by side with the existing file."),
-            new("Code computes", "Beneficial owners along every chain; borderline cases are marked."),
-            new("The analyst approves", "The file update goes out only with their consent."),
+            new("The change comes in", "Address, phone, standing order or power of attorney, from core banking."),
+            new("Code filters", "Does it matter for tax? If so, the case opens and the deadline starts."),
+            new("The agent prepares", "Evidence with quotes, the legal indicia, the request to the customer."),
+            new("A person decides", "Approves the request, then the closing with proof of confirmation."),
         ],
-        Closing: new("The agent does the copy-paste.", "The analyst decides."));
+        Closing: new("The agent tracks the deadline.", "A person decides."));
 
     public static readonly NavItem[] Nav =
     [
         new("Dashboard", "/dashboard", Icons.Material.Rounded.SpaceDashboard),
-        // Items and Calculators stay reachable by URL (tests use them) until the KYC pages replace them.
+        // Items and Calculators stay reachable by URL (tests use them) until the CRS pages replace them.
         // @gen:nav (the feature generator inserts new pages above this line)
         new("Assistant", "/assistant", Icons.Material.Rounded.AutoAwesome, "Agents"),
         new("Agent Arena", "/arena", Icons.Material.Rounded.Forum, "Agents"),

@@ -1,23 +1,25 @@
-# Predarea: DosarViu (Raiffeisen, Operational Efficiency)
+# Predarea: CRS Sentinel (Raiffeisen, AI for Operational Efficiency)
 
-Ce primește juriul: **codul sursă**, o **demonstrație practică a agentului** și un **video de maximum 3 minute**
-(problema, ce e unic, cum funcționează arhitectura). Predare **joi, 29 oct., ora 11:00**; noi predăm până la **10:30**.
-Prezentare pe scenă doar pentru câștigătorul challenge-ului: o pregătim atunci, nu acum.
+Ce primește juriul: **codul sursă**, o **demonstrație practică a agentului** (scenariu cap-coadă) și un **video de maximum
+3 minute** (problema, ce e unic, cum funcționează arhitectura). Predare **joi, 29 oct., ora 11:00**; noi predăm până la
+**10:30**. Prezentare pe scenă doar pentru câștigătorul challenge-ului: o pregătim atunci, nu acum.
 
-## Video: 3 minute, 4 părți
+Planul și cazurile de test: [`PLAYBOOK.md`](PLAYBOOK.md). Faptele și paginile din ghid: [`RESEARCH-CRS.md`](RESEARCH-CRS.md).
 
-Scenariul de demo e cel din [`PLAYBOOK.md`](PLAYBOOK.md#2-ce-construim-și-ce-nu) (Alfa Logistic, Maria 44%, Elena exact 25%).
+## Video: 3 minute, 6 părți
 
 | Timp | Parte | Ce se vede | Ce se spune (de scris cuvânt cu cuvânt) |
 | --- | --- | --- | --- |
-| 0:00–0:30 | **Problema** | Un certificat ONRC lângă un dosar, cu procente scrise de mână | O revizuire KYC de firmă costă băncile 1.500–3.000 $ și durează săptămâni (Fenergo, 2023). Partea grea: lanțurile de proprietate și pragul de 25%. |
-| 0:30–1:00 | **Ce e unic** | Pagina principală, secțiunea „Beneficiarul real, calculat” | Calculul e cod testat, nu model. Pragul e o setare: peste 25% azi, 25% sau mai mult din iulie 2027. Cazul la limită ajunge la om. |
-| 1:00–2:15 | **Demo** | `/kyc/…`: încărcare certificat → pașii agentului → diferențe → lanțuri → Elena marcată → **Aprobă** | Agentul cere singur certificatele firmelor intermediare. Analistul aprobă actualizarea; totul rămâne în `/runs`. |
-| 2:15–3:00 | **Arhitectură + GDPR + bani** | `/architecture`, apoi `/privacy` | Model pe serverul băncii (compatibil OpenAI), date personale mascate, verificări deterministe. Cine plătește: banca, per revizuire; economia: formula din PLAYBOOK, cu cifrele confirmate de mentor. |
+| 0:00–0:20 | **Problema** | Ecranul cu termenele care expiră | Când un client își schimbă adresa, banca are un termen să afle unde plătește taxe. Altfel îl raportează greșit la ANAF, pe fiecare cont. ANAF a cerut corecții la 891 de înregistrări într-un singur semestru. |
+| 0:20–1:20 | **Maria, cap-coadă** | `/crs/{id}`: Maria se mută la München → caz deschis, termen 90 de zile → dovezi cu citat (telefon german, niciun telefon RO) → salariul german ca semnal, fără alertă → cererea scrisă de agent, aprobată de operator → data simulată la ziua 85: memento și escaladare → autocertificare nouă, TIN verificat live → caz închis cu canalul, momentul și dovada | Agentul alege ce dovezi caută; codul decide dacă un indiciu există, cu pagina din ghid; omul aprobă cererea și închiderea. |
+| 1:20–1:50 | **Capcane și neprevăzut** | Ordin permanent către Germania (conform) lângă ordin permanent către SUA (alertă FATCA); Cluj → Iași (niciun caz); PDF cu text alb ascuns oprit de scut; răspuns contradictoriu → excepție la om | Ordinul permanent din contul curent nu e indiciu CRS (ghidul, p. 29), dar este indiciu FATCA (p. 31). Ce nu se potrivește ajunge la om, cu ambele citate. |
+| 1:50–2:30 | **Arhitectura** | `/architecture`, apoi `/privacy` | LLM-ul citește și scrie, codul verifică regulile, omul decide. Date personale mascate înainte de model, servicii externe cu replay, model care poate rula pe serverele băncii. |
+| 2:30–2:50 | **Testabil** | `/crs/tests`: toate cazurile, așteptat vs. obținut; sandbox-ul schimbat live | Fiecare caz are rezultatul scris înainte de rulare. Ce nu prindem încă: conturile firmelor, W-8BEN, fișierul F3000. |
+| 2:50–3:00 | **Fraza de final** | Logo + URL | Fiecare modificare de date poate porni un termen legal. CRS Sentinel o transformă într-o decizie înainte să expire termenul, cu dovadă pentru fiecare pas și cu omul la decizie. |
 
 Sfaturi:
 - **Fără eticheta „Simulare” în video.** Filmăm cu modelul real conectat (Settings → Testează conexiunile pe calculatorul
-  de filmare) sau cu rulări înregistrate live (`AI:Record = true`, apoi `AgentMode = Replay`, eticheta devine „Înregistrare”).
+  de filmare) sau cu rulări înregistrate live (`AI:Record = true`, apoi `AgentMode = Replay`; eticheta devine „Înregistrare”).
 - Interfața în română (implicit). Zoom 125% în browser, fără bara de bookmark-uri, date sintetice realiste.
 - Vocea separat de ecran. Export 1080p. Durata: **≤ 3:00**.
 - Spunem o dată, clar, că pornim de la un template pregătit înainte (e în istoricul repo-ului).
@@ -26,34 +28,51 @@ Sfaturi:
 
 | Când | Ce |
 | --- | --- |
-| Joi 07:00 | **Code freeze**: doar reparații pe calea de demo. |
-| 07:00–09:30 | Filmare, mai multe duble; montaj; voce. |
-| 09:30–10:30 | `dotnet build` (0 warnings) + `dotnet test`, deploy verificat, link în README, video încărcat. |
+| Joi 08:00 | **Code freeze**: doar reparații pe calea de demo. Demo-ul de rezervă e deja înregistrat. |
+| 08:00–09:45 | Filmare, mai multe duble; montaj; voce. |
+| 09:45–10:30 | `dotnet build` (0 warnings) + `dotnet test`, deploy verificat, link în README, video încărcat. |
 | **10:30** | **Predare.** Nu în ultimul minut. |
 
 ## Checklist demo
 
-- [ ] Scenariul (3–5 pași) scris și repetat
+- [ ] Scenariul Mariei și cele 4 capcane scrise și repetate
 - [ ] Rulările pentru fiecare pas înregistrate (`src/HackathonStarter/Recordings/*.json` în repo)
-- [ ] Datele resetate înainte de filmare (Settings → Resetează datele demo)
-- [ ] Paginile care nu țin de KYC ascunse din `SiteConfig.Nav` (Arena, Scenarii, Calculatoare)
-- [ ] Nicio dată reală: firme, persoane și certificate sintetice
+- [ ] Data simulată resetată și datele demo resetate înainte de filmare (Settings → Resetează datele demo)
+- [ ] `/crs/tests` complet verde, pe aceeași versiune care e pe Render
+- [ ] Paginile care nu țin de CRS ascunse din `SiteConfig.Nav` (Arena, Scenarii, Calculatoare)
+- [ ] Nicio dată reală: clienți, documente și TIN-uri sintetice
 
 ## Checklist cod
 
-- [ ] `dotnet build` cu 0 warnings, `dotnet test` trece, aplicația pornește **fără** `appsettings.Local.json`
-- [ ] README: ce face, cum se pornește, arhitectura, ce e AI și ce e cod
-- [ ] **Niciun secret în repo (e public):** `git log -p | grep -iE "apikey|sk-|password"` nu găsește nimic real
+- [ ] `dotnet build` cu 0 warnings, `dotnet test` trece, aplicația pornește **fără** `appsettings.Local.json` și fără AWS
+- [ ] README: ce face, cum se pornește, arhitectura, ce e AI și ce e cod, domeniul MVP-ului, interpretările de design
+- [ ] **Niciun secret în repo (e public):** `git log -p | grep -iE "apikey|sk-|password|aws_secret"` nu găsește nimic real
 - [ ] URL-ul Render în README
+
+## Ce NU spunem niciodată
+
+| Nu | Ci |
+| --- | --- |
+| „Băncile au primit amenzi de sute de mii de euro.” | „Riscul e pe fiecare cont.” (Amenzile publice pe 2024: 102.000 lei în total.) |
+| „Raiffeisen are probleme cu CRS.” | Cifrele ANAF sunt pe tot sectorul. |
+| „Nimeni n-a mai făcut asta.” | „Metodă cunoscută, aplicată pe fluxul de după onboarding, cu regulile din ghidul ANAF și omul la decizie.” |
+| „Venitul din străinătate înseamnă rezidență acolo.” | Nu e indiciu oficial; e semnal contextual, fără efect. |
+| „TIN valid.” | „Format valid.” |
+| „Orice actualizare pornește un termen.” | „Fiecare actualizare trebuie evaluată; doar cele relevante fiscal pornesc termenul.” |
+| „Termenul e mereu 90 de zile.” | „90 de zile la conturile noi; la cele preexistente, până la sfârșitul anului sau 90 de zile.” |
+| Reținerea FATCA de 30% | Nu apare în ghid: nu o spunem. |
 
 ## Întrebări probabile ale juriului (cu răspunsul)
 
 | Întrebare | Răspuns scurt |
 | --- | --- |
-| Ce face agentul singur și unde decide omul? | Extrage, compară, calculează și propune. Actualizarea dosarului și orice caz la limită le decide analistul. |
-| Ce se întâmplă dacă modelul greșește un procent? | Fiecare câmp are pagina-sursă; diferențele și beneficiarii se calculează în cod, cu teste; analistul aprobă. |
-| De ce nu ChatGPT? | Pentru că un model poate greși o înmulțire, iar aici o greșeală înseamnă un beneficiar real ratat. Noi lăsăm calculul în cod și arătăm de unde vine fiecare cifră. |
-| Merge cu date reale, sensibile? | Da: model on-premise, mascare înainte de model, temei legal (Legea 129/2019), retenție configurabilă. |
-| Ce e real și ce e simulat? | Calculul, diff-ul, verificările și fluxul de aprobare sunt reale. Certificatele și firmele sunt sintetice; integrarea cu ONRC nu e făcută. |
-| Cine plătește și cât? | Banca, per revizuire sau per analist; economia = revizuiri × minute economisite × cost/minut (cifrele mentorului). |
-| Ce e cu 25% fix? | Azi nu e beneficiar real (peste 25%), din 10 iulie 2027 este (25% sau mai mult). E o setare, iar cazul îl vede un om. |
+| Ce face agentul singur și unde decide omul? | Alege ce dovezi caută, le citează, scrie cererea și evaluează răspunsul. Codul decide dacă există un indiciu și calculează termenul; omul aprobă cererea și închiderea. |
+| Ce se întâmplă dacă modelul greșește sau inventează un citat? | Citatul e verificat în cod față de document și respins dacă nu există. Verdictul vine din reguli, nu din model. |
+| De ce nu ChatGPT? | Un chatbot dă o părere și poate răspunde diferit la același dosar. Aici regulile sunt cod, cu pagina din ghid, iar termenul e urmărit pe fiecare caz. |
+| Raiffeisen nu are deja asta? | Semnalul la modificarea datelor poate exista. Noi acoperim ce urmează după el: dovezi, cerere, răspuns, termen, închidere cu dovadă. (Răspunsul mentorului: de completat.) |
+| De ce ordinul permanent către Germania nu e indiciu, dar cel către SUA este? | La CRS, ordinele permanente din conturile de depozit sunt excluse (ghidul, p. 29); la FATCA excepția nu există (p. 31). |
+| De ce termenul Mariei e 90 de zile? | Contul ei e cont nou (deschis după 2016): 90 de zile de la pierderea valabilității (p. 35–36). La un cont preexistent, termenul e sfârșitul anului sau 90 de zile (p. 29). |
+| Cum verificăm că merge? | `/crs/tests` rulează toate cazurile cu rezultatul scris înainte; sandbox-ul răspunde la „și dacă…?” pe loc; `dotnet test` rulează aceleași cazuri. |
+| Merge cu date reale, sensibile? | Da: mascare înainte de model, model care poate rula la bancă, temei legal (Legea 207/2015, Acordul FATCA), retenție configurabilă. |
+| Ce e real și ce e simulat? | Reale: regulile, termenele, scutul, verificarea formatului TIN, TIN on Europa (live sau replay), bucla cu aprobări. Sintetice: clienții, documentele, răspunsurile clientului. Nefăcute: integrarea cu core banking, trimiterea mesajelor. |
+| Cine plătește și cât? | Banca, per caz sau licență; economia = cazuri × minute economisite × cost pe minut, cu cifrele mentorului; riscul evitat e pe fiecare cont. |
