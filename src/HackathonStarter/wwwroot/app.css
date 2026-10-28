@@ -328,7 +328,7 @@ a.app-list-row:active, .dense-row:active { background: var(--app-fill-strong); }
 @keyframes crs-roll { from { opacity: 0; transform: translateY(55%); filter: blur(4px); } }
 
 /* Demo date in the top bar (Components/Crs/DemoDate.razor). */
-.demo-date { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 0; border-radius: 999px; background: var(--app-fill);
+.demo-date { display: inline-flex; flex-shrink: 0; white-space: nowrap; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 0; border-radius: 999px; background: var(--app-fill);
   color: var(--mud-palette-text-primary); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; overflow: hidden;
   transition: background-color var(--app-base) var(--app-ease), color var(--app-base), transform var(--app-fast) var(--app-spring); }
 .demo-date:hover { background: var(--app-fill-strong); }
