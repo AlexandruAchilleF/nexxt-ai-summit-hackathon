@@ -52,11 +52,29 @@ public class ChangeService(
         Validate(request);
 
         await Writer.WaitAsync();
-        try { return await RecordLockedAsync(request, "user:" + user.Id); }
+        try { return await RecordLockedAsync(request, "user:" + user.Id, systemCases: null); }
         finally { Writer.Release(); }
     }
 
-    private async Task<ChangeResult> RecordLockedAsync(ChangeRequest request, string actor)
+    /// <summary>
+    /// RecordAsync with no signed-in user, for a system writer (the startup seed, ChangeHistorySeed): the same validation,
+    /// lock and decisions; <paramref name="actor"/> ("system:seed") goes to the audit log. Not on IChangeService, so pages
+    /// and agent tools cannot skip the role check; the caller builds this service with a CaseService.
+    /// </summary>
+    internal async Task<ChangeResult> RecordAsSystemAsync(ChangeRequest request, string actor)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (!actor.StartsWith("system", StringComparison.Ordinal))
+            throw new ArgumentException($"A system actor starts with \"system\", not '{actor}'.", nameof(actor));
+        var systemCases = cases as CaseService ?? throw new InvalidOperationException("The system path needs CaseService.");
+        Validate(request);
+
+        await Writer.WaitAsync();
+        try { return await RecordLockedAsync(request, actor, systemCases); }
+        finally { Writer.Release(); }
+    }
+
+    private async Task<ChangeResult> RecordLockedAsync(ChangeRequest request, string actor, CaseService? systemCases)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var client = await ClientService.Full(db).AsTracking().FirstOrDefaultAsync(c => c.Code == request.ClientCode)
@@ -131,7 +149,7 @@ public class ChangeService(
         int? caseId = answered?.Id;
         if (outcome.Uncovered.Any())
         {
-            var opened = await cases.OpenAsync(change, outcome);
+            var opened = systemCases is null ? await cases.OpenAsync(change, outcome) : await systemCases.OpenAsSystemAsync(change, outcome, actor);
             (resultCase, caseId) = (opened.Code, opened.Id);
         }
 

@@ -271,7 +271,6 @@ public class GoldenCasesDataTests
                     Assert.Null(deadline.RemindAt);
                     break;
                 case "DL-NEW-90":
-                case "DL-EXPIRED-NEW": // 17a: the expired deadline of 16
                     Assert.False(deadline.Preexisting);
                     Assert.Equal(c.ReceivedAt!.Value.AddDays(90), deadline.DueAt);
                     Assert.Equal(deadline.DueAt!.Value.AddDays(-5), deadline.RemindAt);
@@ -287,7 +286,13 @@ public class GoldenCasesDataTests
             }
             if (c.Response is { } r && deadline.DueAt is { } due)
                 Assert.True(r.ReceivedAt > c.ReceivedAt && r.ReceivedAt <= due, $"case {c.Id}: the answer is not in time");
+            // The expiry rule follows the account (CaseService.TickAsync, Case.IsPreexisting), never the deadline column.
+            if (c.ExpectedOutcomeRuleId is { } outcomeRule)
+                Assert.Equal(deadline.Preexisting ? RuleIds.DeadlineExpiredPreexisting : RuleIds.DeadlineExpiredNew, outcomeRule);
         }
+        Assert.All(Transcribed.Where(c => c.ExpectedDeadline is null), c => Assert.Null(c.ExpectedOutcomeRuleId));
+        Assert.Equal(("DL-NEW-90", "DL-EXPIRED-NEW"), (GoldenCases.Get("17a").ExpectedDeadlineRule, GoldenCases.Get("17a").ExpectedOutcomeRuleId));
+        Assert.Equal(("DL-PRE-YEAR", "DL-EXPIRED-PRE"), (GoldenCases.Get("17b").ExpectedDeadlineRule, GoldenCases.Get("17b").ExpectedOutcomeRuleId));
     }
 
     [Fact]

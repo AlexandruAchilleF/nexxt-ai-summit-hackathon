@@ -80,8 +80,16 @@ public sealed class EvaluationService(
     {
         var start = Stopwatch.GetTimestamp();
         var versions = new SortedSet<string>(StringComparer.Ordinal);
-        var goldenRows = golden.Select(c => { ct.ThrowIfCancellationRequested(); return Golden(c, versions); }).ToList();
-        var syntheticRows = synthetic.Select(s => { ct.ThrowIfCancellationRequested(); return Synthetic(s, versions); }).ToList();
+        var goldenRows = golden.Select(c => { ct.ThrowIfCancellationRequested(); return Golden(c, versions) with
+        {
+            ExpectedIndicia = c.ExpectedIndicia.Count > 0 ? [.. c.ExpectedIndicia.Select(h => Key(h.RuleId, h.Jurisdiction, h.CoveredBy))] : c.ExpectedHits,
+            ExpectedCleared = c.ExpectedClearedRules.Count > 0 ? [.. c.ExpectedClearedRules.Select(h => Key(h.RuleId, h.Jurisdiction, Coverage.None))] : c.ExpectedCleared,
+        }; }).ToList();
+        var syntheticRows = synthetic.Select(s => { ct.ThrowIfCancellationRequested(); return Synthetic(s, versions) with
+        {
+            ExpectedIndicia = [.. s.ExpectedHits.Select(h => Key(h.RuleId, h.Jurisdiction, Coverage.None))],
+            ExpectedCleared = [.. s.ExpectedCleared.Select(h => Key(h.RuleId, h.Jurisdiction, Coverage.None))],
+        }; }).ToList();
         var version = string.Join(", ", versions);
         var (goldenTotals, syntheticTotals) = (CoverageTotals.Of(goldenRows), CoverageTotals.Of(syntheticRows));
         return new SpecCoverage(SpecSource(versions, version, goldenTotals, syntheticTotals), version, goldenRows, goldenTotals,
@@ -228,7 +236,6 @@ public sealed class EvaluationService(
 
     private DeadlineCheck Deadline(GoldenDeadline expected, RuleOutcome outcome, ClientSnapshot after, DateTime knownAt)
     {
-        if (expected.RuleId?.StartsWith("DL-EXPIRED", StringComparison.Ordinal) == true) return new(expected, null, null);
         // NEVERIFICAT: which account sets the deadline is not in the guide. Ours: the most recently opened one, which gives the
         // earliest deadline (a new account's 90 days never end after a preexisting one's). R2 to make it a shared function.
         var account = after.Accounts.MaxBy(a => a.OpenedOn);

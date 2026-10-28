@@ -122,6 +122,7 @@ public static class DatabaseSetup
             db.Clients.AddRange(ClientSeed.Create(app.Services.GetRequiredService<Features.Deadlines.ISimClock>().UtcNow));
             await db.SaveChangesAsync();
         }
+        await ChangeHistorySeed.RunIfEmptyAsync(app.Services, app.Services.GetRequiredService<Features.Deadlines.ISimClock>().UtcNow);
         // @gen:seed (the feature generator inserts new seeds above this line)
     }
 }

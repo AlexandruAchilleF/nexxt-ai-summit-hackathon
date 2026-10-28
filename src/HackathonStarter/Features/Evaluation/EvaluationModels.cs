@@ -59,12 +59,16 @@ public sealed record CoverageRow(
     public bool Caught => Evaluated && ExpectsAction && Actual == Expected;
     public bool Missed => Evaluated && ExpectsAction && Actual != Expected;
     public bool FalseAlarm => Evaluated && !ExpectsAction && Actual is { } actual && CoverageTotals.IsAction(actual);
+
+    /// <summary>The expected indicia, keyed like <see cref="MissingIndicia"/>: from the data, never from the engine.</summary>
+    public IReadOnlyList<string> ExpectedIndicia { get; init; } = [];
+    /// <summary>The expected cleared rules ("verified, does not apply"), keyed like <see cref="MissingCleared"/>.</summary>
+    public IReadOnlyList<string> ExpectedCleared { get; init; } = [];
 }
 
 /// <summary>The deadline of an opened case, through IDeadlineCalculator.</summary>
 /// <param name="Actual">Null when the engine opened no case.</param>
-/// <param name="Matches">Null when the rule is not the calculator's (DL-EXPIRED-*: CaseService, GoldenWorkflowTests).</param>
-public sealed record DeadlineCheck(GoldenDeadline Expected, DeadlineResult? Actual, bool? Matches);
+public sealed record DeadlineCheck(GoldenDeadline Expected, DeadlineResult? Actual, bool Matches);
 
 /// <param name="Caught">An action was expected and the engine gave it.</param>
 /// <param name="Missed">An action was expected; the engine gave NoCase, Compliant or another decision.</param>
@@ -142,4 +146,15 @@ public sealed record ExtractionReport(SourceNote Source, int? Fields, int? Corre
 public sealed record SignalReport(SourceNote Source, bool EngineTakesSignals, IReadOnlyList<string> CasesWithSignal, int? ChangedDecision);
 
 /// <summary>Part 3: the agent's time per case against the mentor's manual estimate. No number is made up.</summary>
-public sealed record EfficiencyReport(SourceNote Agent, double? AgentMinutesPerCase, SourceNote Manual, decimal? ManualMinutesPerCase);
+public sealed record EfficiencyReport(SourceNote Agent, double? AgentMinutesPerCase, SourceNote Manual, decimal? ManualMinutesPerCase)
+{
+    /// <summary>Manual minus agent minutes, only when both are a result; negative when the agent is slower.</summary>
+    public decimal? SavedMinutesPerCase =>
+        Agent.IsResult && Manual.IsResult && AgentMinutesPerCase is { } agent && ManualMinutesPerCase is { } manual ? manual - (decimal)agent : null;
+
+    public SourceNote Saved => SavedMinutesPerCase is null
+        ? new(EvaluationSource.Unavailable, "Compared only when the agent's time and the manual time both have a source.",
+            "Se compară doar când timpul agentului și timpul manual au amândouă o sursă.")
+        : new(EvaluationSource.Real, "The manual time minus the agent's time, both with a source.",
+            "Timpul manual minus timpul agentului, amândouă cu sursă.");
+}
