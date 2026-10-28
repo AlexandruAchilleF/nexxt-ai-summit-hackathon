@@ -82,10 +82,13 @@ public interface ICrsRuleEngine
     RuleOutcome EvaluateCurrent(ClientSnapshot client);
 
     /// <summary>
-    /// The current state of a client whose change the bank has known since <paramref name="changeKnownAt"/>: re-evaluation
-    /// before closing a case (pass the latest Case.Indicia AddedAt). A self-certification signed that day or later is a new
-    /// one, so a "not a US person" form can cover a FATCA indicium where the agreement allows it (IGA Annex I, II.B.4 and
-    /// III.B.2). Without the date, only a form declaring US status covers one. The default ignores the date.
+    /// The current state of a client whose change the bank has known since <paramref name="changeKnownAt"/> (UTC):
+    /// re-evaluation before closing a case, with the moment of the latest change in it,
+    /// <c>item.Indicia.Select(i => i.AddedAt).DefaultIfEmpty(item.OpenedAt).Max()</c>. A self-certification signed that
+    /// Romanian calendar day or later is a new one, so a "not a US person" form can cover a FATCA indicium where the
+    /// agreement allows it (IGA Annex I, II.B.4 and III.B.2). Without the date, only a form declaring US status covers one.
+    /// The default ignores the date, which is never more lenient than the dated call (a FATCA case stays open); it exists only
+    /// so test doubles such as R2's ScriptedRuleEngine compile, and goes once they implement this overload.
     /// </summary>
     RuleOutcome EvaluateCurrent(ClientSnapshot client, DateTime changeKnownAt) => EvaluateCurrent(client);
 

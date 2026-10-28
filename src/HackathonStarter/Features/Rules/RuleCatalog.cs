@@ -23,6 +23,7 @@ public static class RuleIds
     public const string FatcaPowerOfAttorney = "FATCA-IND-POA";
     public const string FatcaInCareOf = "FATCA-IND-CO";
     public const string FatcaChange = "FATCA-SC";
+    public const string FatcaTin = "FATCA-TIN";
     public const string FatcaScopeAllAccounts = "FATCA-SCOPE-ALL";
 
     public const string SelfCertValid = "SC-VALID";
@@ -175,6 +176,17 @@ public static class RuleCatalog
             "reportable. Preexisting account: US reportable, except under II.B.4 (a \"not a US person\" self-certification " +
             "and, depending on the indicium, documents). US citizenship on file has no exception. The agreement sets no deadline."),
 
+        Rule(RuleIds.FatcaTin, Regime.Fatca, "FATCA: TIN-ul SUA",
+            "Autocertificarea declară rezidență fiscală în SUA sau statut de persoană SUA, dar nu dă TIN-ul SUA. Contul se " +
+            "tratează drept raportabil SUA, iar banca obține o autocertificare cu TIN-ul SUA (formularul W-9 sau un formular " +
+            "similar agreat). Motivele A, B și C de la CRS nu îl înlocuiesc. Un TIN SUA în format greșit cere clarificare " +
+            "(politică: verificare de format, nu de titular). Acordul nu dă un termen.",
+            "38", "FATCA: the US TIN", "IGA art. 2 alin. (2) lit. a) pct. (1); Anexa I, Sec. III.B.1; Sec. VI.A", RuleBasis.Verified,
+            "The self-certification declares US tax residence or US person status but gives no US TIN. The account is treated " +
+            "as US reportable, and the bank obtains a self-certification with the US TIN (Form W-9 or a similar agreed form). " +
+            "The CRS reasons A, B and C do not replace it. A US TIN in the wrong format needs clarification (policy: a format " +
+            "check, not an ownership check). The agreement sets no deadline."),
+
         Rule(RuleIds.FatcaScopeAllAccounts, Regime.Fatca, "FATCA: verificăm toate conturile",
             "Banca nu aplică pragurile de 50.000 USD (conturi preexistente și conturi de depozit noi): toate conturile " +
             "persoanelor fizice sunt verificate.",
@@ -199,12 +211,12 @@ public static class RuleCatalog
         Rule(RuleIds.TinMissing, Regime.Crs, "TIN lipsă",
             "TIN lipsă acceptat doar cu motiv (A/B/C, formularul de la p. 53). Fără TIN, deși jurisdicția emite TIN tuturor " +
             "rezidenților (fișa OCDE), orice motiv: banca are motive să știe că autocertificarea e nesigură (p. 37). " +
-            "TIN-ul SUA al unui rezident SUA nu poate lipsi (p. 38).",
-            "37, 38, 48, 53", "Missing TIN", "CPF Anexa 1, Sec. VII.A pct. 3 lit. a) pct. (iv); Sec. I.D pct. 1-4",
+            "TIN-ul SUA e o regulă FATCA: FATCA-TIN.",
+            "37, 48, 53", "Missing TIN", "CPF Anexa 1, Sec. VII.A pct. 3 lit. a) pct. (iv); Sec. I.D pct. 1-4",
             RuleBasis.Verified,
             "A missing TIN is accepted only with a reason (A/B/C, the form on p. 53). No TIN although the jurisdiction issues " +
             "TINs to all residents (OECD sheet), whatever the reason: the bank has reason to know the self-certification is " +
-            "unreliable (p. 37). A US resident's US TIN cannot be missing (p. 38)."),
+            "unreliable (p. 37). The US TIN is a FATCA rule: FATCA-TIN."),
 
         Rule(RuleIds.SelfCertConsistent, Regime.Crs, "Autocertificare consecventă cu dosarul",
             "Jurisdicțiile din indicii sunt declarate în autocertificarea validă: contul e raportabil pentru fiecare " +

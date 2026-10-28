@@ -206,10 +206,21 @@ public class CrsIndiciaTests
     }
 
     [Fact]
-    public void In_care_of_is_not_a_residence_or_mailing_indicium()
+    public void In_care_of_as_the_only_address_is_also_the_mailing_address_but_never_a_residence()
     {
+        // Decision Î10 (golden case 12): the c/o address is where the bank's mail goes, so lit. b holds too; our reading.
         var o = Run(RoResident().WithOnlyAddress(AddressKind.InCareOf, "IT"));
-        Assert.DoesNotContain(o.Indicia, h => h.RuleId is RuleIds.CrsAddress or RuleIds.CrsMailing);
+        var mail = HitOf(o, RuleIds.CrsMailing);
+        Assert.Equal(("IT", "Addresses/InCareOf", RuleBasis.Interpretation), (mail.Jurisdiction, mail.SourceField, mail.Basis));
+        Assert.DoesNotContain(o.Indicia, h => h.RuleId == RuleIds.CrsAddress); // a c/o address is not a residence (p. 48)
+    }
+
+    [Fact]
+    public void Hold_mail_or_a_c_o_address_next_to_another_current_address_is_not_a_mailing_indicium()
+    {
+        // Î10 decides only the c/o address that is the only one; nothing else is read into it.
+        Assert.DoesNotContain(Run(RoResident().WithOnlyAddress(AddressKind.HoldMail, "IT")).Indicia, h => h.RuleId == RuleIds.CrsMailing);
+        Assert.DoesNotContain(Run(RoResident().WithAddress(AddressKind.InCareOf, "IT")).Indicia, h => h.RuleId == RuleIds.CrsMailing);
     }
 
     // Romania and the US
@@ -222,6 +233,30 @@ public class CrsIndiciaTests
         var o = Run(after);
         Assert.Equal(Decision.NoCase, o.Decision);
         Assert.Equal(RuleIds.Domestic, Assert.Single(o.Cleared).RuleId);
+    }
+
+    [Fact]
+    public void Without_a_guide_exception_a_us_phone_or_order_is_cleared_only_as_not_a_crs_jurisdiction()
+    {
+        // No Romanian phone, a custodial account: the only reason is that the US is not CRS, which the repo's sources do
+        // not contain (the ANAF lists): Interpretation. With the exception, the reason is the guide's (Î12).
+        var phone = ClearedOf(Run(RoResident().ReplacePhone("+13125550147", "US"), "PhoneChanged"), RuleIds.CrsPhone);
+        Assert.Equal(RuleBasis.Interpretation, phone.Basis);
+        Assert.DoesNotContain("pct. 12 lit. c", phone.ExplanationRo);
+
+        var custodial = Account(AccountType.Custodial, Preexisting).WithOrder("073909523/4417209358", "US");
+        var order = ClearedOf(Run(RoResident().WithAccounts(custodial), "StandingOrderCreated"), RuleIds.CrsStandingOrder);
+        Assert.Equal(RuleBasis.Interpretation, order.Basis);
+        Assert.DoesNotContain("exceptat", order.ExplanationRo);
+    }
+
+    [Fact]
+    public void A_non_reportable_phone_next_to_a_romanian_phone_is_cleared_on_the_romanian_phone_first()
+    {
+        var cleared = ClearedOf(Run(RoResident().WithPhone("+971501234567", "AE"), "PhoneAdded"), RuleIds.CrsPhone);
+        Assert.Equal(RuleBasis.Verified, cleared.Basis);
+        Assert.StartsWith("Telefon din Emiratele Arabe Unite (AE), dar există și un telefon actual în România", cleared.ExplanationRo);
+        Assert.Contains("în plus, AE e pe lista ANAF", cleared.ExplanationRo);
     }
 
     [Fact]

@@ -17,8 +17,9 @@ public sealed record EngineCase(string Id, string Title, RuleSubject Before, Rul
     Regime? Regime = null, string[]? Says = null);
 
 /// <summary>
-/// The engine layer of the golden cases, with the data from docs/GOLDEN-CASES.md (R5). R5's GoldenCases.cs (shared
-/// ClientSnapshot) will replace these fixtures through SubjectMapper; until then this is R1's copy of the spec.
+/// R1's RuleSubject fixtures for the golden cases (the path without a snapshot, with product names and texts). The
+/// expectations are R5's GoldenCases (GoldenEngineTests runs those); these may differ in data a card does not fix (balances,
+/// IBANs) but never in the decision, the hits or the regime (Engine_cases_never_contradict_the_canonical_golden_cases).
 /// </summary>
 internal static class EngineCases
 {
@@ -154,7 +155,7 @@ internal static class EngineCases
 
         new("7", "US citizenship (second passport), born in RO", Marius, Marius.WithCitizenships("RO", "US"),
             Change("DocumentUploaded", summary: "pasaport-us-marius.pdf"), Decision.FatcaAlert,
-            [new(RuleIds.FatcaCitizenship, "US", SourceField: "Citizenships")], [], Regime: Regime.Fatca),
+            [new(RuleIds.FatcaCitizenship, "US", SourceField: "Citizenships")], [(RuleIds.FatcaBirthPlace, "US")], Regime: Regime.Fatca),
 
         new("9", "Dual residence RO + DE declared, second residence in DE",
             SorinBefore, SorinBefore.WithAddress(AddressKind.Residence, "DE", text: "Kastanienallee 30, 10435 Berlin"),
@@ -169,7 +170,9 @@ internal static class EngineCases
         new("12", "In-care-of address in IT, the only address (preexisting, lower value)",
             PetruBefore, PetruBefore.WithOnlyAddress(AddressKind.InCareOf, "IT", "c/o Studio Legale Bianchi, Via Roma 10, 10121 Torino"),
             Change("AddressChanged", "poștă", "Vă rog să trimiteți corespondența la avocatul meu din Torino."),
-            Decision.Clarification, [new(RuleIds.CrsInCareOf, "IT", SourceField: "Addresses/InCareOf")], [(RuleIds.FatcaInCareOf, "US")],
+            Decision.Clarification,
+            [new(RuleIds.CrsInCareOf, "IT", SourceField: "Addresses/InCareOf"), new(RuleIds.CrsMailing, "IT", SourceField: "Addresses/InCareOf")],
+            [(RuleIds.FatcaInCareOf, "US")],
             Regime: Regime.Crs, Says: ["Cont preexistent cu valoare mică: o adresă «în grija» din afara SUA nu e indiciu FATCA"]),
 
         new("14", "US phone next to the RO phone", Lucian, Lucian.WithPhone("+13125550147", "US"),

@@ -47,7 +47,43 @@ public class FatcaIndiciaTests
     [InlineData(null)]
     public void Other_places_of_birth_are_not_indicia(string? country)
     {
-        Assert.Equal(Decision.NoCase, Run(RoResident().BornIn(country)).Decision);
+        var o = Run(RoResident().BornIn(country));
+        Assert.Equal(Decision.NoCase, o.Decision);
+        Assert.DoesNotContain(o.Cleared, c => c.RuleId == RuleIds.FatcaBirthPlace); // no US link: nothing to say about it
+    }
+
+    [Theory]
+    [InlineData("RO", "România (RO)")]
+    [InlineData("CA", "CA")]
+    public void A_known_place_of_birth_outside_the_us_is_cleared_when_the_client_has_a_us_link(string country, string place)
+    {
+        // Golden case 7: US citizenship from a passport that says born in Romania; lit. b) checked and not applied.
+        var o = Run(RoResident().WithCitizenships("RO", "US").BornIn(country));
+        var pob = Assert.Single(o.Cleared, c => c.RuleId == RuleIds.FatcaBirthPlace);
+        Assert.Equal(("US", "BirthCountry", RuleBasis.Interpretation), (pob.Jurisdiction, pob.SourceField, pob.Basis)); // new account
+        Assert.Contains(place, pob.ExplanationRo);
+        Assert.Contains("lit. b", pob.ExplanationRo);
+
+        var preexisting = Run(RoResident().WithAccounts(Account(AccountType.Depository, FatcaPreexisting)).WithCitizenships("RO", "US").BornIn(country));
+        Assert.Equal(RuleBasis.Verified, Assert.Single(preexisting.Cleared, c => c.RuleId == RuleIds.FatcaBirthPlace).Basis);
+    }
+
+    [Fact]
+    public void A_birth_country_that_is_no_real_code_is_never_called_not_the_us()
+    {
+        Assert.DoesNotContain(Run(RoResident().WithCitizenships("RO", "US").BornIn("S.U.A.")).Cleared, c => c.RuleId == RuleIds.FatcaBirthPlace);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("  ")]
+    public void An_unknown_place_of_birth_is_never_reported_as_checked(string? country)
+    {
+        var o = Run(RoResident().WithCitizenships("RO", "US").BornIn(country));
+        Assert.Equal(Decision.FatcaAlert, o.Decision);
+        Assert.DoesNotContain(o.Cleared, c => c.RuleId == RuleIds.FatcaBirthPlace);
+        Assert.DoesNotContain(o.Indicia, c => c.RuleId == RuleIds.FatcaBirthPlace);
     }
 
     [Theory]
@@ -283,16 +319,35 @@ public class FatcaIndiciaTests
     }
 
     [Fact]
+    public void The_day_of_the_change_is_the_romanian_calendar_day()
+    {
+        // 2026-10-28 00:30 in Bucharest is still 27 October in UTC: a form dated 27 October is older than the change.
+        var knownAt = new DateTime(2026, 10, 27, 22, 30, 0, DateTimeKind.Utc);
+        var client = WithUsLink(RoResident(), "power-of-attorney", new DateOnly(2019, 3, 14));
+        RuleOutcome SignedOn(int day) => Engine.EvaluateCurrent(
+            client.WithSelfCert(SelfCert(new DateTime(2026, 10, day, 0, 0, 0, DateTimeKind.Utc), new SubjectTaxResidence("RO", "1900101400004"))), knownAt);
+
+        Assert.Equal(Decision.FatcaAlert, SignedOn(27).Decision);
+        Assert.Equal(Decision.Compliant, SignedOn(28).Decision);
+    }
+
+    [Fact]
     public void Golden_14_closes_on_a_new_not_us_person_form_through_the_shared_contract()
     {
-        var c = EngineCases.Get("14");
+        var c = Features.Evaluation.GoldenCases.Get("14");
         ICrsRuleEngine engine = new CrsRuleEngine();
-        var answered = Snapshots.From(c.After.WithSelfCert(NotUsPerson));
+        var answered = c.After! with
+        {
+            SelfCertification = new(ChangeAt.AddDays(3), [new("RO", "1910226354122")], DeclaresUsPerson: false),
+        };
 
-        Assert.Equal(Decision.FatcaAlert, engine.Evaluate(Snapshots.From(c.Before), Snapshots.From(c.After), Features.Changes.ChangeKind.PhoneAdded).Decision);
-        Assert.Equal(Decision.FatcaAlert, engine.EvaluateCurrent(answered).Decision);
-        var o = engine.EvaluateCurrent(answered, ChangeAt);
+        Assert.Equal(Decision.FatcaAlert, engine.Evaluate(c.Before!, c.After!, c.Change!.Kind).Decision);
+        Assert.Equal(Decision.FatcaAlert, engine.EvaluateCurrent(answered).Decision); // without the date the form is not "new"
+        var o = engine.EvaluateCurrent(answered, c.ReceivedAt!.Value);
         Assert.Equal(Decision.Compliant, o.Decision);
+        Assert.Equal(Coverage.SelfCertification, HitOf(o, RuleIds.FatcaPhone).CoveredBy);
         Assert.DoesNotContain("US", o.ReportableFor);
+        // The form of the account opening is older than the change: it covers nothing, with or without the date.
+        Assert.Equal(Decision.FatcaAlert, engine.EvaluateCurrent(c.After!, c.ReceivedAt.Value).Decision);
     }
 }

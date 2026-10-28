@@ -68,6 +68,19 @@ internal static class FatcaIndicia
                 "Effective power of attorney to a person with a US address: FATCA indicium (f).");
 
         InCareOf(s, scope, f);
+
+        // lit. b) checked and not applied (golden case 7): said only when the client has a US link, and only for a real
+        // country code, so an unknown place of birth is never called "not the US".
+        var born = Jurisdictions.Normalize(s.BirthCountry);
+        if (Jurisdictions.IsKnown(born) && !Jurisdictions.IsUnitedStates(born) && f.Hits.Any(h => h.Regime == Regime.Fatca))
+        {
+            var ro = $"Locul nașterii la dosar e {Place(born)}, nu SUA: nu e indiciu FATCA (lit. b).";
+            var en = $"The place of birth on file is {Place(born, true)}, not the US: not a FATCA indicium (b).";
+            if (basis == RuleBasis.Interpretation)
+                (ro, en) = (ro + " Cont nou FATCA: lista de indicii e citită ca «motiv să știe» (GEN-NEW-ACCOUNT, interpretare de design).",
+                    en + " New FATCA account: the list of indicia is read as 'reason to know' (GEN-NEW-ACCOUNT, design interpretation).");
+            f.Clear(RuleIds.FatcaBirthPlace, Us, "BirthCountry", ro, en, basis);
+        }
     }
 
     // lit. g): in-care-of or hold-mail as the only address, in any country. On a preexisting lower value account a non-US

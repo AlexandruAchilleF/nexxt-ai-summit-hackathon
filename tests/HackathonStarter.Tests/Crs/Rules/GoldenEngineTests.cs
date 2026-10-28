@@ -1,18 +1,93 @@
+using HackathonStarter.Features.Changes;
+using HackathonStarter.Features.Evaluation;
 using HackathonStarter.Features.Rules;
-using AccountType = HackathonStarter.Features.Clients.AccountType;
 using HackathonStarter.Features.Tin;
+using Microsoft.Extensions.DependencyInjection;
+using AcceptedExplanationSnapshot = HackathonStarter.Features.Clients.AcceptedExplanationSnapshot;
+using AccountType = HackathonStarter.Features.Clients.AccountType;
+using ExplanationCategory = HackathonStarter.Features.Clients.ExplanationCategory;
+using ResponseKind = HackathonStarter.Features.Cases.ResponseKind;
 using static HackathonStarter.Tests.Crs.RuleEngine.Subjects;
 
 namespace HackathonStarter.Tests.Crs.RuleEngine;
 
-/// <summary>Golden cases, engine layer (docs/GOLDEN-CASES.md): hits compared exactly, Cleared as a superset.</summary>
+/// <summary>
+/// Golden cases, engine layer (docs/GOLDEN-CASES.md). The expectations are R5's canonical data (<see cref="GoldenCases"/>),
+/// run through <see cref="ICrsRuleEngine"/> wired as in Program.cs, with R3's TIN format: hits compared exactly with their
+/// coverage, Cleared as a superset. <see cref="EngineCases"/> are R1's RuleSubject fixtures and must never contradict them.
+/// </summary>
 public class GoldenEngineTests
 {
     private static readonly CrsRuleEngine Engine = new(new FakeTinFormat());
+    private static readonly ICrsRuleEngine Wired = new ServiceCollection().AddRules().AddTin().BuildServiceProvider()
+        .GetRequiredService<ICrsRuleEngine>();
+
+    public static TheoryData<string> CanonicalIds() => [.. GoldenCases.Ready(GoldenLayer.Engine).Select(c => c.Id)];
+
+    /// <summary>What EvaluationService and ChangeService call for the case's change.</summary>
+    private static RuleOutcome Run(GoldenCase c) => c.Change!.Kind == ChangeKind.SelfCertSubmitted
+        ? Wired.EvaluateSelfCertification(c.After!, c.Change.SelfCertification!)
+        : Wired.Evaluate(c.Before!, c.After!, c.Change.Kind);
+
+    private static void AssertMatches(IReadOnlyList<GoldenHit> indicia, IReadOnlyList<GoldenHit> cleared,
+        IReadOnlyList<string>? reportableFor, RuleOutcome o)
+    {
+        Assert.Equal(indicia.Select(h => (h.RuleId, h.Jurisdiction ?? "*", h.CoveredBy)).Order(),
+            o.Indicia.Select(h => (h.RuleId, h.Jurisdiction, h.CoveredBy)).Order());
+        foreach (var e in indicia.Where(e => e.SourceField is not null))
+            Assert.Equal(e.SourceField, o.Indicia.Single(h => h.RuleId == e.RuleId && h.Jurisdiction == e.Jurisdiction).SourceField);
+        foreach (var e in cleared)
+            Assert.Contains(o.Cleared, x => x.RuleId == e.RuleId && (e.Jurisdiction is null || x.Jurisdiction == e.Jurisdiction));
+        if (reportableFor is not null) Assert.Equal(reportableFor.Order(), o.ReportableFor.Order());
+    }
+
+    [Theory]
+    [MemberData(nameof(CanonicalIds))]
+    public void Canonical_golden_case(string id)
+    {
+        var c = GoldenCases.Get(id);
+        var o = Run(c);
+
+        Assert.Equal(c.ExpectedDecision, o.Decision);
+        Assert.Equal(c.ExpectedRegime, o.Regime);
+        AssertMatches(c.ExpectedIndicia, c.ExpectedClearedRules, c.ExpectedReportableFor, o);
+        Assert.All(o.Indicia.Concat(o.Cleared), h => Assert.Equal(RuleCatalog.Get(h.RuleId).GuidePage, h.GuidePage));
+    }
+
+    [Theory]
+    [InlineData("4")]
+    [InlineData("18")]
+    public void Canonical_golden_response_reevaluates_as_the_card_says(string id)
+    {
+        var c = GoldenCases.Get(id);
+        var r = c.Response!;
+        // Case 18: R5's snapshot after the answer; case 4: After with the new self-certification stored as the current one.
+        var answered = r.Kind == ResponseKind.ReasonableExplanation
+            ? GoldenCases.TeodoraAfterAnswer
+            : c.After! with { SelfCertification = r.SelfCertification };
+
+        var o = Wired.EvaluateCurrent(answered);
+
+        Assert.Equal(r.ExpectedDecision, o.Decision);
+        AssertMatches(r.ExpectedIndicia, [], r.ExpectedReportableFor, o);
+    }
+
+    [Fact]
+    public void Engine_cases_never_contradict_the_canonical_golden_cases()
+    {
+        foreach (var golden in GoldenCases.Ready(GoldenLayer.Engine))
+        {
+            if (EngineCases.All.SingleOrDefault(e => e.Id == golden.Id) is not { } mine) continue;
+            Assert.True(golden.ExpectedDecision == mine.Expected, golden.Id);
+            Assert.Equal(golden.ExpectedIndicia.Select(h => (h.RuleId, h.Jurisdiction ?? "*", h.CoveredBy)).Order(),
+                mine.Hits.Select(h => (h.RuleId, h.Jurisdiction, h.CoveredBy)).Order());
+            Assert.Equal(golden.ExpectedRegime, mine.Regime);
+        }
+    }
 
     [Theory]
     [MemberData(nameof(EngineCases.Ids), MemberType = typeof(EngineCases))]
-    public void Golden_case(string id)
+    public void Engine_case_on_the_rule_subject_path(string id)
     {
         var c = EngineCases.Get(id);
         var outcome = Engine.Evaluate(c.Before, c.After, c.Change);
@@ -93,14 +168,82 @@ public class GoldenEngineTests
     }
 
     [Fact]
-    public void Us_standing_order_from_a_deposit_account_is_fatca_but_not_crs()
+    public void Golden_5c_us_standing_order_from_a_deposit_account_is_fatca_and_cleared_for_crs_on_the_guide_exception_first()
     {
-        var c = EngineCases.Get("5c");
-        var outcome = Engine.Evaluate(c.Before, c.After, c.Change);
+        var outcome = Run(GoldenCases.Get("5c"));
 
         Assert.Equal(Regime.Fatca, outcome.Regime);
-        Assert.Contains("excepția CRS", Assert.Single(outcome.Indicia).ExplanationRo);
-        Assert.Contains("SUA nu e jurisdicție CRS", Assert.Single(outcome.Cleared, x => x.RuleId == RuleIds.CrsStandingOrder).ExplanationRo);
+        Assert.Contains("excepția CRS", Assert.Single(outcome.Indicia).ExplanationRo); // FATCA inherits no CRS exception
+        var cleared = Assert.Single(outcome.Cleared, x => x.RuleId == RuleIds.CrsStandingOrder);
+        // Decision Î12: the guide's reason (p. 29 lit. d) first, verified; "the US is not CRS" after it, as our reading.
+        Assert.Equal(("US", RuleBasis.Verified), (cleared.Jurisdiction, cleared.Basis));
+        Assert.StartsWith("Ordin permanent către SUA (US) dintr-un cont de depozit", cleared.ExplanationRo);
+        AssertInOrder(cleared.ExplanationRo, "exceptat la CRS (pct. 12 lit. d", "în plus, SUA nu e jurisdicție CRS raportabilă", "interpretare");
+        AssertInOrder(cleared.Explanation, "excepted under CRS (12(d)", "besides, the US is not a CRS reportable jurisdiction", "interpretation");
+    }
+
+    [Fact]
+    public void Golden_14_us_phone_next_to_a_romanian_phone_is_cleared_for_crs_on_the_romanian_phone_first()
+    {
+        var outcome = Run(GoldenCases.Get("14"));
+
+        Assert.Contains("excepția CRS nu se aplică", Assert.Single(outcome.Indicia, h => h.RuleId == RuleIds.FatcaPhone).ExplanationRo);
+        var cleared = Assert.Single(outcome.Cleared, x => x.RuleId == RuleIds.CrsPhone);
+        Assert.Equal(("US", RuleBasis.Verified), (cleared.Jurisdiction, cleared.Basis));
+        Assert.StartsWith("Telefon din SUA (US), dar există și un telefon actual în România", cleared.ExplanationRo);
+        AssertInOrder(cleared.ExplanationRo, "nu e indiciu CRS (pct. 12 lit. c)", "în plus, SUA nu e jurisdicție CRS raportabilă", "interpretare");
+    }
+
+    [Fact]
+    public void Golden_7_says_the_place_of_birth_was_checked_and_is_not_the_us()
+    {
+        var outcome = Run(GoldenCases.Get("7"));
+
+        var pob = Assert.Single(outcome.Cleared, x => x.RuleId == RuleIds.FatcaBirthPlace);
+        // A new FATCA account (2018): the indicia list read as "reason to know" (GEN-NEW-ACCOUNT), so our reading.
+        Assert.Equal(("US", "BirthCountry", RuleBasis.Interpretation), (pob.Jurisdiction, pob.SourceField, pob.Basis));
+        Assert.Contains("România (RO)", pob.ExplanationRo);
+        Assert.Contains("Romania (RO)", pob.Explanation);
+        Assert.DoesNotContain(outcome.Indicia, h => h.RuleId == RuleIds.FatcaBirthPlace);
+    }
+
+    [Fact]
+    public void Golden_17b_an_accepted_explanation_does_not_cover_an_indicium_on_a_preexisting_account()
+    {
+        // Decision Î11 (guide p. 29, 30, 35, 37): a preexisting account closes on a new self-certification and documentary
+        // evidence; the reasonable explanation is a new-account route. R5's case 17b, plus an accepted student explanation.
+        var c = GoldenCases.Get("17b");
+        var explained = c.After! with
+        {
+            AcceptedExplanations = [new AcceptedExplanationSnapshot("ES", ExplanationCategory.Student, "CRS-2026-0017", c.ReceivedAt!.Value)],
+        };
+
+        foreach (var o in new[] { Wired.Evaluate(c.Before!, explained, c.Change!.Kind), Wired.EvaluateCurrent(explained) })
+        {
+            Assert.Equal((Decision.Clarification, Regime.Crs), (o.Decision, o.Regime));
+            var hit = Assert.Single(o.Indicia);
+            Assert.Equal((RuleIds.CrsAddress, "ES", Coverage.None, RuleBasis.Verified), (hit.RuleId, hit.Jurisdiction, hit.CoveredBy, hit.Basis));
+            Assert.Contains("explicația acceptată nu acoperă indiciul", hit.ExplanationRo);
+            Assert.Contains("the accepted explanation does not cover the indicium", hit.Explanation);
+            Assert.DoesNotContain(o.Cleared, x => x.RuleId == RuleIds.Explanation);
+            Assert.Contains("Cont preexistent", o.ExplanationRo);
+            Assert.Empty(o.ReportableFor);
+        }
+
+        // The same explanation on a new account still covers it (case 18 shape): the restriction is per regime and account.
+        var newAccount = explained with { Accounts = [.. explained.Accounts.Select(a => a with { OpenedOn = new DateOnly(2019, 3, 14) })] };
+        Assert.Equal(Decision.Compliant, Wired.EvaluateCurrent(newAccount).Decision);
+    }
+
+    private static void AssertInOrder(string text, params string[] parts)
+    {
+        var at = 0;
+        foreach (var part in parts)
+        {
+            var i = text.IndexOf(part, at, StringComparison.Ordinal);
+            Assert.True(i >= 0, $"\"{part}\" not found in order in: {text}");
+            at = i + part.Length;
+        }
     }
 
     [Fact]
@@ -144,14 +287,20 @@ public class GoldenEngineTests
     }
 
     [Fact]
-    public void Petru_in_care_of_explains_the_undocumented_account_route_and_the_lower_value_trap()
+    public void Golden_12_in_care_of_is_also_a_mailing_address_and_keeps_the_undocumented_account_route()
     {
-        var c = EngineCases.Get("12");
-        var outcome = Engine.Evaluate(c.Before, c.After, c.Change);
+        var outcome = Run(GoldenCases.Get("12"));
 
-        var hit = Assert.Single(outcome.Indicia);
-        Assert.Contains("cont nedocumentat", hit.ExplanationRo);
-        Assert.Equal(RuleBasis.Interpretation, hit.Basis); // the old Cluj address is on file, but not current (Q6)
+        var co = Assert.Single(outcome.Indicia, h => h.RuleId == RuleIds.CrsInCareOf);
+        Assert.Contains("cont nedocumentat", co.ExplanationRo);
+        Assert.Equal(RuleBasis.Interpretation, co.Basis); // the old Cluj address is on file, but not current (Q6)
+        // Decision Î10: a c/o address is also the current mailing address (p. 29 lit. b): our reading, said as such.
+        var mail = Assert.Single(outcome.Indicia, h => h.RuleId == RuleIds.CrsMailing);
+        Assert.Equal(("IT", "Addresses/InCareOf", RuleBasis.Interpretation), (mail.Jurisdiction, mail.SourceField, mail.Basis));
+        Assert.Contains("Î10", mail.ExplanationRo);
+        // The c/o route of p. 31 (paper search or self-certification, otherwise undocumented), not III.B pct. 19.
+        Assert.Contains("registrul pe hârtie", outcome.ExplanationRo);
+        Assert.DoesNotContain("pct. 19", outcome.ExplanationRo);
         Assert.Contains("valoare mică", Assert.Single(outcome.Cleared, x => x.RuleId == RuleIds.FatcaInCareOf).ExplanationRo);
     }
 

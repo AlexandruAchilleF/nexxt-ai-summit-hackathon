@@ -83,6 +83,22 @@ public class CaseWorkflowEngineTests
         Assert.DoesNotContain("US", closed.ReportableFor);
     }
 
+    [Fact]
+    public async Task A_us_form_without_the_us_tin_opens_a_fatca_case_without_a_deadline()
+    {
+        await using var host = await WithRealEngine();
+        var client = await host.SeedClientAsync("CL-0001", new DateOnly(2019, 3, 14));
+
+        var change = await host.As(Member).Changes.RecordAsync(new ChangeRequest("CL-0001", ChangeKind.SelfCertSubmitted, "online",
+            SelfCertification: new SelfCertificationSnapshot(host.Clock.UtcNow, [new("RO", client.Cnp), new("US", null)], DeclaresUsPerson: true)));
+
+        Assert.Equal((Decision.FatcaAlert, Regime.Fatca), (change.Outcome.Decision, change.Outcome.Regime));
+        await using var db = await host.DbAsync();
+        var item = await db.Cases.Include(c => c.Indicia).SingleAsync(c => c.Code == change.CaseCode);
+        Assert.Equal((Regime.Fatca, "FATCA-SC", (DateTime?)null), (item.Regime, item.DeadlineRuleId, item.DueAt));
+        Assert.Equal((RuleIds.FatcaTin, "US"), (Assert.Single(item.Indicia).RuleId, Assert.Single(item.Indicia).Jurisdiction));
+    }
+
     /// <summary>The real engine, with the closing re-evaluation dated (what R2's CloseAsync would pass).</summary>
     private sealed class ClosesWithDate(CrsRuleEngine real, Func<DateTime?> changeKnownAt) : ICrsRuleEngine
     {

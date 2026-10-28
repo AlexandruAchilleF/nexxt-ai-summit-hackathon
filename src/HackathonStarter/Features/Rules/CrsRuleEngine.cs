@@ -37,8 +37,9 @@ public sealed partial class CrsRuleEngine(ITinFormat? tinFormat = null) : ICrsRu
         var found = Detect(after, scope);
 
         var sc = after.CurrentSelfCertification;
-        // By day: a form signed the day the change became known answers it (the date on a form has no time).
-        var renewed = sc is not null && changeKnownAt is { } knownAt && sc.SignedAt.Date >= knownAt.Date;
+        // By day: a form signed the day the change became known answers it. A form's date has no time, so the moment is read
+        // as a Romanian calendar day (01:00 in Bucharest is still the previous day in UTC).
+        var renewed = sc is not null && changeKnownAt is { } knownAt && sc.SignedAt.Date >= RomanianDay(knownAt);
         var hits = found.Hits.Select(h => Cover(h, after, sc, renewed, scope, earlier.Contains((h.RuleId, h.Jurisdiction)))).ToList();
         var cleared = found.ClearedWithoutHits().ToList();
 
@@ -95,11 +96,17 @@ public sealed partial class CrsRuleEngine(ITinFormat? tinFormat = null) : ICrsRu
         return f;
     }
 
+    private static readonly TimeZoneInfo Bucharest =
+        TimeZoneInfo.TryFindSystemTimeZoneById("Europe/Bucharest", out var zone) ? zone : TimeZoneInfo.Utc;
+
+    private static DateTime RomanianDay(DateTime moment) =>
+        TimeZoneInfo.ConvertTimeFromUtc(moment.Kind == DateTimeKind.Local ? moment.ToUniversalTime() : DateTime.SpecifyKind(moment, DateTimeKind.Utc), Bucharest).Date;
+
     private static bool DeclaresUs(SubjectSelfCertification sc) =>
         sc.DeclaresUsPerson || sc.Residences.Any(r => Jurisdictions.IsUnitedStates(r.Country));
 
     // CRS: a jurisdiction declared in the current valid self-certification covers it (reportable); an accepted explanation
-    // covers it (not reportable). FATCA: a self-certification declaring US status covers it (reportable); a new one saying
+    // covers it (not reportable) only when no account is CRS-preexisting (decision Î11, guide p. 29-30, 35, 37). FATCA: a self-certification declaring US status covers it (reportable); a new one saying
     // "not a US person" only where the agreement allows (renewed, FatcaIndicia.CoveredByDenial); explanations never do.
     private static RuleHit Cover(RuleHit hit, RuleSubject s, SubjectSelfCertification? sc, bool renewed, AccountScope scope,
         bool existedBefore)
@@ -147,12 +154,18 @@ public sealed partial class CrsRuleEngine(ITinFormat? tinFormat = null) : ICrsRu
             };
 
         if (s.AcceptedExplanations.Any(e => Jurisdictions.Normalize(e.Jurisdiction) == hit.Jurisdiction))
-            return hit with
-            {
-                CoveredBy = Coverage.AcceptedExplanation,
-                ExplanationRo = ro + " Acoperit: explicație rezonabilă acceptată.",
-                Explanation = en + " Covered: accepted reasonable explanation.",
-            };
+            return scope.CrsPreexisting
+                ? hit with
+                {
+                    ExplanationRo = ro + " Clientul are un cont preexistent CRS: explicația acceptată nu acoperă indiciul; ghidul cere autocertificare și document justificativ (p. 29-30; GOLDEN-CASES Î11). Explicația rezonabilă e o rută a conturilor noi (p. 35, 37).",
+                    Explanation = en + " The client has a CRS preexisting account: the accepted explanation does not cover the indicium; the guide asks for a self-certification and documentary evidence (p. 29-30; GOLDEN-CASES Q11). The reasonable explanation is a new-account route (p. 35, 37).",
+                }
+                : hit with
+                {
+                    CoveredBy = Coverage.AcceptedExplanation,
+                    ExplanationRo = ro + " Acoperit: explicație rezonabilă acceptată.",
+                    Explanation = en + " Covered: accepted reasonable explanation.",
+                };
 
         return hit with { Explanation = en, ExplanationRo = ro };
     }
@@ -210,11 +223,18 @@ public sealed partial class CrsRuleEngine(ITinFormat? tinFormat = null) : ICrsRu
         const string deadlineRo = " Motorul nu calculează termene.";
         const string deadlineEn = " The engine computes no deadline.";
 
+        var contradicted = hits.Any(h => h.RuleId == RuleIds.FatcaChange && h.CoveredBy == Coverage.None);
+        var usTin = hits.Any(h => h.RuleId == RuleIds.FatcaTin && h.CoveredBy == Coverage.None);
+        var fatcaRo = (contradicted ? " Formularul nu declară legătura cu SUA din dosar (IGA Anexa I, II.B.4 și VI.A)." : "") +
+                      (usTin ? " Se cere o autocertificare cu TIN-ul SUA (ghid p. 38; IGA Anexa I, III.B.1)." : "") +
+                      " Acordul nu dă un termen.";
+        var fatcaEn = (contradicted ? " The form does not declare the US link on file (IGA Annex I, II.B.4 and VI.A)." : "") +
+                      (usTin ? " A self-certification with the US TIN is needed (guide p. 38; IGA Annex I, III.B.1)." : "") +
+                      " The agreement sets no deadline.";
+
         return decision switch
         {
-            Decision.FatcaAlert => (
-                $"Alertă FATCA pe autocertificare: {open}. Formularul nu declară legătura cu SUA din dosar (IGA Anexa I, II.B.4 și VI.A).",
-                $"FATCA alert on the self-certification: {open}. The form does not declare the US link on file (IGA Annex I, II.B.4 and VI.A)."),
+            Decision.FatcaAlert => ($"Alertă FATCA pe autocertificare: {open}.{fatcaRo}", $"FATCA alert on the self-certification: {open}.{fatcaEn}"),
             Decision.Clarification => (
                 $"Autocertificarea nu poate fi acceptată așa: {open}. Se cere clientului corectarea (TIN, motiv sau formular nou).{deadlineRo}",
                 $"The self-certification cannot be accepted as it is: {open}. The client is asked for a correction (TIN, reason or a new form).{deadlineEn}"),
@@ -240,7 +260,9 @@ public sealed partial class CrsRuleEngine(ITinFormat? tinFormat = null) : ICrsRu
         var reportableRo = reportable.Count > 0 ? $" Raportabil pentru: {string.Join(", ", reportable)}." : "";
         var reportableEn = reportable.Count > 0 ? $" Reportable for: {string.Join(", ", reportable)}." : "";
 
-        var onlyInCareOf = openCrs.Count > 0 && openCrs.All(h => h.RuleId == RuleIds.CrsInCareOf);
+        // The c/o route (p. 31) also when the same c/o address gives CRS-IND-MAIL (decision Î10): it is not "another indicium".
+        var onlyInCareOf = openCrs.Count > 0 && openCrs.Any(h => h.RuleId == RuleIds.CrsInCareOf)
+            && openCrs.All(h => h.RuleId == RuleIds.CrsInCareOf || h is { RuleId: RuleIds.CrsMailing, SourceField: "Addresses/InCareOf" });
         var (crsRouteRo, crsRouteEn) = (scope.CrsPreexisting, onlyInCareOf) switch
         {
             (true, true) => (

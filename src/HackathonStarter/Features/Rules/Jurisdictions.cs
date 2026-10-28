@@ -33,6 +33,26 @@ public static class Jurisdictions
     private static readonly HashSet<string> AnafNotReported =
         ["AI", "AG", "BS", "BH", "AE", "KY", "MH", "TC", "VG", "NR", "NC", "QA", "VC"];
 
+    // ISO 3166-1 alpha-2, the 249 officially assigned codes, plus XK (Kosovo, the code the EU uses). Policy: what counts as
+    // a real jurisdiction on a self-certification; never the TIN-format, OECD-sheet or ANAF tables, which are much smaller.
+    private static readonly HashSet<string> Iso3166 =
+    [
+        "AD", "AE", "AF", "AG", "AI", "AL", "AM", "AO", "AQ", "AR", "AS", "AT", "AU", "AW", "AX", "AZ", "BA", "BB", "BD", "BE",
+        "BF", "BG", "BH", "BI", "BJ", "BL", "BM", "BN", "BO", "BQ", "BR", "BS", "BT", "BV", "BW", "BY", "BZ", "CA", "CC", "CD",
+        "CF", "CG", "CH", "CI", "CK", "CL", "CM", "CN", "CO", "CR", "CU", "CV", "CW", "CX", "CY", "CZ", "DE", "DJ", "DK", "DM",
+        "DO", "DZ", "EC", "EE", "EG", "EH", "ER", "ES", "ET", "FI", "FJ", "FK", "FM", "FO", "FR", "GA", "GB", "GD", "GE", "GF",
+        "GG", "GH", "GI", "GL", "GM", "GN", "GP", "GQ", "GR", "GS", "GT", "GU", "GW", "GY", "HK", "HM", "HN", "HR", "HT", "HU",
+        "ID", "IE", "IL", "IM", "IN", "IO", "IQ", "IR", "IS", "IT", "JE", "JM", "JO", "JP", "KE", "KG", "KH", "KI", "KM", "KN",
+        "KP", "KR", "KW", "KY", "KZ", "LA", "LB", "LC", "LI", "LK", "LR", "LS", "LT", "LU", "LV", "LY", "MA", "MC", "MD", "ME",
+        "MF", "MG", "MH", "MK", "ML", "MM", "MN", "MO", "MP", "MQ", "MR", "MS", "MT", "MU", "MV", "MW", "MX", "MY", "MZ", "NA",
+        "NC", "NE", "NF", "NG", "NI", "NL", "NO", "NP", "NR", "NU", "NZ", "OM", "PA", "PE", "PF", "PG", "PH", "PK", "PL", "PM",
+        "PN", "PR", "PS", "PT", "PW", "PY", "QA", "RE", "RO", "RS", "RU", "RW", "SA", "SB", "SC", "SD", "SE", "SG", "SH", "SI",
+        "SJ", "SK", "SL", "SM", "SN", "SO", "SR", "SS", "ST", "SV", "SX", "SY", "SZ", "TC", "TD", "TF", "TG", "TH", "TJ", "TK",
+        "TL", "TM", "TN", "TO", "TR", "TT", "TV", "TW", "TZ", "UA", "UG", "UM", "US", "UY", "UZ", "VA", "VC", "VE", "VG", "VI",
+        "VN", "VU", "WF", "WS", "YE", "YT", "ZA", "ZM", "ZW",
+        "XK",
+    ];
+
     // OECD TIN sheets: does the jurisdiction issue a TIN to every resident individual? Only the sheets we read; null = unknown.
     private static readonly Dictionary<string, bool> IssuesTinToAllIndividuals = new()
     {
@@ -63,6 +83,9 @@ public static class Jurisdictions
         var code = (country ?? "").Trim().ToUpperInvariant();
         return code == "EL" ? "GR" : code;
     }
+
+    /// <summary>A real country or territory code after <see cref="Normalize"/> ("de", "EL", "XK" yes; "", "XX", "UK" no).</summary>
+    public static bool IsKnown(string? country) => Iso3166.Contains(Normalize(country));
 
     public static bool IsRomania(string? country) => Normalize(country) == Romania;
 

@@ -168,6 +168,22 @@ public class SnapshotPathTests
         Assert.Equal(Decision.NoCase, dutch.Decision);
         Assert.Contains("format not checked", Assert.Single(dutch.Cleared, x => x.RuleId == RuleIds.TinFormat).Explanation);
     }
+
+    [Fact]
+    public void Wired_like_program_cs_a_us_form_without_the_us_tin_is_fatca_with_no_deadline_from_the_calculator()
+    {
+        var engine = new ServiceCollection().AddRules().AddTin().BuildServiceProvider().GetRequiredService<ICrsRuleEngine>();
+        var client = Snapshots.From(RoResident());
+        var form = new SelfCertificationSnapshot(ChangeAt, [new TaxResidenceSnapshot("RO", "1900101400004"), new TaxResidenceSnapshot("US", null)], true);
+
+        var o = engine.EvaluateSelfCertification(client, form);
+
+        Assert.Equal((Decision.FatcaAlert, Regime.Fatca), (o.Decision, o.Regime));
+        Assert.Equal((RuleIds.FatcaTin, "US"), (Assert.Single(o.Uncovered).RuleId, Assert.Single(o.Uncovered).Jurisdiction));
+        // What CaseService does with the regime: FATCA gets no deadline from the guide (p. 38, Î1), never the CRS 90 days.
+        var deadline = new Features.Deadlines.DeadlineCalculator().Compute(new(ChangeAt, o.Regime!.Value, client.Accounts[0].OpenedOn));
+        Assert.Equal(("FATCA-SC", (DateTime?)null), (deadline.RuleId, deadline.DueAt));
+    }
 }
 
 /// <summary>RuleSubject fixtures as the shared entities, then as snapshots through ClientSnapshot.From.</summary>
