@@ -37,15 +37,14 @@ durata segmentului ei; cele ≈ 9 s rămase până la 3:00 sunt pentru pauze și
 `AI:AgentMode = Live`. Mock: fără model, cu `AI:AgentMode = Auto`. Detaliile sunt în checklist (secțiunea 4). Replay e
 acceptabil doar pentru o întrebare care citește (ex. „Rezumă cazul”), iar scenariul de mai jos nu are niciuna.
 
-**Ce e pe main (28.10.2026, 22:50, `29bcd47`):** `/audit` (cu istoricul din seed, „Verifică” și „Falsifică”, adică
-„Tamper” în EN), `/metrics`, `/clients` și `/clients/{code}` funcționează (pagina clientului, #45, cu scanarea lui Victor,
-#48). `/cases`, `/cases/{code}` și `/changes/new` sunt încă doar schelete („Vine în faza următoare”), `/dashboard` e cel
-din template, iar data simulată nu are butoane în UI: toate sunt în PR #49 (`ui/crs-pages`, deschis). Etichetele
-marcate „(PR #49)” de mai jos vin din acel PR și se verifică din nou pe `main` după merge.
+**Ce e pe main (28.10.2026, 23:15, `46e6c81`):** `/audit` (cu istoricul din seed, „Verifică” și „Falsifică”, adică
+„Tamper” în EN), `/metrics`, `/clients` și `/clients/{code}` (pagina clientului, #45, cu scanarea lui Victor, #48), iar
+din #49 `/dashboard`, `/cases`, `/cases/{code}`, `/changes/new` și meniul „Demo” cu data simulată. Etichetele marcate
+„(#49)” de mai jos vin din acel PR.
 Agentul are cele 14 unelte și mock-ul RO/EN (#44, #47), cu cele două mesaje fixe ale cazului (`SentinelActions`:
 „Analizează dosarul cazului {cod}: ...” și „Verifică răspunsul clientului pentru cazul {cod}: ...”). Butoanele care le
-trimit nu există încă, nici pe `main`, nici în #49: azi o rulare pornește doar prin API (`POST /api/agents/crs-sentinel`,
-`/api-docs`), iar pașii și „Aprobă” se văd pe `/runs/{id}`. Pagina cazului din #49 are fluxul manual (ciornă, „Aprobă și
+trimit nu există încă pe `main`: azi o rulare pornește doar prin API (`POST /api/agents/crs-sentinel`,
+`/api-docs`), iar pașii și „Aprobă” se văd pe `/runs/{id}`. Pagina cazului (#49) are fluxul manual (ciornă, „Aprobă și
 trimite”, „Înregistrează răspunsul”, „Aprobă închiderea”), fără agent. Până nu apar butoanele, S3 și S4 se filmează pe
 `/runs/{id}`, ca mai jos.
 
@@ -57,7 +56,7 @@ trimite”, „Înregistrează răspunsul”, „Aprobă închiderea”), fără
 
 > Raiffeisen are aproximativ 2,4 milioane de clienți, persoane fizice și juridice. Fiecare actualizare de date trebuie evaluată; doar cele relevante fiscal pornesc un termen. În primul semestru din 2025, după 8 solicitări de feedback de la state membre, ANAF a verificat 3.204 înregistrări din sector: 891 au fost corectate. Riscul e pe fiecare cont.
 
-**Ce se vede:** titlul „CRS Sentinel” (2 s), apoi `/dashboard` (PR #49): termenele care expiră în 7 zile și cazurile pe stări.
+**Ce se vede:** titlul „CRS Sentinel” (2 s), apoi `/dashboard` (#49): termenele care expiră în 7 zile și cazurile pe stări.
 Supratitrare cu sursa sub fiecare cifră: „Raiffeisen, comunicat 28.10.2026” și „ANAF, Raport de activitate S1 2025, p. 36–37”.
 
 **Mod:** fără agent.
@@ -72,8 +71,8 @@ Supratitrare cu sursa sub fiecare cifră: „Raiffeisen, comunicat 28.10.2026”
 
 **Ce se vede:** `/changes/new`, clientul **Maria Popescu `CL-0001`** (cazul 4). Un singur eveniment `AddressChanged` (Î3 din
 GOLDEN-CASES): reședința Leopoldstraße 12, 80802 München, DE și telefonul `+498945217730` în locul `+40721384516`. Click pe
-„Înregistrează și aplică regulile” (PR #49). Rezultatul pe loc: caz deschis, `CRS-IND-ADDR` (DE, p. 29 lit. b) și
-`CRS-IND-PHONE` (DE, p. 29 lit. c), termen `DL-NEW-90`. Click pe codul cazului → `/cases/{code}` (PR #49): antetul cu
+„Înregistrează și aplică regulile” (#49). Rezultatul pe loc: caz deschis, `CRS-IND-ADDR` (DE, p. 29 lit. b) și
+`CRS-IND-PHONE` (DE, p. 29 lit. c), termen `DL-NEW-90`. Click pe codul cazului → `/cases/{code}` (#49): antetul cu
 ceasul termenului. Codul nu e `CRS-2026-0001` din `PLAN.md` §6.3: istoricul din seed (#39) deschide cazuri înainte, deci
 codul se citește pe ecran. Data simulată: offset 0.
 
@@ -93,7 +92,7 @@ ca în `SentinelMariaTests`: `getCase` → `listDocuments` → `readDocument` pe
 telefonul german, verificată de cod (pe `/runs/{id}` telefonul apare mascat, ca tot ce se salvează din rulare) →
 `recordSignal`, semnalul „Angajator: Müller Logistik GmbH” →
 `draftClientRequest` → `sendClientRequest` așteaptă aprobarea. Ana apasă „Aprobă”: cererea pleacă, cazul trece în
-`AwaitingClient`. Apoi `/cases/{code}` (PR #49): citatul real „Telefon: +49 89 4521 7730” și semnalul cu „Semnal, fără
+`AwaitingClient`. Apoi `/cases/{code}` (#49): citatul real „Telefon: +49 89 4521 7730” și semnalul cu „Semnal, fără
 alertă”. Montajul taie așteptarea modelului.
 
 **Mod:** live (Bedrock) sau mock. **Niciodată Replay**: pasul salvează dovezi și schimbă starea cazului. Eticheta rulării
@@ -105,14 +104,14 @@ trebuie să fie „Live” sau „Simulare”, nu „Înregistrare”.
 
 > Ziua 85, fără răspuns: memento operatorului și escaladare la departamentul fiscal. A doua zi sosește autocertificarea nouă. Agentul extrage rezidența și TIN-ul, cu citate; codul confirmă: format valid, indicii acoperite. Operatorul aprobă închiderea, cu dovada la dosar.
 
-**Ce se vede:** pe `/cases/{code}`, meniul „Demo” (PR #49): „La ziua mementoului” (ziua 85); pe caz apar memento-ul și
+**Ce se vede:** pe `/cases/{code}`, meniul „Demo” (#49): „La ziua mementoului” (ziua 85); pe caz apar memento-ul și
 escaladarea (`Reminded` → `Escalated`). Apoi „+1 zi” (ziua 86). Autocertificarea nouă a Mariei
 (`autocertificare-maria-2027.pdf`) intră ca document al clientului, apoi rularea `crs-sentinel` cu mesajul fix „Verifică răspunsul clientului pentru cazul {cod}: ...”
 (`SentinelActions.Verify`), azi prin API, pe `/runs/{id}`. Pașii, ca în `SentinelMariaTests`: `getCase` →
 `listDocuments` → `extractSelfCertification` → DE și TIN `86095174223`, cu citate verificate → `checkTin` → „format
 valid” → `registerResponse` → `evaluateRules` → conform, raportabil pentru DE → `closeCase` așteaptă aprobarea. Ana
 apasă „Aprobă”: caz `Closed`, cu dovada confirmării (canalul, momentul, documentul). Pe `main`, PDF-ul intră doar din cod
-(`IDemoScenarios.DeliverResponseAsync`, ca în test), fără buton în UI, nici în #49: înainte de filmare trebuie un buton
+(`IDemoScenarios.DeliverResponseAsync`, ca în test), fără buton în UI: înainte de filmare trebuie un buton
 sau un alt pas de încărcare. În etalon: memento la 2027-01-21 (ziua 85), răspuns la 2027-01-22 (ziua 86);
 la filmare datele afișate pornesc de la momentul schimbării din S2.
 
@@ -181,7 +180,7 @@ internaționale); numele și adresele nu se maschează (`PLAN.md` §17, README �
 
 **Cifre și surse:** din `/metrics`, rularea din 28.10.2026, 22:08, pe commit-ul `e0bc47c`, fără model (README §8): 23 de
 acțiuni așteptate, toate prinse (13 pe cazurile-etalon, 10 pe clienții sintetici), 0 ratate, 0 alarme false. Valabile și pe
-`29bcd47`: între cele două commit-uri, evaluarea, regulile și datele nu s-au schimbat. Se refac pe versiunea filmată, dacă motorul sau datele se schimbă. Nu spunem „acuratețe 100%”: motorul e
+`46e6c81`: între cele două commit-uri, evaluarea, regulile și datele nu s-au schimbat. Se refac pe versiunea filmată, dacă motorul sau datele se schimbă. Nu spunem „acuratețe 100%”: motorul e
 determinist (`PLAN.md` §16.3). Cele 21 de cazuri-etalon sunt numărate ca în `GOLDEN-CASES.md` (18 scenarii, cu variantele
 5a–5c și 17a–17b). Lista „ce nu prindem încă” e o selecție din README §7 (lista completă e în tabelul de întrebări).
 
@@ -288,7 +287,7 @@ aprobare (`PLAN.md` §6.3); deciziile `NoCase` și `Compliant` merg direct în j
       repornire: Setări → „Resetează datele demo” (admin) readuce clienții, cazurile, istoricul din seed, jurnalul (de la
       GENESIS) și data simulată (offset 0) la starea de la pornire (`DemoData.ResetAsync`, #43). Nu reporniți între
       propunere și aprobare: rularea cu aprobarea în așteptare dispare (`PLAN.md` §6.3).
-- [ ] **Data simulată resetată** (offset 0): o fac repornirea și „Resetează datele demo”; în PR #49, meniul „Demo” are
+- [ ] **Data simulată resetată** (offset 0): o fac repornirea și „Resetează datele demo”; meniul „Demo” (#49) are
       și „Înapoi la data reală”. Meniul arată data reală, fără „+N z”.
 - [ ] **După o eroare, dubla se reia de la baza și data simulată resetate**, pentru că uneltele rulate deja au salvat dovezi
       și au schimbat starea cazului.
@@ -309,8 +308,8 @@ aprobare (`PLAN.md` §6.3); deciziile `NoCase` și `Compliant` merg direct în j
       Testează modelul principal (Bedrock e pe main din PR #5) și fiecare profil din `AI:Profiles`; profilul `extract`
       există doar dacă îl punem în `appsettings.Local.json` (modelul e în `appsettings.Local.example.json`); ținta
       `tin-on-europa` e în `appsettings.json` (PR #23).
-- [ ] Logați ca Ana (operator, admin): data simulată și „Falsifică” („Tamper”) cer admin (`PLAN.md` §15; meniul „Demo”
-      e în PR #49); aprobările cer admin sau member (`AgentRunner.DecideAsync`).
+- [ ] Logați ca Ana (operator, admin): data simulată și „Falsifică” („Tamper”) cer admin (`PLAN.md` §15; meniul „Demo”,
+      #49); aprobările cer admin sau member (`AgentRunner.DecideAsync`).
 - [ ] Zoom 125% în browser, fără bara de bookmark-uri; interfața în RO (butonul RO/EN); export 1080p.
 - [ ] Cele două mesaje către agent (S3, S4) sunt fixate în `SentinelActions` (#47) și trec pe mock în
       `SentinelMariaTests`. Lipsesc butoanele care le trimit de pe pagina cazului și pasul din UI care pune
