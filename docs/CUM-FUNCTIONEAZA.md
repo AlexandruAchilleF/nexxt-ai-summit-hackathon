@@ -102,8 +102,10 @@ Toate cele 21 de cazuri-etalon, cu datele și rezultatul așteptat, sunt în `do
 
 **Nota asupra termenelor:** Calculul termenului diferă între conturile noi și preexistente:
 - **Cont nou:** DueAt = data la care banca știe de schimbare + 90 zile calendaristice (p. 20–21, 35–36)
-- **Cont preexistent:** ghidul spune „până la sfârșitul anului sau 90 de zile” (p. 29); implementăm cea mai târzie dintre ele,
-  cum scrie legea (Codul de procedură fiscală, Anexa nr. 2 pct. 1) și Comentariul OCDE (Secțiunea III, pct. 13). Detalii în README.
+- **Cont preexistent:** ghidul spune „până în ultima zi a anului calendaristic în cauză [...], sau în 90 de zile calendaristice” (p. 29); implementăm cea mai târzie dintre ele.
+  Pentru contul documentat prin adresa de rezidență așa scrie legea (Codul de procedură fiscală, Anexa nr. 2 pct. 1), ca
+  în Comentariul OCDE (Secțiunea III, pct. 13); la indiciile din căutarea electronică, cum sunt cazurile noastre, e
+  interpretarea noastră, aliniată la Comentariul OCDE (pct. 16). Detalii în README.
 - **Preexistent se calculează pe regim** (CRS = 31 dec. 2015, FATCA = 30 iunie 2014), nu pe tipul contului (depozit/custodie). Același cont poate fi nou pentru CRS și preexistent pentru FATCA.
 
 ## 6. Agentul, pe scurt (Persoana 4)

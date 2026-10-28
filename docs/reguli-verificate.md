@@ -4,6 +4,7 @@ Sursa primara: Ghidul ANAF DAC2/CRS/FATCA, varianta 29.12.2025 (79 pagini). Pagi
 Verificat la 28.10.2026 pe textul extras din PDF.
 
 Stare: CONFIRMAT = text gasit in ghid. CORECTAT = ghidul spune altceva decat lista de lucru. NEVERIFICAT = nu apare in ghid.
+CONFIRMAT din lege / din Acordul FATCA / din IRS = text gasit in actul numit (articol si URL), nu in ghid. INTERPRETARE = regula de design, spusa deschis in README. CONFIRMAT prin apel real = raspunsul serviciului, nu un text din ghid sau din lege.
 
 ## Important pentru domeniul MVP
 
@@ -54,7 +55,7 @@ In MVP folosim indiciile ca criterii prin care banca "stie sau are motive sa sti
 | FATCA-NEW-2 | Rezident SUA: declaratie cu TIN SUA, de exemplu W-9 | CONFIRMAT | Ghid p.38 |
 | FATCA-SC-1 | Schimbare de situatie: declaratie noua; fara ea, cont raportabil SUA | CONFIRMAT | Ghid p.38 |
 | FATCA-CURE | Documentele care pot inlatura un indiciu SUA (exceptiile B(4) din Acordul FATCA) | NEVERIFICAT: ghidul doar trimite la Acord | Ghid p.31 |
-| FATCA-W8-1 | W-8BEN valabil de la semnare pana la sfarsitul celui de-al treilea an calendaristic urmator, daca nu intervine o schimbare | CONFIRMAT din IRS, nu din ghidul ANAF; aplicarea in Acordul FATCA Model 1 NEVERIFICATA | IRS, Instructions for Form W-8BEN, "Expiration of Form W-8BEN" |
+| FATCA-W8-1 | W-8BEN valabil, de regula, de la semnare pana la sfarsitul celui de-al treilea an calendaristic urmator, daca nu intervine o schimbare | CONFIRMAT din IRS, nu din ghidul ANAF; aplicarea in Acordul FATCA Model 1 NEVERIFICATA | IRS, Instructions for Form W-8BEN (Rev. 10/2021), "Expiration of Form W-8BEN", https://www.irs.gov/instructions/iw8ben |
 
 ## Alte afirmatii din brief
 
@@ -63,7 +64,8 @@ In MVP folosim indiciile ca criterii prin care banca "stie sau are motive sa sti
 | Nationalitatea nu e indiciu CRS; cetatenia SUA e indiciu FATCA | CONFIRMAT prin listele de la p.29 si p.31 |
 | Salariul din alta tara nu e indiciu | CONFIRMAT: nu apare in nicio lista |
 | CRS se aplica prin DAC2, transpusa in Legea 207/2015; DAC8 transpusa prin OUG 71/2025 | CONFIRMAT, Ghid p.4 |
-| Formularul F3000 si termenul 15 mai | CONFIRMAT din lege, nu din ghid: Codul de procedura fiscala, art. 62 alin. (7); OPANAF 1711/2022 aproba doar formularele F3000 DAC2/CRS si F3000 FATCA |
-| Cuantumul amenzilor | CONFIRMAT din lege, nu din ghid: art. 336 alin. (2) lit. k^1) 2.000-5.000 lei si lit. k^2) 5.000-10.000 lei "pentru fiecare cont care face obiectul raportarii" (introduse prin OUG 102/2022) |
-| Retinerea de 30% FATCA | CONFIRMAT din Acordul FATCA, nu din ghid: banca conforma nu e supusa retinerii (art. 4(1)); doar dupa o neconformare semnificativa nerezolvata in 18 luni (art. 5(2)(b)); cota de 30% e in 26 U.S.C. 1471(a). Nu o spunem in pitch |
+| Formularul F3000 si termenul 15 mai | CONFIRMAT din lege, nu din ghid: Codul de procedura fiscala, art. 62 alin. (7), https://legislatie.just.ro/Public/DetaliiDocument/312603; OPANAF 1711/2022 aproba doar formularele F3000 DAC2/CRS si F3000 FATCA, https://legislatie.just.ro/Public/DetaliiDocument/259750 |
+| Cuantumul amenzilor | CONFIRMAT din lege, nu din ghid: Codul de procedura fiscala, art. 336 alin. (2) lit. k^1) 2.000-5.000 lei si lit. k^2) 5.000-10.000 lei "pentru fiecare cont care face obiectul raportarii", https://legislatie.just.ro/Public/DetaliiDocument/312603 (introduse prin OUG 102/2022, https://legislatie.just.ro/Public/DetaliiDocument/256922) |
+| Retinerea de 30% FATCA | CONFIRMAT din Acordul FATCA, nu din ghid: banca conforma nu e supusa retinerii (art. 4(1)); doar dupa o neconformare semnificativa nerezolvata in 18 luni de la notificare (art. 5(2)(b)), https://home.treasury.gov/system/files/131/FATCA-Agreement-Romania-5-28-2015.pdf; cota de 30% e in 26 U.S.C. 1471(a), https://www.govinfo.gov/content/pkg/USCODE-2023-title26/html/USCODE-2023-title26-subtitleA-chap4-sec1471.htm. Nu o spunem in pitch |
+| Cont preexistent, schimbare de circumstante: cea mai tarzie dintre 31.12 si +90 de zile | CONFIRMAT din lege pentru testul adresei de rezidenta (Cod proc. fisc., Anexa nr. 2 pct. 1, https://legislatie.just.ro/Public/DetaliiDocument/312603; OCDE Sect. III pct. 13); INTERPRETARE la indiciile din cautarea electronica (Anexa nr. 1 Sect. III subsect. B pct. 16 spune doar "ori"; OCDE Sect. III pct. 16); ghidul p.29 spune "sau", in paragraful despre testul adresei de rezidenta (nota 57); la cautarea electronica ghidul (p.30) nu da acest termen |
 | TIN on Europa verifica doar structura si sintaxa | CONFIRMAT prin apel real: raspunsul contine doar validStructure si validSyntax |

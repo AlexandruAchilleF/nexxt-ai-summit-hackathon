@@ -121,11 +121,14 @@ CRS preexistent = existent la 31.12.2015, FATCA preexistent = existent la 30.06.
   conturile noi, ghidul cere autocertificarea și testul de rezonabilitate față de informațiile băncii (p. 33). Folosim
   indiciile drept criterii prin care autocertificarea e contrazisă.
 - **Mutarea în țară** (`GEN-DOMESTIC`) nu are o pagină proprie: nicio regulă din p. 29–31 nu se aplică, deci `NoCase`.
-- **Termenul la contul preexistent.** Ghidul (p. 29) spune „până la sfârșitul anului **sau** 90 de zile”. Aplicăm cea mai
-  târzie dintre cele două date, cum scrie legea pentru contul documentat prin adresa de rezidență (Codul de procedură
-  fiscală, Anexa nr. 2 pct. 1: „oricare dintre acestea este mai recentă”) și Comentariul OCDE la CRS (Secțiunea III,
-  pct. 13). Interpretarea noastră e doar extinderea la indiciile din căutarea electronică, unde legea nu precizează
-  (Anexa nr. 1, secțiunea III, subsecțiunea B, pct. 16), iar Comentariul OCDE (pct. 16) spune tot „cea mai târzie”.
+- **Termenul la contul preexistent.** Ghidul (p. 29) spune „până în ultima zi a anului calendaristic în cauză [...], sau
+  în 90 de zile calendaristice”, în paragraful despre testul adresei de rezidență (nota 57). Aplicăm cea mai târzie
+  dintre cele două date. Pentru contul documentat prin adresa de rezidență așa scrie legea (Codul de procedură fiscală,
+  Anexa nr. 2 pct. 1: „oricare dintre acestea este mai recentă”) și Comentariul OCDE la CRS (Secțiunea III, pct. 13).
+  La indiciile din căutarea electronică legea spune doar „ori” (Anexa nr. 1, secțiunea III, subsecțiunea B, pct. 16),
+  ghidul (p. 30) nu dă termen, iar Comentariul OCDE (pct. 16) spune „until the later of”. Sistemul nu știe prin ce
+  procedură a fost documentat contul, deci aplică aceeași regulă și tratează toate cazurile ca indicii din căutarea
+  electronică (de exemplu 17b): acolo e interpretarea noastră.
 - **NEVERIFICAT:** la FATCA, ghidul (p. 38) nu dă un termen pentru schimbarea de circumstanțe: cazul se deschide fără
   termen din ghid, cu NEVERIFICAT afișat, și nu împrumutăm cele 90 de zile CRS.
 
@@ -210,14 +213,21 @@ Cifrele se completează aici după prima rulare completă, cu data rulării. Nic
 ## 9. Confidențialitate
 
 - **Doar date sintetice.** Clienții, documentele și TIN-urile sunt generate; actele de identitate poartă „SPECIMEN”.
-- **Temeiul legal** este obligația legală (art. 6 alin. (1) lit. (c) GDPR): Legea 207/2015 privind Codul de procedură
-  fiscală (art. 62 alin. (7), art. 291 alin. (4) și Anexa nr. 1) și Acordul FATCA, așa cum le citează ghidul (p. 4).
+- **Temeiul legal** este obligația legală (art. 6 alin. (1) lit. (c) GDPR). Codul de procedură fiscală (Legea 207/2015)
+  cere băncii să aplice procedurile de diligență fiscală din anexele nr. 1 și 2 (art. 291 alin. (4)) și să raporteze
+  anual conturile la ANAF (art. 62 alin. (1)); pentru FATCA, procedurile din Acordul FATCA (art. 62 alin. (3), Legea
+  233/2015). Citatele sunt în [`docs/PRIVACY-TEXT.md`](docs/PRIVACY-TEXT.md#7-surse).
+- **Păstrarea:** rulările agentului se șterg automat după `Privacy:RetentionDays` (implicit 30 de zile). Nicio regulă
+  de retenție nu șterge clienții, cazurile sau jurnalul. Legea cere băncii să păstreze înregistrările de diligență
+  fiscală și de raportare, și probele pe care s-a bazat, 10 ani de la termenul de raportare de 15 mai
+  (art. 62 alin. (11)).
 - **Art. 22 GDPR nu se aplică:** nicio decizie nu se ia exclusiv automat. Codul aplică regulile, omul aprobă cererea și
   închiderea.
-- **Mascarea** CNP-urilor, IBAN-urilor, numerelor de card, e-mailurilor și telefoanelor înainte de model ține de
-  minimizarea datelor (art. 5 alin. (1) lit. (c) GDPR) și de securitatea prelucrării (art. 32 GDPR).
-- Numele și adresele nu sunt mascate înainte de model (datele sunt sintetice). Pagina `/privacy` arată, din configurația
-  live, ce ajunge la care model, ce se salvează și cât timp.
+- **Mascarea** CNP-urilor, IBAN-urilor, numerelor de card, e-mailurilor și telefoanelor românești înainte de model ține
+  de reducerea la minimum a datelor (art. 5 alin. (1) lit. (c) GDPR) și de securitatea prelucrării, prin pseudonimizare
+  și criptare (art. 32 alin. (1) lit. (a) GDPR).
+- Numele, adresele, datele de naștere, TIN-urile străine și telefoanele străine nu sunt mascate înainte de model (datele
+  sunt sintetice). Pagina `/privacy` arată, din configurația live, ce ajunge la care model, ce se salvează și cât timp.
 
 ## 10. Pornire rapidă
 

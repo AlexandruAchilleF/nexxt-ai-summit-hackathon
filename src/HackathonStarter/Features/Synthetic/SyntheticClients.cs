@@ -10,10 +10,14 @@ namespace HackathonStarter.Features.Synthetic;
 /// rules, written by hand after the golden cases. Nothing here runs the rule engine: the label is the scenario chosen at
 /// generation, otherwise the metric would check itself.
 ///
-/// The records are our own, shaped like PLAN section 7 with the same member names (plus a postal code, the ABA routing
-/// number of GOLDEN-CASES.md Î2 and the document's key line), so they map onto the Phase 0 entities by name. Every
-/// account is opened from 2016 on (new for both CRS and FATCA). Documents are referenced by file name only; no PDF is
-/// generated here.
+/// The records are our own, shaped like PLAN section 7 and named like it, with these differences: no Id or foreign keys;
+/// BirthCountry and Cnp are not nullable; an address adds PostalCode; a standing order has BeneficiaryAccount (IBAN, or
+/// the US account number, GOLDEN-CASES.md Î2) instead of BeneficiaryIban, sets BeneficiaryCountry explicitly and adds
+/// BeneficiaryName, RoutingNumber and Currency; a self-certification has no Status (always Valid) or DocumentId, and a tax
+/// residence only Country and Tin; a document has KeyLine instead of StoragePath, Pages, ShieldVerdict and UploadedAt;
+/// a change has no OldValueJson, NewValueJson or EvaluationId (Before and After carry the values). FullName and OneLine
+/// are computed helpers; the enums are subsets of PLAN's. Every account is opened from 2016 on (new for both CRS and FATCA). Documents are referenced by file name
+/// only; no PDF is generated here.
 /// </summary>
 public static class SyntheticClients
 {
@@ -84,6 +88,7 @@ public static class SyntheticClients
         private static readonly string[] PhoneChannels = ["online", "ghișeu", "call center"];
         private static readonly string[] OfficeChannels = ["ghișeu", "online"];
         private static readonly string[] PoaScopes = ["operațiuni pe contul curent", "consultare sold și extrase", "operațiuni pe toate conturile"];
+        private static readonly DateOnly LastYearEnd = new(2025, 12, 31);
 
         private static readonly Street[] RoStreets =
         [
@@ -169,9 +174,9 @@ public static class SyntheticClients
                 "crs-custodial-order" => AddStandingOrder(before, NextReportable(), custodial: true),
                 "crs-poa" => GrantPowerOfAttorney(before, NextReportable()),
                 "crs-mailing" => AddMailing(before, NextReportable()),
-                "fatca-phone" => ChangePhone(before, "US", replace: false),
+                "fatca-phone" => ChangePhone(WithUsSavings(before), "US", replace: false),
                 "fatca-order" => AddStandingOrder(before, "US", custodial: false),
-                "fatca-citizenship" => UploadPassport(before, "US"),
+                "fatca-citizenship" => UploadPassport(WithUsSavings(before), "US"),
                 "trap-depository-order" => AddStandingOrder(before, NextReportable(), custodial: false),
                 "trap-foreign-phone" => ChangePhone(before, NextReportable(), replace: false),
                 "trap-citizenship" => UploadPassport(before, NextReportable()),
@@ -234,9 +239,10 @@ public static class SyntheticClients
                     $"Ordin permanent lunar din {current.Product} către {payee}, {local.BeneficiaryAccount}");
             }
 
-            // Golden cases 5a-5c: foreign orders go out of a second, EUR account (custodial only where the scenario says so).
-            var source = custodial
-                ? new SyntheticAccount(_data.Iban("RZBR"), SyntheticAccountType.Custodial, "Cont de instrumente financiare", Later(current.OpenedOn), Money(2_000, 150_000), "EUR", [])
+            // Golden cases 5a-5c: foreign orders go out of a second, EUR account (custodial only where the scenario says so,
+            // over the FATCA threshold for the US).
+            var source = country == "US" ? FatcaAccount(current.OpenedOn, "Cont curent EUR", "EUR")
+                : custodial ? new SyntheticAccount(_data.Iban("RZBR"), SyntheticAccountType.Custodial, "Cont de instrumente financiare", Later(current.OpenedOn), Money(2_000, 150_000), "EUR", [])
                 : new SyntheticAccount(_data.Iban("RZBR"), SyntheticAccountType.Depository, "Cont curent EUR", Later(current.OpenedOn), Money(300, 25_000), "EUR", []);
             var start = before with { Accounts = [current, source] };
             var relative = $"{_data.Person().FirstName} {before.LastName}";
@@ -281,6 +287,17 @@ public static class SyntheticClients
             return new(country, before, before with { Documents = [payslip] },
                 SyntheticChangeKind.DocumentUploaded, $"Document încărcat: {file} (fluturaș de salariu)");
         }
+
+        // FATCA: a new individual depository account is not reviewed for the US unless its balance exceeds 50.000 $ at
+        // the end of a calendar year (p. 25 lit. b), and due diligence runs from the end of the year it stops being
+        // excepted (p. 38). So each FATCA scenario plays on a depository account opened by 31.12.2025 with at least
+        // 60.000 USD or 75.000 EUR, its Balance standing for that year end. Exchange rate and aggregation: NEVERIFICAT.
+        private SyntheticAccount FatcaAccount(DateOnly firstOpened, string product, string currency) =>
+            new(_data.Iban("RZBR"), SyntheticAccountType.Depository, product, DayBetween(firstOpened, LastYearEnd),
+                currency == "USD" ? Money(60_000, 120_000) : Money(75_000, 140_000), currency, []);
+
+        private SyntheticClient WithUsSavings(SyntheticClient client) =>
+            client with { Accounts = [.. client.Accounts, FatcaAccount(client.Accounts[0].OpenedOn, "Cont de economii USD", "USD")] };
 
         private static SyntheticClient WithOrder(SyntheticClient client, SyntheticAccount account, SyntheticStandingOrder order) =>
             client with
@@ -343,6 +360,8 @@ public sealed record SyntheticClientCase(
     private ExpectedRule Rule(string id) => new(id, id.StartsWith("GEN-", StringComparison.Ordinal) ? null : Jurisdiction);
 }
 
+/// <summary>A rule the engine should list. Among the hits it is expected uncovered (<c>CoveredBy = None</c>).</summary>
+/// <param name="Jurisdiction">Compared with the rule's jurisdiction; null means the jurisdiction is not compared (GEN-* rules).</param>
 public sealed record ExpectedRule(string RuleId, string? Jurisdiction);
 
 public sealed record SyntheticClient(
@@ -397,4 +416,4 @@ public enum SyntheticChangeKind
     AddressChanged, AddressAdded, PhoneAdded, PhoneChanged, StandingOrderCreated, PowerOfAttorneyGranted, DocumentUploaded,
 }
 
-public sealed record SyntheticChange(SyntheticChangeKind Kind, string Summary, string Channel, DateTime ReceivedAt);
+public sealed record SyntheticChange(SyntheticChangeKind Kind, string Summary, string SourceChannel, DateTime ReceivedAt);

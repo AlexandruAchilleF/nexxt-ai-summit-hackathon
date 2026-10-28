@@ -1,6 +1,7 @@
 @page "/privacy"
 @layout PublicLayout
 @using HackathonStarter.Features.Targets
+@using HackathonStarter.Features.Tin
 @inject ChatClientProvider Ai
 @inject TargetClient Targets
 @inject RetentionService Retention
@@ -16,7 +17,8 @@
         <MudText Typo="Typo.body2" Class="mud-text-secondary mb-3">
             @if (Ai.Options.MaskPii)
             {
-                <span>@T("CNPs, IBANs, card numbers, emails and phone numbers are replaced with placeholders such as [CNP_1] before any text leaves the app, and restored only in the answer shown to you. Tools receive the real values; the model never does.")</span>
+                <span>@T("CNPs, IBANs, card numbers, emails and Romanian phone numbers are replaced with placeholders such as [CNP_1] before any text leaves the app, and restored only in the answer shown to you. Tools receive the real values; the model never does.")</span>
+                <span>@T("Not masked: names, addresses, dates of birth, foreign TINs and foreign phone numbers. This is why the demo uses synthetic data only.")</span>
             }
             else
             {
@@ -45,6 +47,10 @@
                     }
                 </tbody>
             </MudSimpleTable>
+            @if (_models.Any(m => m.Provider.Equals("Bedrock", StringComparison.OrdinalIgnoreCase) && m.Host.Contains(".us-west-2.")))
+            {
+                <MudText Typo="Typo.body2" Class="mud-text-secondary mt-2">@T("In the demo the model runs on Amazon Bedrock in us-west-2 (United States), because the workshop account denies eu-central-1, and it sees synthetic data only. In production it would run in an EU region or on the bank's own servers.")</MudText>
+            }
         }
         <MudText Typo="Typo.caption" Class="mud-text-secondary d-block mt-2">@T("Images are sent to vision-capable models as they are: masking applies to text only.")</MudText>
     </MudPaper>
@@ -58,6 +64,7 @@
                 <tr><td>@T("Recorded runs (demo fallback)")</td><td>@T(PrivacySettings.CurrentValue.RedactRecordings ? "Masked like the run history." : "Not masked (Privacy:RedactRecordings = false): use synthetic data only.")</td></tr>
                 <tr><td>@T("Exports (tests, reports)")</td><td>@T("Built from the masked history and downloadable only after a person approves them.")</td></tr>
                 <tr><td>@T("Uploaded documents")</td><td>@T("Kept in memory for the current conversation only. Passages an agent reads from them become part of the run history, masked like the rest.")</td></tr>
+                <tr><td>@T("Audit log (hash chain)")</td><td>@T("Every change received, rule applied, case transition and human decision, with personal data masked like the run history. Each entry holds the SHA-256 hash of the previous one, so an edited entry is found on verification.")</td></tr>
             </tbody>
         </MudSimpleTable>
     </MudPaper>
@@ -77,6 +84,7 @@
             {
                 <span> @T("Last check: {0}, {1} run(s) deleted.", Format.Relative(last), Retention.LastDeleted)</span>
             }
+            <span> @T("No retention rule deletes clients, cases or the audit log: only agent runs expire. A bank must keep the records of its due diligence and reporting procedures, and the evidence it relied on, for 10 years from the reporting deadline of 15 May (Fiscal Procedure Code, Art. 62(11); FATCA records too).")</span>
         </MudText>
     </MudPaper>
 
@@ -86,19 +94,33 @@
             <tbody>
                 <tr>
                     <td>@Lang.Pick("Temei", "Basis")</td>
-                    <td>@Lang.Pick("Obligație legală (art. 6 alin. (1) lit. (c) GDPR): Codul de procedură fiscală (Legea 207/2015) și Acordul FATCA cer băncii să identifice rezidența fiscală a clienților.",
-                            "Legal obligation (Art. 6(1)(c) GDPR): the Romanian Fiscal Procedure Code (Law 207/2015) and the FATCA Agreement require the bank to identify its clients' tax residence.")</td>
+                    <td>@Lang.Pick("Obligație legală (art. 6 alin. (1) lit. (c) GDPR): Codul de procedură fiscală (Legea 207/2015) cere băncii să aplice procedurile de diligență fiscală din anexele nr. 1 și 2 (art. 291 alin. (4)) și să raporteze anual conturile la ANAF (art. 62 alin. (1)); pentru FATCA, procedurile din Acordul FATCA (art. 62 alin. (3), Legea 233/2015).",
+                            "Legal obligation (Art. 6(1)(c) GDPR): the Romanian Fiscal Procedure Code (Law 207/2015) requires the bank to apply the due diligence procedures in Annexes 1 and 2 (Art. 291(4)) and to report the accounts to ANAF every year (Art. 62(1)); for FATCA, the procedures of the FATCA Agreement (Art. 62(3), Law 233/2015).")</td>
                 </tr>
                 <tr>
                     <td>@Lang.Pick("Decizii automate", "Automated decisions")</td>
-                    <td>@Lang.Pick("Art. 22 GDPR nu se aplică: codul aplică regulile din ghidul ANAF, iar un om aprobă cererea către client și închiderea cazului.",
-                            "Art. 22 GDPR does not apply: code applies the rules from the ANAF guide, and a person approves the request to the client and the closing of the case.")</td>
+                    <td>@Lang.Pick("Nicio decizie nu se bazează exclusiv pe prelucrarea automată (art. 22 alin. (1) GDPR): codul aplică regulile din ghidul ANAF, modelul nu decide nimic, iar un om aprobă cererea către client și închiderea cazului.",
+                            "No decision is based solely on automated processing (Art. 22(1) GDPR): code applies the rules from the ANAF guide, the model decides nothing, and a person approves the request to the client and the closing of the case.")</td>
                 </tr>
                 <tr>
                     <td>@Lang.Pick("Mascarea", "Masking")</td>
-                    <td>@Lang.Pick("Ține de minimizarea datelor (art. 5 alin. (1) lit. (c) GDPR) și de securitatea prelucrării (art. 32 GDPR).",
-                            "Serves data minimisation (Art. 5(1)(c) GDPR) and security of processing (Art. 32 GDPR).")</td>
+                    <td>@Lang.Pick("Ține de reducerea la minimum a datelor (art. 5 alin. (1) lit. (c) GDPR) și de securitatea prelucrării, prin pseudonimizare și criptare (art. 32 alin. (1) lit. (a) GDPR).",
+                            "Serves data minimisation (Art. 5(1)(c) GDPR) and security of processing through pseudonymisation and encryption (Art. 32(1)(a) GDPR).")</td>
                 </tr>
+                <tr>
+                    <td>@Lang.Pick("Informarea clientului", "Informing the client")</td>
+                    <td>@Lang.Pick("Banca informează fiecare persoană raportabilă că datele ei sunt prelucrate conform Codului de procedură fiscală și GDPR, cel târziu la deschiderea contului (art. 62 alin. (10)). Aplicația nu trimite această informare.",
+                            "The bank tells every reportable person that their data are processed under the Fiscal Procedure Code and the GDPR, at the latest when the account is opened (Art. 62(10)). This app does not send that notice.")</td>
+                </tr>
+            </tbody>
+        </MudSimpleTable>
+    </MudPaper>
+
+    <MudPaper Outlined="true" Class="pa-5">
+        <MudText Typo="Typo.subtitle1" Style="font-weight:600">@T("Signals and test data")</MudText>
+        <MudSimpleTable Dense="true" Elevation="0" Class="mt-2">
+            <tbody>
+                <tr><td>@T("Test data")</td><td>@T("Synthetic data only: clients, documents and TINs are generated from a fixed seed. Generated identity documents show SPECIMEN.")</td></tr>
             </tbody>
         </MudSimpleTable>
     </MudPaper>
@@ -128,6 +150,10 @@
                     }
                 </tbody>
             </MudSimpleTable>
+            @if (_targets.Any(t => t.Name.Equals(TinOnEuropaClient.Target, StringComparison.OrdinalIgnoreCase)))
+            {
+                <MudText Typo="Typo.body2" Class="mud-text-secondary mt-2">@T("TIN on Europa (European Commission), for EU states only: the app sends the country code and the TIN. The answer says whether the structure and the syntax are correct (validStructure, validSyntax), not whether the TIN was issued, so the app only says 'format valid'. If the service does not answer, a recorded answer to the same request is used, otherwise only the local format rules. Recordings keep the TIN as sent: in this demo every TIN is synthetic.")</MudText>
+            }
         </MudPaper>
     }
 </div>

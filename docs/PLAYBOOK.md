@@ -18,7 +18,7 @@ Ideea anterioară (DosarViu, KYC pentru firme) a fost abandonată pe 28 oct.: nu
   țară: p. 29) și raportarea la ANAF iese greșită, pe fiecare cont.
 - **Cine folosește:** operatorii back-office și echipa de conformare fiscală (CRS/FATCA).
 - **Cine plătește:** banca (conformare și operațiuni). Riscul e pe fiecare cont: corecții cerute de ANAF,
-  neconcordanțe semnalate de IRS și amenzi de 2.000–5.000 lei pe fiecare cont raportabil raportat incorect, incomplet
+  inadvertențe semnalate de IRS și amenzi de 2.000–5.000 lei pe fiecare cont raportabil raportat incorect, incomplet
   sau cu întârziere (Codul de procedură fiscală, art. 336, din OUG 102/2022).
 - **De ce nu e un chatbot:** regulile sunt cod, fiecare cu ID și pagina din ghid. Același dosar dă mereu același verdict,
   termenul e urmărit pe fiecare caz, iar omul semnează.
@@ -214,6 +214,7 @@ trebuie să poată porni aplicația fără credențiale AWS.
 ```
 economie pe an = cazuri de schimbare de situație pe an × minute economisite pe caz × cost pe minut de operator
 risc evitat    = conturi raportabile raportate greșit × amenda pe cont (2.000–5.000 lei, art. 336 alin. (2) lit. k^1) din Codul de procedură fiscală)
+                 (din 09.01.2026, fără plafonul general și fără limita de cumul din OG 2/2001: art. 339 alin. (3)–(4), din OUG 71/2025)
 ```
 
 Cifrele de volum și minute vin de la mentor ([`RESEARCH-CRS.md`](RESEARCH-CRS.md#5-întrebări-pentru-mentorul-raiffeisen-prima-oră-înainte-de-cod),
@@ -227,9 +228,9 @@ există deja); nu înlocuiește nimic, adaugă bucla de după semnal. Obligația
 
 | Întrebare | Răspuns |
 | --- | --- |
-| Pe ce temei prelucrați datele? | Obligație legală (art. 6 alin. 1 lit. c GDPR): Legea 207/2015 (Codul de procedură fiscală, Anexa 1) și Acordul FATCA România–SUA din 28 mai 2015. Nu adăugăm date noi; lucrăm cu ce banca are deja obligația să verifice. |
+| Pe ce temei prelucrați datele? | Obligație legală (art. 6 alin. (1) lit. (c) GDPR): Codul de procedură fiscală cere băncii să aplice procedurile de diligență fiscală din anexele nr. 1 și 2 (art. 291 alin. (4)) și să raporteze anual la ANAF (art. 62 alin. (1)); pentru FATCA, Acordul FATCA România–SUA din 28 mai 2015 (art. 62 alin. (3), Legea 233/2015). Nu adăugăm date noi; lucrăm cu ce banca are deja obligația să verifice. |
 | Unde ajung datele? | CNP, IBAN, telefon etc. sunt mascate înainte de model (`PiiVault`). Modelul poate rula pe serverul băncii; `/privacy` citește configurația live. |
-| Cât le păstrați? | Dovezile cazului: cât cere legea pentru documentele de diligență (NEVERIFICAT: termenul de păstrare). Rulările agentului au retenție separată, configurabilă. |
+| Cât le păstrați? | Înregistrările de diligență fiscală și de raportare, și probele pe care s-a bazat: banca trebuie să le păstreze 10 ani de la termenul de raportare de 15 mai (Codul de procedură fiscală, art. 62 alin. (11)). În aplicație, nicio regulă de retenție nu șterge cazurile sau jurnalul; rulările agentului se șterg după `Privacy:RetentionDays` (implicit 30 de zile). |
 | Decide AI-ul? | Nu. Codul aplică regulile, omul aprobă cererea și închiderea (art. 22 GDPR: fără decizii exclusiv automate). |
 | Discriminare? | Naționalitatea nu e semnal (excepție: cetățenia SUA, cerută de FATCA). Semnalele AI nu pornesc nicio acțiune singure. |
 | Ce date ați folosit? | Doar sintetice. Nu ne-a trebuit nicio dată Raiffeisen. |

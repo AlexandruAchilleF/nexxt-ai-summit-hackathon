@@ -25,6 +25,8 @@ public class Case
     public DateTime? RemindAt { get; set; }
     public DateTime? RemindedAt { get; set; }
     public DateTime? EscalatedAt { get; set; }
+    /// <summary>Why the case went to the tax department: the person's reason (masked with PiiVault.ForStorage) or the watcher's code text.</summary>
+    public string? EscalationReason { get; set; }
     public DateTime? ClosedAt { get; set; }
     public DateTime? ExpiredAt { get; set; }
     /// <summary>Closure or expiry consequence, written by code from the guide (with <see cref="OutcomeRuleId"/>), in both languages.</summary>
