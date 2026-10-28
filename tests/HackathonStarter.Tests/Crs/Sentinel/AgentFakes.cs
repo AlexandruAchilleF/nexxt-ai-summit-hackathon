@@ -161,7 +161,7 @@ public sealed class FakeCases : ICaseService
         filter?.ClientCode is { } code && code != Case.ClientCode ? [] : new List<Case> { Case });
 
     public Task<Case?> GetAsync(string code) => Task.FromResult(code == Case.Code ? Case : null);
-    public Task<Case> OpenAsync(ChangeEvent change, RuleOutcome outcome) => throw new NotSupportedException();
+    public Task<Case> OpenAsync(ChangeEvent change, RuleOutcome outcome, Func<int, Task>? logChange = null) => throw new NotSupportedException();
 
     public Task<Evidence> AddEvidenceAsync(NewEvidence e)
     {

@@ -53,7 +53,9 @@ public interface ICaseService
     /// deadline, FATCA indicia none (p. 38), self-certification checks (SC-*, FATCA-TIN) none. If the client already has an
     /// open case, the new indicia are added and the deadline stays (design choice: the guide is silent, PLAN 9.2, NEVERIFICAT).
     /// </summary>
-    Task<Case> OpenAsync(ChangeEvent change, RuleOutcome outcome);
+    /// <param name="logChange">Called with the case id once the case is saved and before the case's own audit entry, so the
+    /// change's entries come first in the log and carry the case id (ChangeService). The case's entry is written even if it throws.</param>
+    Task<Case> OpenAsync(ChangeEvent change, RuleOutcome outcome, Func<int, Task>? logChange = null);
 
     /// <summary>Saves a quote; code verifies it against the visible (shielded) text of the document page.</summary>
     Task<Evidence> AddEvidenceAsync(NewEvidence evidence);
@@ -172,23 +174,23 @@ public class CaseService(
 
     // ---- Opening and growing a case ----
 
-    public async Task<Case> OpenAsync(ChangeEvent change, RuleOutcome outcome)
+    public async Task<Case> OpenAsync(ChangeEvent change, RuleOutcome outcome, Func<int, Task>? logChange = null)
     {
         ArgumentNullException.ThrowIfNull(change);
         ArgumentNullException.ThrowIfNull(outcome);
         var user = await RequireEditor();
-        return await OpenAsync(change, outcome, Actor(user));
+        return await OpenAsync(change, outcome, Actor(user), logChange);
     }
 
     /// <summary>OpenAsync with no signed-in user, only for ChangeService.RecordAsSystemAsync (the startup seed): <paramref name="actor"/> goes to the audit log.</summary>
-    internal Task<Case> OpenAsSystemAsync(ChangeEvent change, RuleOutcome outcome, string actor)
+    internal Task<Case> OpenAsSystemAsync(ChangeEvent change, RuleOutcome outcome, string actor, Func<int, Task>? logChange = null)
     {
         ArgumentNullException.ThrowIfNull(change);
         ArgumentNullException.ThrowIfNull(outcome);
-        return OpenAsync(change, outcome, actor);
+        return OpenAsync(change, outcome, actor, logChange);
     }
 
-    private async Task<Case> OpenAsync(ChangeEvent change, RuleOutcome outcome, string actor)
+    private async Task<Case> OpenAsync(ChangeEvent change, RuleOutcome outcome, string actor, Func<int, Task>? logChange)
     {
         var uncovered = outcome.Uncovered.GroupBy(h => (h.RuleId, h.Jurisdiction)).Select(g => g.First()).ToList();
         if (uncovered.Count == 0)
@@ -206,7 +208,7 @@ public class CaseService(
                 .Where(c => c.ClientId == client.Id && c.Status != CaseStatus.Closed && c.Status != CaseStatus.Expired)
                 .OrderBy(c => c.Id)
                 .FirstOrDefaultAsync();
-            if (existing is not null) return await ExtendAsync(db, existing, change, uncovered, regime, client.Accounts, now, actor);
+            if (existing is not null) return await ExtendAsync(db, existing, change, uncovered, regime, client.Accounts, now, actor, logChange);
 
             var item = new Case
             {
@@ -224,21 +226,25 @@ public class CaseService(
             db.Cases.Add(item);
             await db.SaveChangesAsync();
 
-            await audit.AppendAsync(actor, AuditKinds.CaseOpened, new
+            await LogAsync(logChange, item.Id, () => audit.AppendAsync(actor, AuditKinds.CaseOpened, new
             {
                 code = item.Code, client = item.ClientCode, changeId = change.Id, regime = item.Regime.ToString(),
                 rules = item.Indicia.Select(i => $"{i.RuleId}:{i.Jurisdiction}").ToArray(),
                 deadlineRule = item.DeadlineRuleId, preexisting = item.IsPreexisting, dueAt = item.DueAt, remindAt = item.RemindAt,
-            }, item.Id);
+            }, item.Id));
             return item;
         });
     }
 
     private async Task<Case> ExtendAsync(AppDbContext db, Case item, ChangeEvent change, List<RuleHit> uncovered, Regime regime,
-                                         List<Account> accounts, DateTime now, string actor)
+                                         List<Account> accounts, DateTime now, string actor, Func<int, Task>? logChange)
     {
         var added = uncovered.Where(h => !item.Indicia.Any(i => i.RuleId == h.RuleId && i.Jurisdiction == h.Jurisdiction)).ToList();
-        if (added.Count == 0) return item;
+        if (added.Count == 0)
+        {
+            if (logChange is not null) await logChange(item.Id);
+            return item;
+        }
 
         var hadCrs = HasCrs(item.Regime);
         item.Indicia.AddRange(added.Select(h => ToIndicium(h, change.Id, now)));
@@ -257,12 +263,19 @@ public class CaseService(
             item.IsPreexisting = Deadline(accounts, change.ReceivedAt, Regime.Crs, now).Preexisting;
         await db.SaveChangesAsync();
 
-        await audit.AppendAsync(actor, AuditKinds.CaseIndiciumAdded, new
+        await LogAsync(logChange, item.Id, () => audit.AppendAsync(actor, AuditKinds.CaseIndiciumAdded, new
         {
             code = item.Code, changeId = change.Id, regime = item.Regime.ToString(),
             added = added.Select(h => $"{h.RuleId}:{h.Jurisdiction}").ToArray(), deadlineStarted, dueAt = item.DueAt,
-        }, item.Id);
+        }, item.Id));
         return item;
+    }
+
+    /// <summary>The change's entries (<paramref name="logChange"/>) before the case's, which is written even if they fail.</summary>
+    private static async Task LogAsync(Func<int, Task>? logChange, int caseId, Func<Task> caseEntry)
+    {
+        try { if (logChange is not null) await logChange(caseId); }
+        finally { await caseEntry(); }
     }
 
     /// <summary>

@@ -25,7 +25,8 @@ public interface IChangeService
 /// <summary>
 /// The only writer of client data (besides CaseService's AcceptedExplanation on close). One change: apply it to the client,
 /// snapshot before/after, let code decide (rule engine or shield), save the change and the evaluation in one transaction,
-/// then the case, then the audit log. Depends on ICaseService; CaseService never depends on this. Owner: R2.
+/// then the case, then the audit log (the change's entries before the case's). Depends on ICaseService; CaseService never
+/// depends on this. Owner: R2.
 /// </summary>
 public class ChangeService(
     IDbContextFactory<AppDbContext> dbFactory,
@@ -142,27 +143,33 @@ public class ChangeService(
             await transaction.CommitAsync();
         }
 
-        // The case first, then the audit log (another connection; codes, rule IDs and jurisdictions only), so a failed
-        // append never leaves a change with uncovered indicia and no case. An answer to an open case that brings a new
+        // The audit log (another connection; codes, rule IDs and jurisdictions only): the change received, its rules, then the
+        // case it opens. CaseService saves the case first and calls LogChangeAsync with its id before its own entry, so a
+        // failed append never leaves a change with uncovered indicia and no case. An answer to an open case that brings a new
         // uncovered hit (e.g. a TIN in the wrong format) extends that case: OpenAsync adds to the client's open case.
-        string? resultCase = answered?.Code;
-        int? caseId = answered?.Id;
-        if (outcome.Uncovered.Any())
+        async Task LogChangeAsync(int? caseId)
         {
-            var opened = systemCases is null ? await cases.OpenAsync(change, outcome) : await systemCases.OpenAsSystemAsync(change, outcome, actor);
-            (resultCase, caseId) = (opened.Code, opened.Id);
+            await audit.AppendAsync(actor, AuditKinds.ChangeReceived, new
+            {
+                changeId = change.Id, client = client.Code, kind = change.Kind.ToString(), channel = change.SourceChannel,
+                decision = outcome.Decision.ToString(), engineVersion = outcome.EngineVersion, selfCertificationId = applied.SelfCertification?.Id,
+                documentId = request.DocumentId, answers = answered?.Code,
+            }, caseId);
+            foreach (var hit in outcome.Indicia)
+                await audit.AppendAsync(actor, AuditKinds.RuleApplied, RulePayload(change.Id, hit, applied: true), caseId);
+            foreach (var hit in outcome.Cleared)
+                await audit.AppendAsync(actor, AuditKinds.RuleApplied, RulePayload(change.Id, hit, applied: false), caseId);
         }
 
-        await audit.AppendAsync(actor, AuditKinds.ChangeReceived, new
+        string? resultCase = answered?.Code;
+        if (outcome.Uncovered.Any())
         {
-            changeId = change.Id, client = client.Code, kind = change.Kind.ToString(), channel = change.SourceChannel,
-            decision = outcome.Decision.ToString(), engineVersion = outcome.EngineVersion, selfCertificationId = applied.SelfCertification?.Id,
-            documentId = request.DocumentId, answers = answered?.Code,
-        }, caseId);
-        foreach (var hit in outcome.Indicia)
-            await audit.AppendAsync(actor, AuditKinds.RuleApplied, RulePayload(change.Id, hit, applied: true), caseId);
-        foreach (var hit in outcome.Cleared)
-            await audit.AppendAsync(actor, AuditKinds.RuleApplied, RulePayload(change.Id, hit, applied: false), caseId);
+            var opened = systemCases is null
+                ? await cases.OpenAsync(change, outcome, id => LogChangeAsync(id))
+                : await systemCases.OpenAsSystemAsync(change, outcome, actor, id => LogChangeAsync(id));
+            resultCase = opened.Code;
+        }
+        else await LogChangeAsync(answered?.Id);
         if (shielded?.Result.Verdict == ShieldVerdict.HiddenTextRemoved)
             await audit.AppendAsync(actor, AuditKinds.ShieldAlert, new
             {

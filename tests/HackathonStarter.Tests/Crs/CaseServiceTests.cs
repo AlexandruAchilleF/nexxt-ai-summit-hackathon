@@ -991,7 +991,7 @@ public class CaseServiceTests
         Assert.Contains("ResponseReceived", (await Assert.ThrowsAsync<InvalidOperationException>(() => member.EscalateAsync(code, "x"))).Message);
 
         Assert.Equal(
-            [AuditKinds.CaseOpened, AuditKinds.ChangeReceived, AuditKinds.RuleApplied, // the change's entries are linked to its case
+            [AuditKinds.ChangeReceived, AuditKinds.RuleApplied, AuditKinds.CaseOpened, // the change's entries are linked to its case
              AuditKinds.RequestDrafted, AuditKinds.RequestDrafted, AuditKinds.RequestRejected, AuditKinds.RequestApproved,
              AuditKinds.CaseEscalated, AuditKinds.ResponseRegistered],
             host.Audit.Entries.Where(e => e.CaseId is not null).Select(e => e.Kind));
@@ -1334,7 +1334,7 @@ public class CaseServiceTests
 
         public Task<List<Case>> QueueAsync(CaseQueueFilter? filter = null) => throw new NotSupportedException();
         public Task<Case?> GetAsync(string code) => throw new NotSupportedException();
-        public Task<Case> OpenAsync(ChangeEvent change, RuleOutcome outcome) => throw new NotSupportedException();
+        public Task<Case> OpenAsync(ChangeEvent change, RuleOutcome outcome, Func<int, Task>? logChange = null) => throw new NotSupportedException();
         public Task<Evidence> AddEvidenceAsync(NewEvidence evidence) => throw new NotSupportedException();
         public Task<ContextSignal> AddSignalAsync(NewSignal signal) => throw new NotSupportedException();
         public Task<List<Evidence>> ListEvidenceAsync(string clientCode) => throw new NotSupportedException();
