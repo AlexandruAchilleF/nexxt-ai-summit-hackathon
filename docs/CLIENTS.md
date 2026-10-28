@@ -5,7 +5,7 @@ Pick what the challenge needs. All of it is optional; if you don't use something
 | Need | Use | Effort |
 | --- | --- | --- |
 | "It should work on a phone / laptop" | The app itself: it's responsive and **installable** (PWA) | Nothing: already on |
-| Photo of a document (receipt, ID, invoice) | 📎 in the chat: on a phone it offers the camera | Nothing (needs a vision model for real reading) |
+| Photo of a document (receipt, ID, invoice) | The "Attach file" button in the chat: on a phone it offers the camera | Nothing (needs a vision model for real reading) |
 | A separate frontend (Lovable, React, a second team) | The **HTTP API** + `Security:AllowedOrigins` | 30 min |
 | NFC, push on iPhone, fully offline, app-store app | .NET MAUI Blazor Hybrid (see the end) | Hours: only if the challenge requires it |
 
@@ -48,7 +48,7 @@ Security__ApiKey         = some-long-random-string
 Security__ApiUser        = member          # the demo user API calls act as (viewer = read-only)
 ```
 
-⚠️ A key used from browser code is visible to anyone who opens DevTools. For a hackathon that's fine because the
+**Warning:** a key used from browser code is visible to anyone who opens DevTools. For a hackathon that's fine because the
 rate limits (`Security:AgentRunsPerMinute`, `DailyLiveRunBudget`) protect your AI credits. Use `ApiUser=viewer`
 if the frontend shouldn't change data. Never put the model's API key in a frontend.
 
@@ -130,9 +130,9 @@ async function askStreaming(messages, onEvent) {
 }
 
 await askStreaming([{ role: "user", content: "Give me an overview" }], e => {
-  if (e.type === "step" && e.step.kind === "ToolCall") console.log("🔧", e.step.tool);
+  if (e.type === "step" && e.step.kind === "ToolCall") console.log("tool:", e.step.tool);
   if (e.type === "delta") process.stdout?.write?.(e.text);
-  if (e.type === "done") console.log("\n✅", e.answer);
+  if (e.type === "done") console.log("\nanswer:", e.answer);
 });
 ```
 

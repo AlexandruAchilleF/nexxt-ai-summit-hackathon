@@ -62,7 +62,7 @@ The in-app **/architecture** page shows the same flow with the live list of agen
 
 ```
 src/HackathonStarter/
-├── Config/SiteConfig.cs        ⭐ name, colors, landing, nav, demo users
+├── Config/SiteConfig.cs        edit first: name, colors, landing, nav, demo users
 ├── Features/
 │   ├── Items/                  example CRUD feature (entity, service, seed): copy it or use tools/NewFeature
 │   ├── Finance/                FinanceCalculator (loan, savings, retirement), Iban: tested
