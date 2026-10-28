@@ -59,6 +59,11 @@ public sealed record CoverageRow(
     public bool Caught => Evaluated && ExpectsAction && Actual == Expected;
     public bool Missed => Evaluated && ExpectsAction && Actual != Expected;
     public bool FalseAlarm => Evaluated && !ExpectsAction && Actual is { } actual && CoverageTotals.IsAction(actual);
+
+    /// <summary>The expected indicia, keyed like <see cref="MissingIndicia"/>: from the data, never from the engine.</summary>
+    public IReadOnlyList<string> ExpectedIndicia { get; init; } = [];
+    /// <summary>The expected cleared rules ("verified, does not apply"), keyed like <see cref="MissingCleared"/>.</summary>
+    public IReadOnlyList<string> ExpectedCleared { get; init; } = [];
 }
 
 /// <summary>The deadline of an opened case, through IDeadlineCalculator.</summary>

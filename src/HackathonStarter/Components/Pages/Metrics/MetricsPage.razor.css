@@ -1,0 +1,75 @@
+.metrics-section {
+    margin-bottom: 40px;
+}
+
+.metrics-section + .metrics-section {
+    padding-top: 24px;
+    border-top: 1px solid var(--app-separator);
+}
+
+::deep .metrics-title {
+    font-weight: 600;
+    letter-spacing: -.01em;
+}
+
+::deep .metrics-subtitle {
+    font-weight: 600;
+}
+
+::deep .metrics-muted,
+.metrics-muted {
+    color: var(--mud-palette-text-secondary);
+}
+
+::deep .metrics-source,
+.metrics-source {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px;
+    margin: 4px 0 12px;
+    font-size: 14px;
+    line-height: 1.45;
+}
+
+.metrics-table ::deep .metrics-rules {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    max-width: 340px;
+}
+
+.metrics-table ::deep .metrics-rule {
+    padding: 1px 6px;
+    border-radius: 6px;
+    background: var(--app-well, rgba(0, 0, 0, .05));
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.metrics-table ::deep .metrics-rule-cleared {
+    background: transparent;
+    border: 1px dashed var(--mud-palette-lines-default);
+    color: var(--mud-palette-text-secondary);
+}
+
+.metrics-table ::deep .metrics-rules > div {
+    flex-basis: 100%;
+    font-size: 12px;
+}
+
+::deep .metrics-mismatch,
+.metrics-mismatch {
+    color: var(--mud-palette-error);
+    font-weight: 500;
+}
+
+.metrics-table ::deep .metrics-nowrap {
+    white-space: nowrap;
+}
+
+.metrics-table ::deep .mud-table-cell {
+    padding-left: 10px;
+    padding-right: 10px;
+    vertical-align: top;
+}
