@@ -24,7 +24,8 @@ public sealed record EvaluationReport(DateTime RanAt, TimeSpan Duration, SpecCov
 
 /// <summary>
 /// Part 1: the rule engine on the golden cases and the synthetic clients. Deterministic code on data written to the same
-/// rules, so everything is expected to pass: say "the guide's rules are implemented and tested", never "100% accuracy".
+/// rules, so everything is expected to pass: <c>Source</c> says "the guide's rules are implemented and tested" only
+/// when every evaluated row passes, otherwise how many do not match yet. Never "100% accuracy".
 /// </summary>
 /// <param name="EngineVersion">RuleOutcome.EngineVersion of the registered engine.</param>
 public sealed record SpecCoverage(

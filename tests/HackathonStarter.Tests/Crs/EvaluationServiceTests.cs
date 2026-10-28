@@ -38,8 +38,13 @@ public class EvaluationServiceTests
             Assert.Equal(0, totals.Missed);
             Assert.Equal(0, totals.FalseAlarms);
             Assert.Equal(totals.ActionsExpected, totals.Caught);
-            Assert.Equal(totals.Evaluated, totals.Passed);
         }
+        // What the engine controls matches on every row; the deadline is IDeadlineCalculator's, so a golden row may still
+        // fail on it (case 2: no deadline from the guide, DL-NEW-90 from the calculator) and the report shows it.
+        Assert.All(spec.Golden.Concat(spec.Synthetic).Where(r => r.Evaluated), r =>
+            Assert.True(r.DecisionMatches && r.IndiciaMatch != false && r.ClearedMatch != false && r.ReportableMatches != false && r.Error is null, r.Id));
+        Assert.All(spec.Golden.Where(r => r.Status == CoverageStatus.Failed), r => Assert.False(r.Deadline?.Matches, r.Id));
+        Assert.Equal(spec.SyntheticTotals.Evaluated, spec.SyntheticTotals.Passed);
         Assert.Equal(GoldenCases.All.Count, spec.Golden.Count);
         Assert.Equal(GoldenCases.All.Count(c => c.HasInput && c.ExpectedDecision != Decision.ShieldAlert), spec.GoldenTotals.Evaluated);
         Assert.Equal(50, spec.SyntheticTotals.Evaluated);
@@ -77,6 +82,82 @@ public class EvaluationServiceTests
         // The phase 0 placeholder is named as such: these numbers are not a result.
         Assert.Equal(EvaluationSource.Phase0Placeholder, spec.Source.Source);
         Assert.False(spec.Source.IsResult);
+    }
+
+    [Fact]
+    public async Task An_engine_that_always_asks_for_clarification_raises_a_false_alarm_on_every_quiet_case()
+    {
+        var spec = (await Service(new AlwaysEngine(Decision.Clarification)).RunAsync()).Spec;
+
+        var golden = GoldenCases.All.Where(c => c.HasInput && c.ExpectedDecision != Decision.ShieldAlert).ToList();
+        var synthetic = SyntheticSnapshots.Create();
+        Assert.True(synthetic.Count(s => s.Expected is Decision.NoCase or Decision.Compliant) > 0);
+        Assert.Equal(golden.Count(c => c.ExpectedDecision is Decision.NoCase or Decision.Compliant), spec.GoldenTotals.FalseAlarms);
+        Assert.Equal(synthetic.Count(s => s.Expected is Decision.NoCase or Decision.Compliant), spec.SyntheticTotals.FalseAlarms);
+        // Clarification where FATCA was expected is another decision: missed, not caught.
+        Assert.Equal(golden.Count(c => c.ExpectedDecision == Decision.Clarification), spec.GoldenTotals.Caught);
+        Assert.Equal(golden.Count(c => c.ExpectedDecision == Decision.FatcaAlert), spec.GoldenTotals.Missed);
+        Assert.Equal(synthetic.Count(s => s.Expected == Decision.FatcaAlert), spec.SyntheticTotals.Missed);
+    }
+
+    [Fact]
+    public async Task The_claim_implemented_and_tested_holds_only_when_every_row_passes()
+    {
+        var golden = Inputs with { Golden = () => [GoldenCases.Get("4"), GoldenCases.Get("5b"), GoldenCases.Get("5c")] };
+
+        var passing = (await Service(new OracleEngine(), inputs: golden).RunAsync()).Spec.Source;
+        Assert.Equal(EvaluationSource.Real, passing.Source);
+        Assert.StartsWith("The guide's rules are implemented and tested: the registered engine (test-oracle) on 3 golden cases with input and 50 synthetic clients", passing.Reason);
+        Assert.StartsWith("Regulile din ghid sunt implementate și testate: motorul înregistrat (test-oracle) pe 3 cazuri-etalon cu date de intrare și 50 de clienți sintetici", passing.ReasonRo);
+
+        var failing = (await Service(new OracleEngine(wrongCase: "4"), inputs: golden).RunAsync()).Spec.Source;
+        Assert.Equal(EvaluationSource.Real, failing.Source);
+        Assert.DoesNotContain("implemented and tested", failing.Reason);
+        Assert.DoesNotContain("implementate și testate", failing.ReasonRo);
+        Assert.StartsWith("1 golden case does not match the specification yet (see the failed rows)", failing.Reason);
+        Assert.StartsWith("1 caz-etalon nu se potrivește încă cu specificația (vezi rândurile picate)", failing.ReasonRo);
+    }
+
+    [Fact]
+    public async Task A_new_self_certification_goes_to_EvaluateSelfCertification_and_without_one_the_case_has_no_input()
+    {
+        var maria = GoldenCases.Get("4");
+        var form = new SelfCertificationSnapshot(Now, [new TaxResidenceSnapshot("DE", "86095174223")], DeclaresUsPerson: false);
+        GoldenCase[] golden =
+        [
+            maria with { Id = "sc", Change = maria.Change! with { Kind = ChangeKind.SelfCertSubmitted, SelfCertification = form } },
+            maria with { Id = "sc-empty", Change = maria.Change! with { Kind = ChangeKind.SelfCertSubmitted, SelfCertification = null } },
+        ];
+        var engine = new RecordingEngine();
+        var spec = (await Service(engine, inputs: Inputs with { Golden = () => golden, Synthetic = () => [] }).RunAsync()).Spec;
+
+        Assert.Equal([nameof(ICrsRuleEngine.EvaluateSelfCertification)], engine.Calls.Select(c => c.Method));
+        Assert.Same(maria.After, engine.Calls[0].Client);
+        Assert.Same(form, engine.Calls[0].Form);
+        Assert.Equal(CoverageStatus.Failed, Row(spec, "sc").Status); // NoCase where a clarification was expected
+        Assert.Equal(CoverageStatus.NoInput, Row(spec, "sc-empty").Status);
+    }
+
+    [Fact]
+    public async Task An_engine_that_throws_fails_the_row_with_the_exception_type_and_counts_as_missed()
+    {
+        var spec = (await Service(new ThrowingEngine()).RunAsync()).Spec;
+
+        var maria = Row(spec, "4");
+        Assert.Equal(CoverageStatus.Failed, maria.Status);
+        Assert.Equal(nameof(InvalidOperationException), maria.Error);
+        Assert.Null(maria.Actual);
+        foreach (var totals in new[] { spec.GoldenTotals, spec.SyntheticTotals })
+        {
+            Assert.Equal((totals.Evaluated, 0), (totals.Failed, totals.Passed));
+            Assert.Equal((totals.ActionsExpected, 0, 0), (totals.Missed, totals.Caught, totals.FalseAlarms));
+        }
+
+        // The reason is that every evaluation threw, not that there was no input.
+        Assert.Equal(EvaluationSource.Unavailable, spec.Source.Source);
+        Assert.Contains("threw an exception on every evaluation", spec.Source.Reason);
+        Assert.Contains("a aruncat o excepție la fiecare evaluare", spec.Source.ReasonRo);
+        Assert.DoesNotContain("no golden case has input", spec.Source.Reason);
     }
 
     [Fact]
@@ -144,6 +225,23 @@ public class EvaluationServiceTests
     }
 
     [Fact]
+    public async Task An_invented_quote_that_the_generated_truth_contains_is_not_counted_as_invented()
+    {
+        var declaration = EvaluationService.InventedQuotes[2];
+        var pdf = new SyntheticPdf("test.pdf", "CL-0099", [], [new PdfQuote(1, "Sold final: 15.491,20 RON")],
+            ["DECLAR CA SUNT REZIDENT FISCAL IN GERMANIA DIN 01.09.2026."], []);
+
+        var invented = EvaluationService.InventedFor(pdf).ToList();
+        Assert.DoesNotContain(declaration, invented);
+        Assert.Equal([EvaluationService.InventedQuotes[0], EvaluationService.InventedQuotes[1], "Sold final: 15.491,21 RON"], invented);
+
+        // A verifier that finds the declaration in the visible text is not charged with accepting an invented quote.
+        var quotes = (await Service(new NoCaseEngine("test"), verifier: new AcceptingVerifier(), inputs: Inputs with { Documents = () => [pdf] })
+            .RunAsync()).Uncertainty.Quotes;
+        Assert.Equal((3, 3), (quotes.Invented.Quotes, quotes.Invented.Verified));
+    }
+
+    [Fact]
     public async Task A_verifier_that_accepts_everything_rejects_no_invented_quote()
     {
         var quotes = (await Service(new NoCaseEngine("test"), verifier: new AcceptingVerifier()).RunAsync()).Uncertainty.Quotes;
@@ -179,6 +277,36 @@ public class EvaluationServiceTests
         Assert.Equal(22.5m, set.ManualMinutesPerCase);
     }
 
+    [Theory]
+    [InlineData("22,5")]
+    [InlineData("1,000")]
+    [InlineData("0")]
+    [InlineData("-5")]
+    public async Task A_manual_time_that_is_not_a_positive_number_with_a_decimal_point_is_not_used(string value)
+    {
+        var configured = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { [EvaluationService.ManualMinutesKey] = value }).Build();
+        var manual = (await Service(new OracleEngine(), configuration: configured).RunAsync()).Efficiency;
+
+        Assert.Equal(EvaluationSource.Unavailable, manual.Manual.Source);
+        Assert.Contains("is not a positive number of minutes", manual.Manual.Reason);
+        Assert.Null(manual.ManualMinutesPerCase);
+    }
+
+    [Theory]
+    [InlineData(0, "0 cazuri-etalon")]
+    [InlineData(1, "1 caz-etalon")]
+    [InlineData(2, "2 cazuri-etalon")]
+    [InlineData(19, "19 cazuri-etalon")]
+    [InlineData(20, "20 de cazuri-etalon")]
+    [InlineData(50, "50 de cazuri-etalon")]
+    [InlineData(100, "100 de cazuri-etalon")]
+    [InlineData(101, "101 cazuri-etalon")]
+    [InlineData(119, "119 cazuri-etalon")]
+    [InlineData(120, "120 de cazuri-etalon")]
+    public void Romanian_counts_take_de_from_twenty_on(int n, string expected) =>
+        Assert.Equal(expected, EvaluationService.CountRo(n, "caz-etalon", "cazuri-etalon"));
+
     [Fact]
     public async Task No_signal_changes_a_decision_because_the_engine_takes_none()
     {
@@ -193,8 +321,8 @@ public class EvaluationServiceTests
 
     private static CoverageRow Row(SpecCoverage spec, string id) => spec.Golden.Concat(spec.Synthetic).Single(r => r.Id == id);
 
-    /// <summary>Answers exactly what the golden cases and the scenarios expect.</summary>
-    private sealed class OracleEngine : ICrsRuleEngine
+    /// <summary>Answers exactly what the golden cases and the scenarios expect, except NoCase on <paramref name="wrongCase"/>.</summary>
+    private sealed class OracleEngine(string? wrongCase = null) : ICrsRuleEngine
     {
         public const string Version = "test-oracle";
         private readonly Dictionary<string, SyntheticSnapshotCase> _synthetic = SyntheticSnapshots.Create().ToDictionary(s => s.Code);
@@ -208,8 +336,10 @@ public class EvaluationServiceTests
         private RuleOutcome Expected(ClientSnapshot after)
         {
             if (GoldenCases.All.FirstOrDefault(c => ReferenceEquals(c.After, after)) is { } c)
-                return Outcome(c.ExpectedDecision, c.ExpectedIndicia.Select(h => Hit(h.RuleId, h.Jurisdiction, h.CoveredBy)),
-                    c.ExpectedClearedRules.Select(h => Hit(h.RuleId, h.Jurisdiction, Coverage.None)), c.ExpectedReportableFor ?? []);
+                return c.Id == wrongCase
+                    ? Outcome(Decision.NoCase, [], [], [])
+                    : Outcome(c.ExpectedDecision, c.ExpectedIndicia.Select(h => Hit(h.RuleId, h.Jurisdiction, h.CoveredBy)),
+                        c.ExpectedClearedRules.Select(h => Hit(h.RuleId, h.Jurisdiction, Coverage.None)), c.ExpectedReportableFor ?? []);
             var s = _synthetic[after.Code];
             return Outcome(s.Expected, s.ExpectedHits.Select(h => Hit(h.RuleId, h.Jurisdiction, Coverage.None)),
                 s.ExpectedCleared.Select(h => Hit(h.RuleId, h.Jurisdiction, Coverage.None)), []);
@@ -229,6 +359,41 @@ public class EvaluationServiceTests
         public RuleOutcome EvaluateCurrent(ClientSnapshot client) => NoCase();
         public RuleOutcome EvaluateSelfCertification(ClientSnapshot client, SelfCertificationSnapshot selfCertification) => NoCase();
         private RuleOutcome NoCase() => new(Decision.NoCase, [], [], [], "", "", version);
+    }
+
+    private sealed class AlwaysEngine(Decision decision) : ICrsRuleEngine
+    {
+        public IReadOnlyList<RuleDefinition> Catalog => RuleCatalog.All;
+        public RuleOutcome Evaluate(ClientSnapshot before, ClientSnapshot after, ChangeKind kind) => Answer();
+        public RuleOutcome EvaluateCurrent(ClientSnapshot client) => Answer();
+        public RuleOutcome EvaluateSelfCertification(ClientSnapshot client, SelfCertificationSnapshot selfCertification) => Answer();
+        private RuleOutcome Answer() => new(decision, [], [], [], "", "", "test");
+    }
+
+    private sealed class RecordingEngine : ICrsRuleEngine
+    {
+        public List<(string Method, ClientSnapshot Client, SelfCertificationSnapshot? Form)> Calls { get; } = [];
+        public IReadOnlyList<RuleDefinition> Catalog => RuleCatalog.All;
+
+        public RuleOutcome Evaluate(ClientSnapshot before, ClientSnapshot after, ChangeKind kind) => Record(nameof(Evaluate), after, null);
+        public RuleOutcome EvaluateCurrent(ClientSnapshot client) => Record(nameof(EvaluateCurrent), client, null);
+        public RuleOutcome EvaluateSelfCertification(ClientSnapshot client, SelfCertificationSnapshot selfCertification) =>
+            Record(nameof(EvaluateSelfCertification), client, selfCertification);
+
+        private RuleOutcome Record(string method, ClientSnapshot client, SelfCertificationSnapshot? form)
+        {
+            Calls.Add((method, client, form));
+            return new(Decision.NoCase, [], [], [], "", "", "test");
+        }
+    }
+
+    private sealed class ThrowingEngine : ICrsRuleEngine
+    {
+        public IReadOnlyList<RuleDefinition> Catalog => RuleCatalog.All;
+        public RuleOutcome Evaluate(ClientSnapshot before, ClientSnapshot after, ChangeKind kind) => throw new InvalidOperationException();
+        public RuleOutcome EvaluateCurrent(ClientSnapshot client) => throw new InvalidOperationException();
+        public RuleOutcome EvaluateSelfCertification(ClientSnapshot client, SelfCertificationSnapshot selfCertification) =>
+            throw new InvalidOperationException();
     }
 
     private sealed class BlindShield : IHiddenTextShield

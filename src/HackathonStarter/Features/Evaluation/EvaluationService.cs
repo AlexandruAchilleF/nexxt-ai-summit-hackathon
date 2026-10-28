@@ -23,8 +23,15 @@ public sealed record EvaluationInputs(
     Func<IReadOnlyList<SyntheticSnapshotCase>> Synthetic,
     Func<IReadOnlyList<SyntheticPdf>> Documents)
 {
+    /// <summary>Deterministic, so generated once per process; the evaluation only reads them.</summary>
     public static EvaluationInputs Default { get; } =
-        new(() => GoldenCases.All, () => SyntheticSnapshots.Create(), () => [.. SyntheticPdfs.All()]);
+        new(() => GoldenCases.All, Once(() => SyntheticSnapshots.Create()), Once<IReadOnlyList<SyntheticPdf>>(() => [.. SyntheticPdfs.All()]));
+
+    private static Func<T> Once<T>(Func<T> create)
+    {
+        var value = new Lazy<T>(create);
+        return () => value.Value;
+    }
 }
 
 /// <summary>
@@ -41,8 +48,8 @@ public sealed class EvaluationService(
 
     public const string ManualMinutesKey = "Evaluation:ManualMinutesPerCase";
 
-    /// <summary>Quotes no generated document contains, as a model might invent them.</summary>
-    private static readonly string[] Invented =
+    /// <summary>Quotes a model might invent; skipped on a document whose generated truth contains one.</summary>
+    public static IReadOnlyList<string> InventedQuotes { get; } =
     [
         "Rezidență fiscală: Statele Unite ale Americii",
         "Telefon: +1 312 555 0147",
@@ -76,22 +83,52 @@ public sealed class EvaluationService(
         var goldenRows = golden.Select(c => { ct.ThrowIfCancellationRequested(); return Golden(c, versions); }).ToList();
         var syntheticRows = synthetic.Select(s => { ct.ThrowIfCancellationRequested(); return Synthetic(s, versions); }).ToList();
         var version = string.Join(", ", versions);
-        var evaluated = goldenRows.Count(r => r.Evaluated);
-
-        var source = versions.Count == 0
-            ? new SourceNote(EvaluationSource.Unavailable, "Nothing was evaluated: no golden case has input and there is no synthetic client.",
-                "Nu s-a evaluat nimic: niciun caz-etalon nu are date de intrare și nu există clienți sintetici.")
-            : versions.Contains(Phase0EngineVersion)
-                ? new SourceNote(EvaluationSource.Phase0Placeholder,
-                    $"The rule engine is not on main yet: the registered one is the phase 0 placeholder ({Phase0EngineVersion}), so these numbers are not a result.",
-                    $"Motorul de reguli nu e încă pe main: cel înregistrat e înlocuitorul din Faza 0 ({Phase0EngineVersion}), deci cifrele nu sunt un rezultat.")
-                : new SourceNote(EvaluationSource.Real,
-                    $"The guide's rules are implemented and tested: the registered engine ({version}) on {evaluated} golden cases with input and {syntheticRows.Count} synthetic clients.",
-                    $"Regulile din ghid sunt implementate și testate: motorul înregistrat ({version}) pe {evaluated} cazuri-etalon cu date de intrare și {syntheticRows.Count} clienți sintetici.");
-
-        return new SpecCoverage(source, version, goldenRows, CoverageTotals.Of(goldenRows), syntheticRows, CoverageTotals.Of(syntheticRows),
-            Stopwatch.GetElapsedTime(start));
+        var (goldenTotals, syntheticTotals) = (CoverageTotals.Of(goldenRows), CoverageTotals.Of(syntheticRows));
+        return new SpecCoverage(SpecSource(versions, version, goldenTotals, syntheticTotals), version, goldenRows, goldenTotals,
+            syntheticRows, syntheticTotals, Stopwatch.GetElapsedTime(start));
     }
+
+    private SourceNote SpecSource(ISet<string> versions, string version, CoverageTotals golden, CoverageTotals synthetic)
+    {
+        var evaluated = golden.Evaluated + synthetic.Evaluated;
+        if (versions.Count == 0)
+            return evaluated == 0
+                ? new(EvaluationSource.Unavailable, "Nothing was evaluated: no golden case has input and there is no synthetic client.",
+                    "Nu s-a evaluat nimic: niciun caz-etalon nu are date de intrare și nu există clienți sintetici.")
+                : new(EvaluationSource.Unavailable,
+                    $"The registered rule engine ({engine.GetType().Name}) threw an exception on every evaluation ({CountEn(evaluated, "evaluation", "evaluations")}, see the failed rows), so there is no result.",
+                    $"Motorul de reguli înregistrat ({engine.GetType().Name}) a aruncat o excepție la fiecare evaluare ({CountRo(evaluated, "evaluare", "evaluări")}, vezi rândurile picate), deci nu există un rezultat.");
+        if (versions.Contains(Phase0EngineVersion))
+            return new(EvaluationSource.Phase0Placeholder,
+                $"The rule engine is not on main yet: the registered one is the phase 0 placeholder ({Phase0EngineVersion}), so these numbers are not a result.",
+                $"Motorul de reguli nu e încă pe main: cel înregistrat e înlocuitorul din Faza 0 ({Phase0EngineVersion}), deci cifrele nu sunt un rezultat.");
+
+        var scope = $"the registered engine ({version}) on {CountEn(golden.Evaluated, "golden case", "golden cases")} with input and {CountEn(synthetic.Evaluated, "synthetic client", "synthetic clients")}";
+        var scopeRo = $"motorul înregistrat ({version}) pe {CountRo(golden.Evaluated, "caz-etalon", "cazuri-etalon")} cu date de intrare și {CountRo(synthetic.Evaluated, "client sintetic", "clienți sintetici")}";
+        // The claim of PLAN 16.3 holds only when every evaluated row passes; the source stays Real either way.
+        if (golden.Failed == 0 && synthetic.Failed == 0)
+            return new(EvaluationSource.Real, $"The guide's rules are implemented and tested: {scope}.", $"Regulile din ghid sunt implementate și testate: {scopeRo}.");
+
+        var failed = new List<(string En, string Ro)>();
+        if (golden.Failed > 0)
+            failed.Add((CountEn(golden.Failed, "golden case", "golden cases"), CountRo(golden.Failed, "caz-etalon", "cazuri-etalon")));
+        if (synthetic.Failed > 0)
+            failed.Add((CountEn(synthetic.Failed, "synthetic client", "synthetic clients"), CountRo(synthetic.Failed, "client sintetic", "clienți sintetici")));
+        var one = golden.Failed + synthetic.Failed == 1;
+        return new(EvaluationSource.Real,
+            $"{string.Join(" and ", failed.Select(f => f.En))} {(one ? "does" : "do")} not match the specification yet (see the failed rows): {scope}.",
+            $"{string.Join(" și ", failed.Select(f => f.Ro))} nu se {(one ? "potrivește" : "potrivesc")} încă cu specificația (vezi rândurile picate): {scopeRo}.");
+    }
+
+    /// <summary>"1 golden case", "2 golden cases".</summary>
+    public static string CountEn(int n, string one, string many) => $"{n} {(n == 1 ? one : many)}";
+
+    /// <summary>
+    /// Romanian numerals: singular at 1; "de" when the last two digits are 00 or 20-99 ("20 de cazuri", "100 de cazuri"),
+    /// none at 0, 2-19 and 101-119 ("12 cazuri", "101 cazuri").
+    /// </summary>
+    public static string CountRo(int n, string one, string many) =>
+        n == 1 ? $"1 {one}" : n >= 20 && n % 100 is 0 or >= 20 ? $"{n} de {many}" : $"{n} {many}";
 
     private CoverageRow Golden(GoldenCase c, ISet<string> versions)
     {
@@ -247,8 +284,8 @@ public sealed class EvaluationService(
         var clean = rows.Count(r => r.Hidden == Concealment.None);
         var shieldBench = new ShieldBench(
             new SourceNote(EvaluationSource.Real,
-                $"The registered shield ({shield.GetType().Name}) on {pdfs.Count} generated PDFs, as it is; the truth is how each was generated.",
-                $"Scutul înregistrat ({shield.GetType().Name}) pe {pdfs.Count} PDF-uri generate, așa cum e; adevărul e felul în care a fost generat fiecare."),
+                $"The registered shield ({shield.GetType().Name}) on {CountEn(pdfs.Count, "generated PDF", "generated PDFs")}, as it is; the truth is how each was generated.",
+                $"Scutul înregistrat ({shield.GetType().Name}) pe {CountRo(pdfs.Count, "PDF generat", "PDF-uri generate")}, așa cum e; adevărul e felul în care a fost generat fiecare."),
             rows, [.. Concealments.Select(c => new ConcealmentTally(c, hidden[c], detected[c]))], clean, rows.Count(r => r.FalseAlarm),
             Stopwatch.GetElapsedTime(start));
 
@@ -270,9 +307,17 @@ public sealed class EvaluationService(
         return new(checks.Count, checks.Count(c => c.Verified), checks.Count(c => !c.Verified && c.FoundOnlyInHiddenText));
     }
 
-    /// <summary>The fixed invented quotes, plus each true quote with its last digit changed (a near miss).</summary>
-    private static IEnumerable<string> InventedFor(SyntheticPdf pdf) =>
-        Invented.Concat(pdf.MockQuotes.Select(q => NearMiss(q.Text)).OfType<string>());
+    /// <summary>
+    /// The fixed invented quotes, plus each true quote with its last digit changed (a near miss), minus any the document's
+    /// generated truth contains: such a quote is true, and rejecting it would be the verifier's error.
+    /// </summary>
+    public static IEnumerable<string> InventedFor(SyntheticPdf pdf)
+    {
+        var truth = pdf.MockQuotes.Select(q => q.Text).Concat(pdf.ExpectedText).Concat(pdf.Hidden.Select(h => h.Text))
+            .Select(EvidenceVerifier.Normalize).ToList();
+        return InventedQuotes.Concat(pdf.MockQuotes.Select(q => NearMiss(q.Text)).OfType<string>())
+            .Where(q => !truth.Any(t => t.Contains(EvidenceVerifier.Normalize(q), StringComparison.Ordinal)));
+    }
 
     private static string? NearMiss(string quote)
     {
@@ -296,8 +341,8 @@ public sealed class EvaluationService(
 
     private static ExtractionReport Extraction() => new(
         new SourceNote(EvaluationSource.Unavailable,
-            "R4's extraction is not on main yet. It is measured only from a real, live run, never from the mock.",
-            "Extragerea lui R4 nu e încă pe main. Se măsoară doar dintr-o rulare reală, live, niciodată din mock."),
+            "There is no live run of R4's extraction yet. It is measured only from a real, live run, never from the mock.",
+            "Nu există încă o rulare live a extragerii lui R4. Se măsoară doar dintr-o rulare reală, live, niciodată din mock."),
         null, null);
 
     private SignalReport Signals(IReadOnlyList<GoldenCase> golden, IReadOnlyList<SyntheticSnapshotCase> synthetic)
@@ -352,7 +397,8 @@ public sealed class EvaluationService(
             return new(agent, null, new SourceNote(EvaluationSource.Unavailable,
                 $"Awaiting the Raiffeisen mentor's answer ({ManualMinutesKey} is empty).",
                 $"În așteptarea răspunsului mentorului Raiffeisen ({ManualMinutesKey} e gol)."), null);
-        if (!decimal.TryParse(raw, NumberStyles.Number, CultureInfo.InvariantCulture, out var minutes) || minutes <= 0)
+        // A decimal point only: "22,5" is not read as 225.
+        if (!decimal.TryParse(raw.Trim(), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var minutes) || minutes <= 0)
             return new(agent, null, new SourceNote(EvaluationSource.Unavailable,
                 $"{ManualMinutesKey} is not a positive number of minutes.",
                 $"{ManualMinutesKey} nu e un număr pozitiv de minute."), null);
