@@ -176,6 +176,19 @@ public class CaseService(
         ArgumentNullException.ThrowIfNull(change);
         ArgumentNullException.ThrowIfNull(outcome);
         var user = await RequireEditor();
+        return await OpenAsync(change, outcome, Actor(user));
+    }
+
+    /// <summary>OpenAsync with no signed-in user, only for ChangeService.RecordAsSystemAsync (the startup seed): <paramref name="actor"/> goes to the audit log.</summary>
+    internal Task<Case> OpenAsSystemAsync(ChangeEvent change, RuleOutcome outcome, string actor)
+    {
+        ArgumentNullException.ThrowIfNull(change);
+        ArgumentNullException.ThrowIfNull(outcome);
+        return OpenAsync(change, outcome, actor);
+    }
+
+    private async Task<Case> OpenAsync(ChangeEvent change, RuleOutcome outcome, string actor)
+    {
         var uncovered = outcome.Uncovered.GroupBy(h => (h.RuleId, h.Jurisdiction)).Select(g => g.First()).ToList();
         if (uncovered.Count == 0)
             throw new InvalidOperationException($"Decision {outcome.Decision} has no uncovered indicium: no case to open.");
@@ -192,7 +205,7 @@ public class CaseService(
                 .Where(c => c.ClientId == client.Id && c.Status != CaseStatus.Closed && c.Status != CaseStatus.Expired)
                 .OrderBy(c => c.Id)
                 .FirstOrDefaultAsync();
-            if (existing is not null) return await ExtendAsync(db, existing, change, uncovered, regime, client.Accounts, now, user);
+            if (existing is not null) return await ExtendAsync(db, existing, change, uncovered, regime, client.Accounts, now, actor);
 
             var item = new Case
             {
@@ -211,7 +224,7 @@ public class CaseService(
             db.Cases.Add(item);
             await db.SaveChangesAsync();
 
-            await audit.AppendAsync(Actor(user), AuditKinds.CaseOpened, new
+            await audit.AppendAsync(actor, AuditKinds.CaseOpened, new
             {
                 code = item.Code, client = item.ClientCode, changeId = change.Id, regime = item.Regime.ToString(),
                 rules = item.Indicia.Select(i => $"{i.RuleId}:{i.Jurisdiction}").ToArray(),
@@ -222,7 +235,7 @@ public class CaseService(
     }
 
     private async Task<Case> ExtendAsync(AppDbContext db, Case item, ChangeEvent change, List<RuleHit> uncovered, Regime regime,
-                                         List<Account> accounts, DateTime now, DemoUser user)
+                                         List<Account> accounts, DateTime now, string actor)
     {
         var added = uncovered.Where(h => !item.Indicia.Any(i => i.RuleId == h.RuleId && i.Jurisdiction == h.Jurisdiction)).ToList();
         if (added.Count == 0) return item;
@@ -239,7 +252,7 @@ public class CaseService(
         }
         await db.SaveChangesAsync();
 
-        await audit.AppendAsync(Actor(user), AuditKinds.CaseIndiciumAdded, new
+        await audit.AppendAsync(actor, AuditKinds.CaseIndiciumAdded, new
         {
             code = item.Code, changeId = change.Id, regime = item.Regime.ToString(),
             added = added.Select(h => $"{h.RuleId}:{h.Jurisdiction}").ToArray(), deadlineStarted, dueAt = item.DueAt,
