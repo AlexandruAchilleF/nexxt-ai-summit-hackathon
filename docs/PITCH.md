@@ -22,23 +22,24 @@ muta data simulată și folosi „Tamper”.
 | S5 | 1:24–1:46 | Trei capcane | 45 | 45 | ≈ 20,8 s | fără agent (codul) |
 | S6 | 1:46–1:58 | Scutul | 25 | 25 | ≈ 11,5 s | fără agent (codul) |
 | S7 | 1:58–2:20 | Arhitectura și jurnalul | 45 | 45 | ≈ 20,8 s | fără agent |
-| S8 | 2:20–2:46 | Metricile și domeniul MVP | 46 | 56 | ≈ 25,8 s | doar citire |
+| S8 | 2:20–2:46 | Metricile și domeniul MVP | 46 | 52 | ≈ 24,0 s | doar citire |
 | S9 | 2:46–3:00 | Fraza de final | 29 | 29 | ≈ 13,4 s | fără agent |
-| | | **Total** | **349** | **375** | **≈ 2:53** | |
+| | | **Total** | **349** | **371** | **≈ 2:51** | |
 
 Cum am numărat (28.10.2026): cuvintele scrise = `wc -w` pe textul vocii. Cuvintele rostite = aceleași, cu cifrele citite
 în litere: „2,4” = 3 („două virgulă patru”), „2025” = 5, „3.204” = 5, „891” = 5, „85” = 3, „21” = 3, „F3000” = 3 („ef trei
-mii”), „8”, „50” și „90” = 1; fiecare placeholder `[N1]`–`[N3]` = 3 (cazul cel mai lung sub 100, „douăzeci și unu”).
+mii”), „23” = 3, „8”, „50”, „90” și „0” = 1.
 Siglele (ANAF, CRS, SUA, TIN-ul, CNP-ul, PDF) = 1. Durata = cuvinte rostite ÷ 130 × 60. Fiecare fereastră din tabel e mai lungă decât
-durata segmentului ei; cele ≈ 6 s rămase până la 3:00 sunt pentru pauze și tranziții. Dacă la cronometrare trecem de
+durata segmentului ei; cele ≈ 9 s rămase până la 3:00 sunt pentru pauze și tranziții. Dacă la cronometrare trecem de
 3:00, scurtăm S5 și S7, nu cifrele.
 
 **Modul de filmare:** același pentru toată dubla. Live: Bedrock (`AI:Provider = Bedrock`, `us-west-2`), cu
 `AI:AgentMode = Live`. Mock: fără model, cu `AI:AgentMode = Auto`. Detaliile sunt în checklist (secțiunea 4). Replay e
 acceptabil doar pentru o întrebare care citește (ex. „Rezumă cazul”), iar scenariul de mai jos nu are niciuna.
 
-**Ce e încă pe main (28.10.2026):** `/dashboard`, `/changes/new`, `/cases/{code}`, `/clients/{code}`, `/audit` și `/metrics`
-sunt doar pagini goale („Coming in the next phase”), iar agentul e scheletul din Faza 0. Etichetele marcate „(după R2)”
+**Ce e pe main (28.10.2026, 22:10, `e0bc47c`):** `/audit` (cu istoricul din seed) și `/metrics` funcționează;
+`/cases`, `/cases/{code}`, `/changes/new` și `/clients/{code}` sunt doar schelete („Vine în faza următoare”), `/dashboard` e
+încă cel din template, data simulată nu are butoane în UI, iar agentul are doar `getCase` (uneltele sunt în PR #44). Etichetele marcate „(după R2)”
 sau „(după R3)” vin din `PLAN.md` §15 și nu există încă în cod.
 
 ## 2. Scenariul, cuvânt cu cuvânt
@@ -154,15 +155,17 @@ sintetice · Amazon Bedrock, us-west-2” (pe mock: „Simulare: unelte reale, f
 
 ### S8 · 2:20–2:46 · Metricile și domeniul MVP
 
-**Vocea** (46 de cuvinte scrise, 56 rostite, ≈ 26 s):
+**Vocea** (46 de cuvinte scrise, 52 rostite, ≈ 24 s):
 
-> Rezultatul corect e scris înainte de cod: 21 de cazuri-etalon și 50 de clienți sintetici. Ultima rulare: [N1] prinse, [N2] ratate, [N3] alarme false. MVP-ul: persoane fizice și schimbările de după onboarding. Nu prindem încă conturile firmelor, fișierul F3000 și textul acoperit de forme în PDF.
+> Rezultatul corect e scris înainte de cod: 21 de cazuri-etalon și 50 de clienți sintetici. Ultima rulare: 23 prinse, 0 ratate, 0 alarme false. MVP-ul: persoane fizice și schimbările de după onboarding. Nu prindem încă conturile firmelor, fișierul F3000 și textul acoperit de forme în PDF.
 
 **Ce se vede:** `/metrics`: cazurile-etalon, așteptat vs. obținut, apoi cei 50 de clienți sintetici. Data rulării vizibilă.
 
 **Mod:** doar citire (pagina arată o rulare deja făcută).
 
-**Cifre și surse:** `[N1]`, `[N2]`, `[N3]` = `[din /metrics, rularea din <data>]`. Nu spunem „acuratețe 100%”: motorul e
+**Cifre și surse:** din `/metrics`, rularea din 28.10.2026, 22:08, pe commit-ul `e0bc47c`, fără model (README §8): 23 de
+acțiuni așteptate, toate prinse (13 pe cazurile-etalon, 10 pe clienții sintetici), 0 ratate, 0 alarme false. Se refac pe
+versiunea filmată, dacă motorul sau datele se schimbă. Nu spunem „acuratețe 100%”: motorul e
 determinist (`PLAN.md` §16.3). Cele 21 de cazuri-etalon sunt numărate ca în `GOLDEN-CASES.md` (18 scenarii, cu variantele
 5a–5c și 17a–17b). Lista „ce nu prindem încă” e o selecție din README §7 (lista completă e în tabelul de întrebări).
 
@@ -190,7 +193,7 @@ aprobare (`PLAN.md` §6.3); deciziile `NoCase` și `Compliant` merg direct în j
    și-a majorat profitul la 849 de milioane de lei în primul semestru”: „segmentul Retail a înregistrat o creștere de 44% a
    numărului de clienți noi comparativ cu primul semestru din 2025”.
    <https://www.capital.ro/raiffeisen-bank-romania-si-a-majorat-profitul-la-849-de-milioane-de-lei-in-primul-semestru-creditarea-si-baza-de-clienti-au-continuat-sa-creasca.html>.
-   Nu e în vocea din S1 (cronometrarea are ≈ 6 s rezervă); se poate folosi la întrebări sau în supratitrare. „Aproximativ
+   Nu e în vocea din S1 (cronometrarea are ≈ 9 s rezervă); se poate folosi la întrebări sau în supratitrare. „Aproximativ
    4.000 de angajați” nu are sursă publică (articolul nu dă numărul): dacă se spune, doar „potrivit mentorului”.
 2. **ANAF, S1 2025.** Raportul de activitate ANAF S1 2025, p. 36: „a soluționat 8 solicitări de feedback din partea statelor
    membre, conform Directivei 2011/16/UE, în urma cărora s-au efectuat 3.204 verificări specifice ale datelor transmise de
@@ -288,13 +291,14 @@ aprobare (`PLAN.md` §6.3); deciziile `NoCase` și `Compliant` merg direct în j
     refacem.
 - [ ] **Setări → Conexiuni → „Testează conexiunile”** (admin sau member), pe calculatorul și rețeaua de filmare: toate verzi.
       Testează modelul principal (Bedrock e pe main din PR #5) și fiecare profil din `AI:Profiles`; profilul `extract`
-      există doar dacă îl punem în `appsettings.Local.json` (modelul e în `appsettings.Local.example.json`); ținta TIN on
-      Europa nu e încă pe main.
+      există doar dacă îl punem în `appsettings.Local.json` (modelul e în `appsettings.Local.example.json`); ținta
+      `tin-on-europa` e în `appsettings.json` (PR #23).
 - [ ] Logați ca Ana (operator, admin): data simulată și „Tamper” cer admin (`PLAN.md` §15, după R2 și R3); aprobările cer
       admin sau member (`AgentRunner.DecideAsync`).
 - [ ] Zoom 125% în browser, fără bara de bookmark-uri; interfața în RO (butonul RO/EN); export 1080p.
 - [ ] Textele exacte ale celor două mesaje către agent (S3, S4) fixate cu R4 și încercate pe mock (după R4).
-- [ ] Cifrele din S8 completate din `/metrics`, cu data rulării, pe aceeași versiune care e pe Render.
+- [ ] Cifrele din S8 (completate din `/metrics` pe `e0bc47c`, 28.10.2026, 22:08) verificate din nou pe versiunea filmată,
+      aceeași care e pe Render.
 - [ ] Răspunsul mentorului trecut în tabelul de întrebări.
 - [ ] Textul citit cu voce tare și cronometrat: ≤ 3:00.
 - [ ] **Demo-ul de rezervă înregistrat** (până la 08:00), pe același traseu.
