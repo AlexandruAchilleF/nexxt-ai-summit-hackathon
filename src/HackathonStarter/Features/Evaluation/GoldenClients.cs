@@ -110,7 +110,7 @@ public static class GoldenClients
     // Case 10. The balance is the one on his statement (extras-victor-2026-09.pdf, 30.09.2026).
     private static Client Victor() => StandardRoResident(10, "Victor", "Neagu", new(1976, 8, 12), "1760812403886",
         "Str. Polonă 33, ap. 8", "010494 București", "+40733418920", // address and phone added
-        new Account { Iban = "RO84RZBR0000060096630475", Type = AccountType.Depository, Product = "Cont curent", OpenedOn = new(2017, 3, 20), Balance = 15_491.20m, Currency = "RON" }); // product, OpenedOn added
+        new Account { Iban = "RO84RZBR0000060096630475", Type = AccountType.Depository, Product = "Cont curent", OpenedOn = new(2017, 3, 20), Balance = 15_491.20m, Currency = "RON" }); // type, product, OpenedOn added by R5, not on the card
 
     // Case 11. Born in Iași.
     private static Client Doina() => StandardRoResident(11, "Doina", "Cazacu", new(1958, 1, 17), "2580117222041",
@@ -186,7 +186,7 @@ public static class GoldenClients
                 new SelfCertification
                 {
                     // ReceivedAt added by R5, not on the card.
-                    SignedAt = signedAt, ReceivedAt = signedAt, Channel = "ghișeu",
+                    SignedAt = signedAt, ReceivedAt = signedAt, Channel = "branch",
                     Residences = [new TaxResidence { Country = "RO", Tin = cnp }],
                 },
             ],

@@ -48,7 +48,8 @@ public class SeedTests
         Assert.False(Preexisting.For(Regime.Crs, account.OpenedOn));
         Assert.False(Preexisting.For(Regime.Fatca, account.OpenedOn));
         var selfCert = Assert.Single(maria.SelfCertifications);
-        Assert.Equal((new DateTime(2019, 3, 14, 0, 0, 0, DateTimeKind.Utc), "ghișeu", SelfCertStatus.Valid, false),
+        // The card says "la ghișeu"; in code the channel is "branch".
+        Assert.Equal((new DateTime(2019, 3, 14, 0, 0, 0, DateTimeKind.Utc), "branch", SelfCertStatus.Valid, false),
             (selfCert.SignedAt, selfCert.Channel, selfCert.Status, selfCert.DeclaresUsPerson));
         var residence = Assert.Single(selfCert.Residences);
         Assert.Equal(("RO", "2910608400319"), (residence.Country, residence.Tin));
@@ -95,7 +96,7 @@ public class SeedTests
             var cases = GoldenCases.All.Where(c => c.ClientCode == code && c.HasInput).ToList();
             // Case 1 starts where case 15 ends (Ioana already in Iași): the seed holds the first state.
             Assert.Contains(cases, c => Json(c.Before!) == Json(expected));
-            Assert.All(cases, c => Assert.True(Json(c.Before!) == Json(expected) || cases.Any(o => Json(o.After!) == Json(c.Before!)),
+            Assert.All(cases, c => Assert.True(Json(c.Before!) == Json(expected) || cases.Any(o => o.Id != c.Id && Json(o.After!) == Json(c.Before!)),
                 $"case {c.Id}: Before is neither the seeded client nor another case's After"));
         }
     }
@@ -247,6 +248,16 @@ public class SeedTests
             Assert.Empty(c.Documents);
             Assert.Empty(c.AcceptedExplanations);
         });
+    }
+
+    [Fact]
+    public void Every_seeded_self_certification_uses_a_ChangeEvent_channel_name()
+    {
+        // Golden and filler alike: "branch" in code, as ChangeEvent.SourceChannel; "ghișeu" is only the Romanian text on screen.
+        var seed = ClientSeed.Create(Now);
+        Assert.Contains(seed, c => c.Code.StartsWith("CL-2", StringComparison.Ordinal));
+        Assert.All(seed.SelectMany(c => c.SelfCertifications.Select(s => (c.Code, s.Channel))),
+            x => Assert.True(x.Channel is "branch" or "online" or "call center", $"{x.Code}: channel \"{x.Channel}\""));
     }
 
     [Fact]

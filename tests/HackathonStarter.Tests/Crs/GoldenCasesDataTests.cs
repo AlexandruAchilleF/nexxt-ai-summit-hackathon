@@ -3,6 +3,7 @@ using HackathonStarter.Features.Changes;
 using HackathonStarter.Features.Clients;
 using HackathonStarter.Features.Evaluation;
 using HackathonStarter.Features.Rules;
+using HackathonStarter.Features.Shield;
 using HackathonStarter.Features.Synthetic;
 using HackathonStarter.Services;
 
@@ -114,29 +115,50 @@ public class GoldenCasesDataTests
     }
 
     [Fact]
-    public void Documents_are_the_synthetic_pdfs_of_the_client()
+    public void Quotes_pass_the_shield_and_the_evidence_verifier()
     {
-        Assert.All(Transcribed, c => Assert.All(Documents(c), d =>
-        {
-            Assert.Contains(d.FileName, SyntheticPdfs.FileNames);
-            Assert.Equal(c.ClientCode, SyntheticPdfs.Get(d.FileName).ClientCode);
-        }));
+        // Through the real gate: each PDF is scanned once and every quote is verified in its visible text (and is there
+        // verbatim, as a person reads it). The hidden text of case 10 is never a quote, and the gate flags it.
+        var shield = new HiddenTextShield();
+        var verifier = new EvidenceVerifier();
+        var problems = new List<string>();
+        foreach (var c in GoldenCases.All)
+            foreach (var d in Documents(c))
+            {
+                if (!SyntheticPdfs.FileNames.Contains(d.FileName)) { problems.Add($"case {c.Id}: {d.FileName} is not generated"); continue; }
+                var pdf = SyntheticPdfs.Get(d.FileName);
+                if (pdf.ClientCode != c.ClientCode) problems.Add($"case {c.Id}: {d.FileName} belongs to {pdf.ClientCode}");
+                var scan = shield.Scan(pdf.Bytes);
+                if (d.Pages is { } pages && pages != scan.Pages.Count) problems.Add($"case {c.Id}: {d.FileName} has {scan.Pages.Count} pages, not {pages}");
+                foreach (var q in d.Quotes)
+                {
+                    if (q.Text.Contains(SyntheticPdfs.Injection, StringComparison.Ordinal)) problems.Add($"case {c.Id}: the injection is quoted");
+                    var check = verifier.Verify(q.Text, scan);
+                    if (!check.Verified) problems.Add($"case {c.Id}: \"{q.Text}\" in {d.FileName}: {check.Note}");
+                    else if (!scan.Pages.Any(page => page.VisibleText.Contains(q.Text, StringComparison.Ordinal)))
+                        problems.Add($"case {c.Id}: \"{q.Text}\" is not verbatim in the visible text of {d.FileName}");
+                }
+            }
+        Assert.True(problems.Count == 0, string.Join("\n", problems));
+
+        var statement = Assert.Single(GoldenCases.Get("10").Documents);
+        var injection = verifier.Verify(SyntheticPdfs.Injection, shield.Scan(SyntheticPdfs.Get(statement.FileName).Bytes));
+        Assert.False(injection.Verified);
+        Assert.True(injection.FoundOnlyInHiddenText, injection.Note);
     }
 
     [Fact]
-    public async Task Evidence_and_signal_quotes_are_in_the_text_of_their_pdf()
+    public void Channels_use_the_code_names()
     {
-        // What EvidenceVerifier will look for; the hidden text of case 10 is never a quote.
-        var problems = new List<string>();
-        foreach (var c in Transcribed)
-            foreach (var d in Documents(c))
-            {
-                var file = await DocumentText.ExtractAsync(new MemoryStream(SyntheticPdfs.Get(d.FileName).Bytes), d.FileName);
-                foreach (var q in d.Quotes.Where(q => q.EvidenceFor is not null || q.IsSignal))
-                    if (!file.Text.Contains(q.Text, StringComparison.Ordinal)) problems.Add($"case {c.Id}: {d.FileName} has no \"{q.Text}\"");
-                if (d.Quotes.Any(q => q.Text.Contains(SyntheticPdfs.Injection, StringComparison.Ordinal))) problems.Add($"case {c.Id}: the injection is quoted");
-            }
-        Assert.True(problems.Count == 0, string.Join("\n", problems));
+        // The human's decision: "branch" in code, as ChangeEvent.SourceChannel; "ghișeu" is only the Romanian text on screen.
+        var channels = Transcribed.Select(c => (Where: $"case {c.Id} change", c.Change!.Channel))
+            .Concat(Transcribed.Where(c => c.Response is not null).Select(c => (Where: $"case {c.Id} answer", c.Response!.Channel)))
+            .Concat(GoldenClients.Codes.SelectMany(code => GoldenClients.Create(code).SelfCertifications.Select(s => (Where: $"{code} self-certification", s.Channel))));
+        Assert.All(channels, x => Assert.False(TextMatch.ContainsAny(x.Channel, "ghiseu"), $"{x.Where}: channel \"{x.Channel}\""));
+
+        // The cards that say "la ghișeu", and the standard RO resident's self-certification (GOLDEN-CASES.md 1).
+        Assert.All(new[] { "3", "11", "15", "17b" }, id => Assert.Equal("branch", GoldenCases.Get(id).Change!.Channel));
+        Assert.Equal("branch", Assert.Single(GoldenClients.Create("CL-0001").SelfCertifications).Channel);
     }
 
     [Fact]
@@ -289,25 +311,6 @@ public class GoldenCasesDataTests
     }
 
     [Fact]
-    public async Task Documents_are_generated_and_contain_their_quotes()
-    {
-        // The quotes must be in the generated PDF as DocumentText extracts it, or EvidenceVerifier rejects them.
-        var problems = new List<string>();
-        foreach (var c in GoldenCases.All)
-            foreach (var d in c.Documents.Append(c.Response?.Document).OfType<GoldenDocument>())
-            {
-                if (!SyntheticPdfs.FileNames.Contains(d.FileName)) { problems.Add($"case {c.Id}: {d.FileName} is not generated"); continue; }
-                var pdf = SyntheticPdfs.Get(d.FileName);
-                if (pdf.ClientCode != c.ClientCode) problems.Add($"case {c.Id}: {d.FileName} belongs to {pdf.ClientCode}");
-                var file = await DocumentText.ExtractAsync(new MemoryStream(pdf.Bytes), pdf.FileName);
-                if (d.Pages is { } pages && pages != file.Pages) problems.Add($"case {c.Id}: {d.FileName} has {file.Pages} pages, not {pages}");
-                foreach (var q in d.Quotes.Where(q => !file.Text.Contains(q.Text, StringComparison.Ordinal)))
-                    problems.Add($"case {c.Id}: \"{q.Text}\" is not in {d.FileName}");
-            }
-        Assert.True(problems.Count == 0, string.Join("\n", problems));
-    }
-
-    [Fact]
     public void The_domain_decisions_are_in_the_data()
     {
         // GOLDEN-CASES.md 5 (28.10). Case 2: only the Milan address before the change, no self-certification on file.
@@ -323,7 +326,19 @@ public class GoldenCasesDataTests
 
         // 7: born in RO, so FATCA-IND-POB is cleared. 12: the c/o address is the only current one (Î6, variant A).
         Assert.Equal("RO", GoldenCases.Get("7").After!.BirthCountry);
+        Assert.Contains("FATCA-IND-POB", GoldenCases.Get("7").ExpectedCleared);
         Assert.Equal(AddressKind.InCareOf, Assert.Single(GoldenCases.Get("12").After!.CurrentAddresses).Kind);
+
+        // Î10: the c/o address is also a mailing address.
+        Assert.Equal(["CRS-IND-CO:IT", "CRS-IND-MAIL:IT"], GoldenCases.Get("12").ExpectedHits);
+
+        // Î12: the cleared CRS rule of 5c and 14 gives the guide's reason first; "SUA nu e jurisdicție CRS raportabilă" comes after.
+        foreach (var (id, guideReason) in new[] { ("5c", "ordin dintr-un cont de depozit, exceptat la CRS"), ("14", "există și un telefon în România") })
+        {
+            var reason = Assert.Single(GoldenCases.Get(id).ExpectedClearedRules).Reason;
+            Assert.StartsWith(guideReason, reason, StringComparison.Ordinal);
+            Assert.EndsWith("; în plus, SUA nu e jurisdicție CRS raportabilă", reason, StringComparison.Ordinal);
+        }
     }
 
     [Fact]

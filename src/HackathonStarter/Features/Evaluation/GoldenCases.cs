@@ -182,7 +182,7 @@ public static class GoldenCases
             After = Snapshot("CL-0003"),
             // Reason B, "unable to obtain" (Î8, p. 53): A ("the country does not issue") contradicts his own explanation.
             // Summary added by R5, not on the card.
-            Change = new("CL-0003", ChangeKind.SelfCertSubmitted, "ghișeu",
+            Change = new("CL-0003", ChangeKind.SelfCertSubmitted, "branch",
                 SelfCertification: new(GoldenClients.Midnight(2026, 10, 26),
                     [new("AT", null, NoTinReason.B_UnableToObtain, "Nu sunt încă înregistrat la administrația fiscală austriacă și nu am primit Steuernummer.")],
                     DeclaresUsPerson: false),
@@ -395,7 +395,7 @@ public static class GoldenCases
             Before = Snapshot("CL-0011"),
             After = Snapshot("CL-0011", c => c.PowersOfAttorney.Add(MateiPowerOfAttorney())),
             // Summary added by R5, not on the card.
-            Change = new("CL-0011", ChangeKind.PowerOfAttorneyGranted, "ghișeu", PowerOfAttorney: Of(MateiPowerOfAttorney()),
+            Change = new("CL-0011", ChangeKind.PowerOfAttorneyGranted, "branch", PowerOfAttorney: Of(MateiPowerOfAttorney()),
                 Summary: "Împuternicire pentru Matei Cazacu (fiul), Mariahilfer Straße 45, 1060 Wien: operațiuni pe contul curent"),
             ReceivedAt = ChangeMoment,
             ExpectedRegime = Regime.Crs,
@@ -473,7 +473,7 @@ public static class GoldenCases
             Before = Snapshot("CL-0015"),
             After = Snapshot("CL-0015", c => MoveTo(c, IoanaIasi())),
             // Summary added by R5, not on the card.
-            Change = new("CL-0015", ChangeKind.AddressChanged, "ghișeu", Address: Of(IoanaIasi()),
+            Change = new("CL-0015", ChangeKind.AddressChanged, "branch", Address: Of(IoanaIasi()),
                 Summary: "Adresă nouă: Bd. Ștefan cel Mare și Sfânt 8, ap. 12, 700064 Iași"),
             ReceivedAt = ChangeMoment,
             ExpectedClearedRules = [new("GEN-DOMESTIC", null, Reason: "noua adresă e în România; nicio regulă din lista închisă nu se aplică")],
@@ -521,7 +521,7 @@ public static class GoldenCases
             Before = Snapshot("CL-0017"),
             After = Snapshot("CL-0017", c => MoveTo(c, GheorgheBarcelona())),
             // Summary added by R5, not on the card.
-            Change = new("CL-0017", ChangeKind.AddressChanged, "ghișeu", Address: Of(GheorgheBarcelona()),
+            Change = new("CL-0017", ChangeKind.AddressChanged, "branch", Address: Of(GheorgheBarcelona()),
                 Summary: "Adresă nouă: Avenida Diagonal 450, 08006 Barcelona"),
             ReceivedAt = new DateTime(2026, 3, 10, 8, 0, 0, DateTimeKind.Utc),
             ExpectedRegime = Regime.Crs,
