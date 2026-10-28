@@ -748,6 +748,15 @@ aceeași funcție de extragere.
   caz, fiecare dovadă verificată, fiecare aprobare/refuz uman, fiecare memento/escaladare, fiecare verificare TIN.
 - Append-only din cod: un singur punct de scriere (`AuditLog.AppendAsync`), serializat (lock), ca `Seq` să fie
   continuu.
+- Pentru `ChangeService.RecordAsync` și `CaseService.OpenAsync` (inclusiv extensia cu/fără indicii noi),
+  schimbarea, evaluarea, cazul și intrările audit se confirmă în aceeași tranzacție și același context EF.
+  O eroare de append, inclusiv după salvarea unei intrări, anulează întreaga operație. Retry după această eroare
+  nu dublează scrierile anulate. Ordinea este `change.received → rule.applied → case.opened/case.indicium-added`.
+  Lock-urile sunt în ordinea case writer → audit writer; AuditLog folosește conexiunea tranzacției, fără al doilea
+  writer SQLite. Garanția presupune instanța unică a aplicației și AuditLog configurat în aplicație.
+  Nu repară istoricul incomplet anterior și nu deduplică retrimiterea unei cereri deja confirmate
+  (de exemplu, răspuns HTTP pierdut după commit). Celelalte tranziții de caz rămân în afara acestei garanții.
+  `VerifyAsync.Ok` verifică integritatea lanțului, nu dovedește singur completitudinea istoricului.
 
 ---
 

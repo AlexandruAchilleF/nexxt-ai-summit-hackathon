@@ -80,7 +80,6 @@ public interface IAuditLog
 /// </summary>
 public sealed class AuditLog(IDbContextFactory<AppDbContext> dbFactory, ISimClock clock, CurrentUser user) : IAuditLog
 {
-    private static readonly SemaphoreSlim WriteLock = new(1, 1);
 
     // Readable in the UI: "+49" and "Brașov" stay as they are instead of \u002B and \u0219.
     private static readonly JsonSerializerOptions Readable = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
@@ -88,31 +87,36 @@ public sealed class AuditLog(IDbContextFactory<AppDbContext> dbFactory, ISimCloc
     public async Task<AuditEntry> AppendAsync(string actor, string kind, object? payload = null, int? caseId = null)
     {
         var payloadJson = MaskedJson(payload);
-        await WriteLock.WaitAsync();
+        if (AuditOperation.Current is { } current)
+            return await AppendAsync(current, actor, kind, payloadJson, caseId);
+
+        await AuditOperation.Writer.WaitAsync();
         try
         {
             await using var db = await dbFactory.CreateDbContextAsync();
-            var last = await db.AuditEntries.AsNoTracking().OrderByDescending(e => e.Seq).FirstOrDefaultAsync();
-            var now = clock.UtcNow;
-            var entry = new AuditEntry
-            {
-                Seq = (last?.Seq ?? 0) + 1,
-                At = new DateTime(now.Ticks - now.Ticks % TimeSpan.TicksPerMillisecond, DateTimeKind.Utc),
-                Actor = actor,
-                CaseId = caseId,
-                Kind = kind,
-                PayloadJson = payloadJson,
-                PrevHash = last?.Hash ?? AuditChain.Genesis,
-            };
-            entry.Hash = AuditChain.ComputeHash(entry.PrevHash, entry);
-            db.AuditEntries.Add(entry);
-            await db.SaveChangesAsync();
-            return entry;
+            return await AppendAsync(db, actor, kind, payloadJson, caseId);
         }
-        finally
+        finally { AuditOperation.Writer.Release(); }
+    }
+
+    private async Task<AuditEntry> AppendAsync(AppDbContext db, string actor, string kind, string payloadJson, int? caseId)
+    {
+        var last = await db.AuditEntries.AsNoTracking().OrderByDescending(e => e.Seq).FirstOrDefaultAsync();
+        var now = clock.UtcNow;
+        var entry = new AuditEntry
         {
-            WriteLock.Release();
-        }
+            Seq = (last?.Seq ?? 0) + 1,
+            At = new DateTime(now.Ticks - now.Ticks % TimeSpan.TicksPerMillisecond, DateTimeKind.Utc),
+            Actor = actor,
+            CaseId = caseId,
+            Kind = kind,
+            PayloadJson = payloadJson,
+            PrevHash = last?.Hash ?? AuditChain.Genesis,
+        };
+        entry.Hash = AuditChain.ComputeHash(entry.PrevHash, entry);
+        db.AuditEntries.Add(entry);
+        await db.SaveChangesAsync();
+        return entry;
     }
 
     public async Task<List<AuditEntry>> ListAsync(int? caseId = null, int take = 200)
