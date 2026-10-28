@@ -158,11 +158,13 @@ public class TinOnEuropaTests
         Assert.All(conversation, t => Assert.DoesNotContain("2910608400319", vault.Mask(t.Content)));
     }
 
-    [Fact]
-    public async Task Recording_of_another_tin_is_never_replayed()
+    [Theory]
+    [InlineData("1023217608018")]
+    [InlineData("1023211140737")] // Same original 16-bit fingerprint (1870), different format verdict.
+    public async Task Recording_of_another_tin_is_never_replayed(string other)
     {
-        // Both pass the card checksum, so PiiVault masks them to the same placeholder and the replay keys collide.
-        const string recorded = "1023217608406", other = "1023217608018";
+        // Both pass the card checksum, so PiiVault masks them to the same placeholder.
+        const string recorded = "1023217608406";
         Assert.Equal(PiiVault.ForStorage().Mask(recorded), PiiVault.ForStorage().Mask(other));
         Assert.True(new TinFormat().Check("FR", recorded).FormatValid);
         Assert.False(new TinFormat().Check("FR", other).FormatValid);

@@ -31,8 +31,8 @@ public sealed class TinOnEuropaClient(TargetClient? targets)
 
     /// <summary>
     /// The key of TargetClient's recordings; only the last turn is sent ({{text}}). Recordings mask the TIN (a CNP becomes
-    /// [CNP-1]), so the first turn is a 16-bit fingerprint of it: two TINs with the same placeholder get different keys,
-    /// and 16 bits are too few to recover a TIN.
+    /// [CNP-1]), so the first turn holds a full SHA-256 fingerprint of country and TIN to bind replay to the request.
+    /// This deterministic fingerprint is pseudonymous, not anonymous: candidate TINs can be linked by hashing them.
     /// </summary>
     public static IReadOnlyList<ChatTurn> Conversation(string country, string tin) =>
         [new("user", $"fingerprint {Fingerprint(country, tin)}"), new("user", BuildRequest(country, tin))];
@@ -69,7 +69,7 @@ public sealed class TinOnEuropaClient(TargetClient? targets)
         && Value(r, "tinNumber") is { } echoed && (echoed == tin || echoed == PiiVault.ForStorage().Mask(tin));
 
     private static string Fingerprint(string country, string tin) =>
-        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes($"{country}:{tin}")).AsSpan(0, 2));
+        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes($"{country}:{tin}")));
 
     private static string? Value(XElement response, string name) => response.Element(XName.Get(name, Ns))?.Value;
 

@@ -207,7 +207,6 @@ secundar).
 - fișierul F3000 și formularele W-8BEN;
 - textul acoperit de o formă desenată peste el, în PDF; OCR pe scanări proaste;
 - existența unui TIN (verificăm doar formatul);
-- intrarea în jurnal nu se scrie în aceeași tranzacție cu schimbarea de date: dacă scrierea în jurnal pică, schimbarea rămâne fără intrare;
 - conturile preexistente cu valoare mare (peste 1.000.000 USD): acolo Comentariul OCDE (Secțiunea III, pct. 49, p. 125)
   vorbește doar de cele 90 de zile de la identificarea indiciului;
 - integrarea reală cu sistemele băncii, ONRC sau ANAF.

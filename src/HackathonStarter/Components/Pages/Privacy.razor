@@ -153,7 +153,7 @@
             </MudSimpleTable>
             @if (_targets.Any(t => t.Name.Equals(TinOnEuropaClient.Target, StringComparison.OrdinalIgnoreCase)))
             {
-                <MudText Typo="Typo.body2" Class="mud-text-secondary mt-2">@T("TIN on Europa (European Commission), for EU states only: the app sends the country code and the TIN. The answer says whether the structure and the syntax are correct (validStructure, validSyntax), not whether the TIN was issued, so the app only says 'format valid'. If the service does not answer, a recorded answer to the same request is used, otherwise only the local format rules. Recordings mask TINs that match a CNP or card number; other TINs are kept as sent. In this demo every TIN is synthetic.")</MudText>
+                <MudText Typo="Typo.body2" Class="mud-text-secondary mt-2">@T("TIN on Europa (European Commission), for EU states only: the app sends the country code and the TIN. The answer says whether the structure and the syntax are correct (validStructure, validSyntax), not whether the TIN was issued, so the app only says 'format valid'. If the service does not answer, a recorded answer to the same request is used, otherwise only the local format rules. Recordings mask TINs that match a CNP or card number; other TINs are kept as sent. They also store a deterministic SHA-256 fingerprint of country and TIN to bind replay to the request. This fingerprint is pseudonymous, not anonymous: candidate TINs can be linked by hashing them. In this demo every TIN is synthetic.")</MudText>
             }
         </MudPaper>
     }
