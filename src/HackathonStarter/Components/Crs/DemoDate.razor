@@ -13,7 +13,8 @@
    answer, tamper mode). After a date move the deadline tick runs at once, so reminders and expiries show before it closes. *@
 <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" Class="ml-1" aria-label="@T("Demo")" ListClass="demo-menu">
     <ActivatorContent>
-        <span class="@($"demo-date{(_offsetDays > 0 ? " is-ahead" : "")}{(_busy ? " is-busy" : "")}")" title="@T("Demo: date and shortcuts")" tabindex="0" role="button" aria-haspopup="menu">
+        <span class="@($"demo-date{(_offsetDays > 0 ? " is-ahead" : "")}{(_busy ? " is-busy" : "")}")" title="@T("Demo: date and shortcuts")" tabindex="0" role="button" aria-haspopup="menu"
+              @onclick="@(e => context.ToggleAsync(e))" @onkeydown="@(e => e.Key is "Enter" or " " ? context.ToggleAsync(e) : Task.CompletedTask)">
             <MudIcon Icon="@Icons.Material.Rounded.CalendarMonth" Size="Size.Small" />
             <span class="demo-date-value" @key="_offsetDays">@CrsUi.Date(Clock.UtcNow)</span>
             <span class="demo-date-short" @key="@($"s{_offsetDays}")">@CrsUi.DateShort(Clock.UtcNow)</span>
