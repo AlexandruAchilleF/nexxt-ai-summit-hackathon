@@ -10,10 +10,11 @@ namespace HackathonStarter.Config;
 /// </summary>
 public static class SiteConfig
 {
-    public const string Name = "Acme";
+    // Working name: change it here (and in the PWA icons) once the team picks the final one.
+    public const string Name = "DosarViu";
     public static string Description => Lang.Pick(
-        ro: "O propoziție scurtă despre ce face aplicația.",
-        en: "A short sentence about what your app does.");
+        ro: "Revizuirea KYC a firmelor: certificatul ONRC comparat cu dosarul, beneficiarii reali calculați în cod.",
+        en: "Business KYC reviews: the ONRC certificate compared with the file, beneficial owners computed in code.");
     public const string Logo = "/icons/icon.svg"; // a path in wwwroot like "/logo.svg", or an emoji
 
     /// <summary>Brand color (hex): filled buttons and selection. Keep white text on it at 4.5:1 or more. The MudBlazor theme is derived from it.</summary>
@@ -50,112 +51,111 @@ public static class SiteConfig
 
     private static readonly Landing LandingRo = new(
         Enabled: true,
-        Headline: "Ideea voastră, într-o singură propoziție",
-        Subheadline: "Spuneți pentru cine e și ce se schimbă pentru ei. Cel mult două rânduri.",
+        Headline: "Dosarul KYC al firmei, la zi cu fiecare certificat ONRC",
+        Subheadline: "Agentul compară certificatul nou cu dosarul, calculează beneficiarii reali pe fiecare lanț de proprietate și pregătește actualizarea. Analistul aprobă.",
         CtaLabel: "Deschide aplicația",
         CtaHref: "/dashboard",
-        Announcement: new("Nou", "Scenarii cu agenți", "/scenarios"),
+        Announcement: new("Nou", "Pragul AMLR din iulie 2027, deja configurabil", "/#how"),
         Preview: new(
-            ItemId: "REQ-1042",
-            ItemTitle: "Verifică o cerere",
-            ItemDescription: "Agentul citește documentele atașate, verifică cifrele în cod și cere aprobare înainte să schimbe ceva.",
+            ItemId: "KYC-2041",
+            ItemTitle: "Revizuire periodică: Alfa Logistic SRL",
+            ItemDescription: "Certificatul ONRC nou diferă de dosar: un asociat nou, prin două firme intermediare.",
             Activity:
             [
-                "Ana a atașat 2 documente",
-                "Agentul a extras 6 câmpuri · 4 sec",
-                "Verificarea pii-leak a trecut",
+                "Certificat ONRC încărcat (12 pagini)",
+                "Agentul a extras 4 asociați și 2 administratori · 6 sec",
+                "Diferențe față de dosar: 1 asociat nou, 1 cotă schimbată",
             ],
-            Prompt: "Verifică cererea și spune-mi ce trebuie văzut de un om",
-            Reply: "Cinci câmpuri se potrivesc cu evidențele. Unul trebuie văzut de un om: documentul a expirat.",
+            Prompt: "Compară certificatul cu dosarul și calculează beneficiarii reali",
+            Reply: "Maria Ionescu: 20% direct + 24% prin Beta Holding (60% × 40%) = 44%, beneficiar real. Elena Radu are exact 25% prin Gamma Invest: la limită, decide un om.",
             ResultTitle: "Necesită aprobare",
-            ResultDetail: "Actualizare înregistrare · 1 câmp"),
-        Statement: new("O frază scurtă despre ce ați construit.",
-            "Continuați cu de ce contează, cine plătește și de ce poate fi crezut. Două-trei rânduri, nu mai mult."),
+            ResultDetail: "Actualizare dosar · 1 beneficiar real, 1 caz la limită"),
+        Statement: new("Beneficiarii reali se calculează în cod, nu se ghicesc.",
+            "Fiecare procent e produsul cotelor de pe lanț, fiecare caz la limita de 25% ajunge la un om și fiecare decizie rămâne în audit. Modelul poate rula pe serverele băncii: datele nu pleacă din ea."),
         Sections:
         [
-            new("Agenți care întreabă întâi",
-                "Agenții folosesc unelte reale, arată fiecare pas și așteaptă un om înainte ca ceva să iasă din aplicație.",
+            new("Certificatul, citit și comparat",
+                "Din PDF-ul ONRC rezultă asociați, cote și administratori, comparați câmp cu câmp cu ce știe deja banca.",
                 [
-                    new(Icons.Material.Rounded.Build, "Unelte", "Unelte tipizate cu rezultate mici; modelul nu face niciodată calcule."),
-                    new(Icons.Material.Rounded.HowToReg, "Aprobări", "Orice are efect în afara aplicației așteaptă un editor."),
-                    new(Icons.Material.Rounded.History, "Istoricul rulărilor", "Fiecare pas, apel de unealtă și decizie e salvat, mascat."),
-                    new(Icons.Material.Rounded.Forum, "Scenarii", "Conversații pe mai multe replici cu un sistem extern."),
+                    new(Icons.Material.Rounded.DocumentScanner, "Extragere", "Certificatul ONRC devine câmpuri structurate, fiecare cu pagina din care provine."),
+                    new(Icons.Material.Rounded.CompareArrows, "Diferențe în cod", "Asociați noi sau ieșiți, cote schimbate, administratori: comparația o face codul, nu modelul."),
+                    new(Icons.Material.Rounded.HowToReg, "Aprobare", "Dosarul se actualizează doar după ce analistul confirmă."),
+                    new(Icons.Material.Rounded.History, "Audit", "Cine a aprobat, ce s-a schimbat și pe ce bază rămân în istoric."),
                 ]),
-            new("Confidențialitate din proiectare",
-                "Datele personale sunt mascate înainte să ajungă la un model și înainte de orice salvare. Ștergerea e automată.",
+            new("Beneficiarul real, calculat",
+                "Procentul indirect e produsul cotelor pe fiecare lanț, adunat pe toate lanțurile aceleiași persoane.",
                 [
-                    new(Icons.Material.Rounded.Shield, "Mascare", "IBAN, CNP, carduri și emailuri devin înlocuitori."),
-                    new(Icons.Material.Rounded.Rule, "Verificări deterministe", "Verdicte repetabile, cu amprentă."),
-                    new(Icons.Material.Rounded.FileDownload, "Exporturi", "Rulările devin teste și rapoarte după aprobare."),
-                    new(Icons.Material.Rounded.Timer, "Retenție", "Rulările vechi se șterg după un program."),
+                    new(Icons.Material.Rounded.AccountTree, "Lanțuri de proprietate", "Oricâte firme intermediare, cu cicluri detectate și semnalate."),
+                    new(Icons.Material.Rounded.Rule, "Pragul legal", "Peste 25% azi (Legea 129/2019), 25% sau mai mult din iulie 2027 (AMLR): o setare."),
+                    new(Icons.Material.Rounded.Gavel, "Control fără cote", "Acorduri între asociați sau drept de veto: semnalate analistului, nu ignorate."),
+                    new(Icons.Material.Rounded.SupervisorAccount, "Când nu există", "Fără beneficiar real identificat, regula legală: conducerea de rang superior."),
                 ]),
         ],
         Steps:
         [
-            new("Conectezi", "Legi aplicația de un model și, opțional, de un sistem extern."),
-            new("Rulezi", "Agenții lucrează cu unelte; acțiunile riscante așteaptă aprobare."),
-            new("Verifici", "Reguli în cod decid trecut sau picat, la fel de fiecare dată."),
-            new("Exporți", "Rulările aprobate devin teste și rapoarte."),
+            new("Încarci certificatul", "PDF-ul ONRC al firmei, la onboarding sau la revizuirea periodică."),
+            new("Agentul compară", "Extrage datele și le pune față în față cu dosarul existent."),
+            new("Codul calculează", "Beneficiarii reali pe fiecare lanț; cazurile la limită sunt marcate."),
+            new("Analistul aprobă", "Actualizarea dosarului pleacă doar cu acordul lui."),
         ],
-        Closing: new("Construit pentru demo.", "Gata de producție."));
+        Closing: new("Agentul face copy-paste-ul.", "Analistul decide."));
 
     private static readonly Landing LandingEn = new(
         Enabled: true,
-        Headline: "Your big idea, one sentence long",
-        Subheadline: "Explain who it is for and what changes for them. Keep it under two lines.",
+        Headline: "The company's KYC file, current with every ONRC certificate",
+        Subheadline: "The agent compares the new certificate with the file, computes beneficial owners along every ownership chain and prepares the update. The analyst approves.",
         CtaLabel: "Open the app",
         CtaHref: "/dashboard",
-        Announcement: new("New", "Agent scenarios", "/scenarios"),
+        Announcement: new("New", "The July 2027 AMLR threshold, already a setting", "/#how"),
         Preview: new(
-            ItemId: "REQ-1042",
-            ItemTitle: "Review a request",
-            ItemDescription: "The agent reads the attached documents, checks the numbers in code and asks before changing anything.",
+            ItemId: "KYC-2041",
+            ItemTitle: "Periodic review: Alfa Logistic SRL",
+            ItemDescription: "The new ONRC certificate differs from the file: a new shareholder, through two intermediate companies.",
             Activity:
             [
-                "Ana attached 2 documents",
-                "Agent extracted 6 fields · 4 sec",
-                "Check pii-leak passed",
+                "ONRC certificate uploaded (12 pages)",
+                "Agent extracted 4 shareholders and 2 directors · 6 sec",
+                "Differences from the file: 1 new shareholder, 1 changed stake",
             ],
-            Prompt: "Check the request and tell me what needs a human",
-            Reply: "Five fields match the records. One needs a human: the document has expired.",
+            Prompt: "Compare the certificate with the file and compute the beneficial owners",
+            Reply: "Maria Ionescu: 20% direct + 24% through Beta Holding (60% × 40%) = 44%, a beneficial owner. Elena Radu holds exactly 25% through Gamma Invest: borderline, a person decides.",
             ResultTitle: "Approval needed",
-            ResultDetail: "Update record · 1 field"),
-        Statement: new("A short statement of what you built.",
-            "Continue with why it matters, who pays for it and what makes it trustworthy. Two or three lines at most."),
+            ResultDetail: "Update file · 1 beneficial owner, 1 borderline case"),
+        Statement: new("Beneficial owners are computed in code, not guessed.",
+            "Every percentage is the product of the stakes along the chain, every case at the 25% line goes to a person and every decision stays in the audit trail. The model can run on the bank's own servers: the data never leaves."),
         Sections:
         [
-            new("Agents that ask first",
-                "Agents call real tools, show every step and wait for a human before anything leaves the app.",
+            new("The certificate, read and compared",
+                "Shareholders, stakes and directors come out of the ONRC PDF and are compared field by field with what the bank already knows.",
                 [
-                    new(Icons.Material.Rounded.Build, "Tools", "Typed tools with small results; the model never does arithmetic."),
-                    new(Icons.Material.Rounded.HowToReg, "Approvals", "Anything with an effect outside the app waits for an editor."),
-                    new(Icons.Material.Rounded.History, "Run history", "Every step, tool call and decision is saved, masked."),
-                    new(Icons.Material.Rounded.Forum, "Scenarios", "Multi-turn conversations against an external system."),
+                    new(Icons.Material.Rounded.DocumentScanner, "Extraction", "The ONRC certificate becomes structured fields, each with the page it came from."),
+                    new(Icons.Material.Rounded.CompareArrows, "Differences in code", "New or departed shareholders, changed stakes, directors: code compares, not the model."),
+                    new(Icons.Material.Rounded.HowToReg, "Approval", "The file is updated only after the analyst confirms."),
+                    new(Icons.Material.Rounded.History, "Audit", "Who approved, what changed and on what basis stay in the history."),
                 ]),
-            new("Private by design",
-                "Personal data is masked before it reaches a model and before anything is saved. Retention is automatic.",
+            new("The beneficial owner, computed",
+                "The indirect percentage is the product of the stakes along each chain, summed over every chain of the same person.",
                 [
-                    new(Icons.Material.Rounded.Shield, "Masking", "IBAN, CNP, cards and emails become placeholders."),
-                    new(Icons.Material.Rounded.Rule, "Deterministic checks", "Repeatable verdicts with a fingerprint."),
-                    new(Icons.Material.Rounded.FileDownload, "Exports", "Runs become tests and reports after approval."),
-                    new(Icons.Material.Rounded.Timer, "Retention", "Old runs are deleted on a schedule."),
+                    new(Icons.Material.Rounded.AccountTree, "Ownership chains", "Any number of intermediate companies, with cycles detected and flagged."),
+                    new(Icons.Material.Rounded.Rule, "The legal threshold", "Over 25% today (Romanian Law 129/2019), 25% or more from July 2027 (AMLR): one setting."),
+                    new(Icons.Material.Rounded.Gavel, "Control without shares", "Shareholder agreements or veto rights: flagged to the analyst, not ignored."),
+                    new(Icons.Material.Rounded.SupervisorAccount, "When there is none", "No beneficial owner found: the legal fallback is senior management."),
                 ]),
         ],
         Steps:
         [
-            new("Connect", "Point the app at a model and, optionally, an external system."),
-            new("Run", "Agents work with tools; risky actions wait for approval."),
-            new("Check", "Rules in code decide pass or fail, the same way every time."),
-            new("Export", "Approved runs become tests and reports."),
+            new("Upload the certificate", "The company's ONRC PDF, at onboarding or at the periodic review."),
+            new("The agent compares", "It extracts the data and puts it side by side with the existing file."),
+            new("Code computes", "Beneficial owners along every chain; borderline cases are marked."),
+            new("The analyst approves", "The file update goes out only with their consent."),
         ],
-        Closing: new("Built for the demo.", "Ready for production."));
+        Closing: new("The agent does the copy-paste.", "The analyst decides."));
 
     public static readonly NavItem[] Nav =
     [
         new("Dashboard", "/dashboard", Icons.Material.Rounded.SpaceDashboard),
-        new("Items", "/items", Icons.Material.Rounded.Checklist),
+        // Items and Calculators stay reachable by URL (tests use them) until the KYC pages replace them.
         // @gen:nav (the feature generator inserts new pages above this line)
-        new("Calculators", "/calculators", Icons.Material.Rounded.Calculate, "Finance"),
         new("Assistant", "/assistant", Icons.Material.Rounded.AutoAwesome, "Agents"),
         new("Agent Arena", "/arena", Icons.Material.Rounded.Forum, "Agents"),
         new("Scenarios", "/scenarios", Icons.Material.Rounded.QuestionAnswer, "Agents"),
@@ -169,7 +169,7 @@ public static class SiteConfig
     /// Bottom navigation on phones (max 4–5 hrefs from <see cref="Nav"/>; the menu button still shows everything).
     /// Empty = no bottom bar.
     /// </summary>
-    public static readonly string[] MobileNav = ["/dashboard", "/items", "/assistant", "/calculators"];
+    public static readonly string[] MobileNav = ["/dashboard", "/assistant", "/runs", "/settings"];
 
     /// <summary>
     /// Installable app (PWA): "Install" in Chrome/Edge (desktop + Android), "Add to Home Screen" on iPhone.

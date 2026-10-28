@@ -1,58 +1,59 @@
-# Submission playbook
+# Predarea: DosarViu (Raiffeisen, Operational Efficiency)
 
-What judges receive: **source code**, a **practical demonstration of the agent**, and a **video pitch of up to
-3 minutes** (problem, what makes the solution unique, how the architecture works).
+Ce primește juriul: **codul sursă**, o **demonstrație practică a agentului** și un **video de maximum 3 minute**
+(problema, ce e unic, cum funcționează arhitectura). Predare **joi, 29 oct., ora 11:00**; noi predăm până la **10:30**.
+Prezentare pe scenă doar pentru câștigătorul challenge-ului: o pregătim atunci, nu acum.
 
-## Timeline (work backwards from the deadline)
+## Video: 3 minute, 4 părți
 
-| When | What |
+Scenariul de demo e cel din [`PLAYBOOK.md`](PLAYBOOK.md#2-ce-construim-și-ce-nu) (Alfa Logistic, Maria 44%, Elena exact 25%).
+
+| Timp | Parte | Ce se vede | Ce se spune (de scris cuvânt cu cuvânt) |
+| --- | --- | --- | --- |
+| 0:00–0:30 | **Problema** | Un certificat ONRC lângă un dosar, cu procente scrise de mână | O revizuire KYC de firmă costă băncile 1.500–3.000 $ și durează săptămâni (Fenergo, 2023). Partea grea: lanțurile de proprietate și pragul de 25%. |
+| 0:30–1:00 | **Ce e unic** | Pagina principală, secțiunea „Beneficiarul real, calculat” | Calculul e cod testat, nu model. Pragul e o setare: peste 25% azi, 25% sau mai mult din iulie 2027. Cazul la limită ajunge la om. |
+| 1:00–2:15 | **Demo** | `/kyc/…`: încărcare certificat → pașii agentului → diferențe → lanțuri → Elena marcată → **Aprobă** | Agentul cere singur certificatele firmelor intermediare. Analistul aprobă actualizarea; totul rămâne în `/runs`. |
+| 2:15–3:00 | **Arhitectură + GDPR + bani** | `/architecture`, apoi `/privacy` | Model pe serverul băncii (compatibil OpenAI), date personale mascate, verificări deterministe. Cine plătește: banca, per revizuire; economia: formula din PLAYBOOK, cu cifrele confirmate de mentor. |
+
+Sfaturi:
+- **Fără eticheta „Simulare” în video.** Filmăm cu modelul real conectat (Settings → Testează conexiunile pe calculatorul
+  de filmare) sau cu rulări înregistrate live (`AI:Record = true`, apoi `AgentMode = Replay`, eticheta devine „Înregistrare”).
+- Interfața în română (implicit). Zoom 125% în browser, fără bara de bookmark-uri, date sintetice realiste.
+- Vocea separat de ecran. Export 1080p. Durata: **≤ 3:00**.
+- Spunem o dată, clar, că pornim de la un template pregătit înainte (e în istoricul repo-ului).
+
+## Program (de la sfârșit spre început)
+
+| Când | Ce |
 | --- | --- |
-| Day 1, after kick-off | Pick the idea in ≤ 45 min. Write the one-sentence pitch and the demo script **first**. |
-| Day 1, first 15 min of coding | `SiteConfig.cs`, `tools/NewFeature` for your entities, seed data. **Deploy** (Azure App Service / Docker) and share the URL. |
-| Day 1, afternoon | Build the agent: tools on your services → `ToolAgent` → `<AgentChat />`. Show it at the mentor checkpoint. |
-| Day 1, evening | Real model connected. Rehearse the demo with `"AI": { "Record": true }` to record runs. Commit `Recordings/`. |
-| Night | Polish only the demo path. Hide unfinished pages (remove them from `SiteConfig.Nav`). |
-| **Day 2, 07:00** | **Code freeze.** Only fixes to the demo path from now on. |
-| Day 2, 07:00–09:30 | Record the video (several takes, `"AgentMode": "Replay"` for identical runs). Edit. |
-| Day 2, 09:30–10:30 | README final, `dotnet build` (0 warnings) + `dotnet test`, deploy, test the live URL on a phone. |
-| Day 2, **≥ 30 min before deadline** | Submit. Don't submit at the last minute. |
-| After submission | Rehearse the live pitch with the timer, at least 3 times. Prepare answers to likely questions. |
+| Joi 07:00 | **Code freeze**: doar reparații pe calea de demo. |
+| 07:00–09:30 | Filmare, mai multe duble; montaj; voce. |
+| 09:30–10:30 | `dotnet build` (0 warnings) + `dotnet test`, deploy verificat, link în README, video încărcat. |
+| **10:30** | **Predare.** Nu în ultimul minut. |
 
-## Video: 3 minutes, 4 parts
+## Checklist demo
 
-| Time | Part | Content |
-| --- | --- | --- |
-| 0:00–0:30 | **Problem** | Who suffers, how often, what it costs (one number). |
-| 0:30–1:10 | **What's unique** | Your insight in one sentence. Why existing tools / ChatGPT don't solve it. |
-| 1:10–2:20 | **Demo** | The agent working on a realistic case: request → tool calls visible → result → human approval. |
-| 2:20–3:00 | **Architecture** | Screen-record `/architecture`: web app → API → agent runtime → tools → data/models. Mention human-in-the-loop, audit trail (`/runs`), tested finance functions as tools, Microsoft.Extensions.AI (model-agnostic) + fallback. |
+- [ ] Scenariul (3–5 pași) scris și repetat
+- [ ] Rulările pentru fiecare pas înregistrate (`src/HackathonStarter/Recordings/*.json` în repo)
+- [ ] Datele resetate înainte de filmare (Settings → Resetează datele demo)
+- [ ] Paginile care nu țin de KYC ascunse din `SiteConfig.Nav` (Arena, Scenarii, Calculatoare)
+- [ ] Nicio dată reală: firme, persoane și certificate sintetice
 
-Tips:
-- Write the script word for word; read it while recording the voice-over separately from the screen.
-- Use `"AgentMode": "Replay"` so every take is identical; say honestly that the run was recorded if asked.
-- Zoom the browser to 125% and hide the bookmarks bar. Use realistic seed data, not "test 123".
-- Export at 1080p. Check the duration: **≤ 3:00**.
+## Checklist cod
 
-## Demo checklist
+- [ ] `dotnet build` cu 0 warnings, `dotnet test` trece, aplicația pornește **fără** `appsettings.Local.json`
+- [ ] README: ce face, cum se pornește, arhitectura, ce e AI și ce e cod
+- [ ] **Niciun secret în repo (e public):** `git log -p | grep -iE "apikey|sk-|password"` nu găsește nimic real
+- [ ] URL-ul Render în README
 
-- [ ] Happy-path script written (3–5 steps) and rehearsed
-- [ ] Runs recorded for every step of the script (`src/HackathonStarter/Recordings/*.json` committed)
-- [ ] Works with Wi-Fi off (`AI__AgentMode=Replay dotnet run --project src/HackathonStarter` on the presenting laptop)
-- [ ] Data reset: restart the app (Development recreates the database)
-- [ ] Unfinished pages hidden from `SiteConfig.Nav`
-- [ ] Dark/light mode chosen for the projector (light is usually safer)
+## Întrebări probabile ale juriului (cu răspunsul)
 
-## Code checklist
-
-- [ ] `dotnet build` has 0 warnings, `dotnet test` passes, the app runs with **no appsettings.Local.json**
-- [ ] README: what it does, how to run in one command, architecture, which parts are AI
-- [ ] `appsettings.Local.example.json` lists every setting; **no secrets committed** (`git log -p | grep -i apikey`)
-- [ ] Deployed URL in the README
-
-## Likely judge questions
-
-- What does the agent do on its own, and where does a human decide?
-- What happens when the model is wrong? (approval step, audit trail, constrained tools)
-- Can this run with sensitive data? (Azure OpenAI in an EU region, or self-hosted / open-weight models via the OpenAI-compatible provider; uploads are not stored)
-- How would it scale / what does it cost per request?
-- What is real and what is mocked in the demo?
+| Întrebare | Răspuns scurt |
+| --- | --- |
+| Ce face agentul singur și unde decide omul? | Extrage, compară, calculează și propune. Actualizarea dosarului și orice caz la limită le decide analistul. |
+| Ce se întâmplă dacă modelul greșește un procent? | Fiecare câmp are pagina-sursă; diferențele și beneficiarii se calculează în cod, cu teste; analistul aprobă. |
+| De ce nu ChatGPT? | Pentru că un model poate greși o înmulțire, iar aici o greșeală înseamnă un beneficiar real ratat. Noi lăsăm calculul în cod și arătăm de unde vine fiecare cifră. |
+| Merge cu date reale, sensibile? | Da: model on-premise, mascare înainte de model, temei legal (Legea 129/2019), retenție configurabilă. |
+| Ce e real și ce e simulat? | Calculul, diff-ul, verificările și fluxul de aprobare sunt reale. Certificatele și firmele sunt sintetice; integrarea cu ONRC nu e făcută. |
+| Cine plătește și cât? | Banca, per revizuire sau per analist; economia = revizuiri × minute economisite × cost/minut (cifrele mentorului). |
+| Ce e cu 25% fix? | Azi nu e beneficiar real (peste 25%), din 10 iulie 2027 este (25% sau mai mult). E o setare, iar cazul îl vede un om. |

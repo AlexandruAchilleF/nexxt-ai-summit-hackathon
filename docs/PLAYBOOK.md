@@ -1,145 +1,142 @@
-# Playbook: de la temă la demo în 24h
+# Playbook: DosarViu (Raiffeisen, Operational Efficiency)
 
-Cum adaptăm template-ul la orice temă primim la NEXXT AI Hackathon (28–29 oct. 2026). Estimările sunt pentru
-echipa de 5, cu template-ul de azi. Împreună cu [`SUBMISSION.md`](SUBMISSION.md) (timeline, video, checklist).
+NEXXT AI Hackathon, 28–29 oct. 2026. Kickoff miercuri 09:00, **predare joi 11:00**: cod sursă, demonstrația agentului
+și un **video de maximum 3 minute**. Nu există prezentare live decât pentru câștigătorul fiecărui challenge.
+Faptele și sursele: [`RESEARCH-KYC.md`](RESEARCH-KYC.md). Video și predare: [`SUBMISSION.md`](SUBMISSION.md).
 
-## 1. Ce avem deja (nu se mai scrie mâine)
+## 1. Ideea, într-o propoziție
 
-| Nevoie în orice temă | Piesa din template | Unde |
+> **La revizuirea KYC a unei firme, agentul citește certificatul ONRC, îl compară cu dosarul băncii, calculează
+> beneficiarii reali pe fiecare lanț de proprietate și pregătește actualizarea; analistul doar verifică și aprobă.**
+
+- **Cine suferă:** analiștii KYC / onboarding de firme din Raiffeisen. Copiază date din PDF-uri, compară de mână și
+  calculează procente indirecte pe lanțuri de firme.
+- **Cine plătește:** Raiffeisen (bugetul de operațiuni și conformitate). O revizuire KYC corporate costă în medie
+  1.500–3.000 $ și durează săptămâni ([`RESEARCH-KYC.md`](RESEARCH-KYC.md#3-cât-costă-azi-pentru-cine-plătește)).
+- **Ce e unic (de spus în video):**
+  1. **Calculul e cod, nu model.** Procentele indirecte și pragul legal sunt funcții testate; modelul doar extrage
+     și explică. Același certificat dă mereu același rezultat.
+  2. **Pragul e o setare, iar 25% fix ajunge la om.** Peste 25% azi (Legea 129/2019), 25% sau mai mult din
+     10 iulie 2027 (AMLR). Nimeni altcineva din sală nu va ști asta.
+  3. **Datele nu pleacă din bancă.** Modelul poate rula pe serverul nostru / al băncii (API compatibil OpenAI),
+     iar datele personale sunt mascate înainte de orice model.
+
+## 2. Ce construim (și ce nu)
+
+**Scenariul de demo** (firmă și persoane sintetice, `SyntheticData`):
+
+```
+Alfa Logistic SRL (clientul)
+├── Maria Ionescu        20% direct
+├── Beta Holding SRL     40%  ├─ Maria Ionescu 60%    ⇒ 24% indirect ⇒ total 44%  ✔ beneficiar real
+│                             └─ Andrei Pop    40%    ⇒ 16%                       ✘ sub prag
+└── Gamma Invest SRL     40%  ├─ Elena Radu    62,5%  ⇒ exact 25%                 ⚠ la prag: decide omul
+                              └─ Ion Vasile    37,5%  ⇒ 15%                       ✘ sub prag
+```
+
+Elena e exact la 25%: **nu** e beneficiar real după Legea 129/2019 (peste 25%), dar **este** după AMLR din 2027
+(25% sau mai mult). Calculul se face cu `decimal`, ca 40% × 62,5% să dea fix 25%, nu 24,9999%.
+
+Dosarul vechi o avea pe Maria doar cu 20% direct; certificatul nou arată intrarea Beta Holding.
+Agentul trebuie să găsească diferența, să ceară certificatele Beta și Gamma, să calculeze și să propună actualizarea.
+
+| Must-have (pentru video) | Nice-to-have (doar dacă rămâne timp) | Nu facem |
 | --- | --- | --- |
-| Agent cu unelte, aprobare umană, istoric | `ToolAgent`, `needsApproval`, `/runs` | `Agents/`, `Features/Assistant` |
-| Demo care nu pică pe scenă | live → înregistrare → mock | `AI:Record`, `Recordings/` |
-| Răspuns la GDPR | mascare la model și la salvare, retenție, `/privacy`, `/privacy-policy` | `PiiVault`, `RunRedaction`, `RetentionService` |
-| Verdicte repetabile („no flaky”) | verificări deterministe cu amprentă | `Features/Checks` |
-| Cifre corecte | calcule în cod, verificate cu `expected-number` | `FinanceCalculator` |
-| Sistem extern (API partener, chatbot testat, model pe serverul nostru) | ținte cu timeout și replay | `Targets:<nume>`, `TargetClient` |
-| Conversații pe mai multe replici (client, escroc, atacator) | `ScenarioAgent` + profil `driver` | `Features/Scenarios`, `/scenarios` |
-| Documente (PDF, poze) | extragere text, căutare în pasaje, imagini la modele vision | `DocumentText`, `DocumentSearch` |
-| Date de test fără persoane reale | CNP/IBAN/card/CUI valide, deterministe | `SyntheticData`, `/api/synthetic/*` |
-| Livrabile | export test xUnit/JSON, raport Markdown, cu aprobare | `Features/Exports`, `/exports` |
-| Produs „real” | temă întunecată, sidebar + panou de conținut, PWA | `AppTheme`, `wwwroot/app.css` |
-| Prima impresie | pagina principală (titlu, imaginea aplicației, secțiuni, „Cum funcționează”), textele în ambele limbi | `SiteConfig.Landing`, `wwwroot/landing.css` |
-| Pagini publice | termeni, politică de confidențialitate, date și confidențialitate, contact, în afara aplicației | `PublicLayout`, `SiteConfig.Legal` |
-| Română + engleză | română implicit, buton RO/EN; un test pică dacă lipsește o traducere | `@T("…")`, `Services/Lang.Ro.cs` |
-| Integrare | API pentru fiecare agent, `/api-docs` | `Api/` |
+| Entități + seed sintetic | Graf de proprietate vizual (Cytoscape) | Integrare reală ONRC / registrul BR |
+| Extragere certificat → câmpuri (cu mock) | Raport de discrepanță față de registrul BR | Persoane politic expuse (PEP), sancțiuni |
+| Diferențe certificat vs dosar, **în cod**, cu teste | Raport KYC exportabil (`IRunExporter`) | Entități străine (doar semnalate) |
+| Calculatorul de beneficiari reali, **cu teste** (lanțuri, sume, cicluri, prag configurabil) | Mod „regim 2027” comutabil din UI | OCR pe scanări proaste |
+| Agentul: extrage → compară → calculează → propune actualizarea (**cu aprobare**) | | |
+| Pagina dosarului: asociați, lanțuri (tabel indentat), beneficiari | | |
+| Verificări deterministe pe răspuns (`pii-leak` + una nouă, vezi mai jos) | | |
 
-## 2. Ce lipsește (evaluare sinceră)
+**Verificare nouă (Check):** `ubo-threshold-explained`: dacă răspunsul agentului numește un beneficiar real,
+procentul trebuie să fie cel calculat de cod (ca `expected-number`), iar cazurile la limită să fie menționate.
+Verdictul îl dă codul, nu modelul.
 
-- **Deploy-ul public e pe planul gratuit Render** (0.15 CPU, adoarme după ~15 min fără trafic). Bun ca link pentru juriu;
-  demo-ul de pe scenă și video-ul le facem de pe laptop (secțiunea 6).
-- **Identitatea produsului:** `SiteConfig` (nume, landing, `Legal`) are încă valori de completat. Pe scenă ar apărea „Acme”.
-  Textele paginii principale sunt de două ori (`LandingRo` și `LandingEn`), inclusiv exemplul din imaginea aplicației (`Preview`).
-- **Feature-ul exemplu `Items`** și pagina **Calculators** nu țin de nicio temă: se ascund din `SiteConfig.Nav` sau se înlocuiesc.
-- **Conținut încă în engleză:** datele de exemplu, sugestiile din chat-ul agenților, explicațiile verificărilor și mesajele
-  de validare. Le rescriem oricum pentru temă: direct în română (mock-urile înțeleg ambele limbi cu `TextMatch`).
-- **Fără cifre pe pagina principală:** le-am scos pentru că erau inventate. Dacă vrem cifre, le citim live din aplicație
-  (rulări, verificări picate, exporturi aprobate), nu le scriem de mână.
-- **Fără graf** (lanțuri de proprietate, arbori de atac): necesar doar pentru Raiffeisen Ops.
-- **Fără migrații:** o bază persistentă se resetează când schimbăm entitățile (în Development se face singur).
-- **Login demo** (3 utilizatori): suficient pentru hackathon, de spus deschis dacă juriul întreabă.
-- **Textele legale** sunt un punct de plecare, nerevizuite de un jurist.
+## 3. Plan de construcție (echipa)
 
-## 3. Primele 2 ore, indiferent de temă
+Ore efective, în paralel. Estimările vin din playbook-ul de ieri, ajustate pentru scenariul de mai sus.
 
-| Când | Ce | Cine |
-| --- | --- | --- |
-| 0:00–0:45 | Research pe temă, pitch-ul într-o propoziție, „cine plătește și cât”, scenariul de demo în 3–5 pași | toți |
-| 0:45–1:30 | `SiteConfig`: nume, `Legal`, `Nav` (ascundem Items și Calculators), `LandingRo` + `LandingEn` cu exemplul din `Preview` | frontend + pitch |
-| 0:45–1:30 | Entitățile cu `dotnet run --project tools/NewFeature -- <Nume>`, seed din `SyntheticData` | dev .NET |
-| 0:45–1:30 | Ținte și chei în `appsettings.Local.json`, **Settings → Test connections** | securitate |
-| 1:30–2:00 | Primul push pe `main`, deploy verificat pe URL-ul public, link la mentori | oricine |
+| Pas | Piese din template | Cine | Ore |
+| --- | --- | --- | --- |
+| Entități `Company`, `Shareholding`, `KycFile` + seed (3 firme, 4 persoane, dosarul vechi) | `tools/NewFeature`, `SyntheticData` | dev .NET 1 | 1 |
+| `OwnershipCalculator`: lanțuri, produs, sumă pe persoană, cicluri, prag `> / ≥`, fallback conducere. **Teste întâi** | ca `FinanceCalculator` | dev .NET 1 + securitate | 2 |
+| `KycDiff`: certificat vs dosar (asociați noi/ieșiți, cote, administratori), cu teste | serviciu nou | securitate | 1.5 |
+| Certificate ONRC sintetice în PDF (3 bucăți) + extragere `StructuredAi.GenerateAsync<CertificateData>` cu mock | `DocumentText`, `StructuredAi` | dev .NET 2 | 2 |
+| `KycAgent : ToolAgent`: `extractCertificate`, `compareWithFile`, `computeBeneficialOwners`, `listMissingCertificates`, `updateFile` (**needsApproval**) + mock RO/EN | `ToolAgent`, `TextMatch` | dev .NET 2 | 2 |
+| Paginile `/kyc` (listă) și `/kyc/{id}` (dosar, lanțuri, beneficiari, chat cu agentul) + `SiteConfig.Nav` | `PageHeader`, `Pill`, `AgentChat` | frontend | 3 |
+| Dashboard pe KYC (dosare de revizuit, discrepanțe, aprobări în așteptare) în locul celui cu Items | `StatCard`, `ActivityRings` | frontend | 1.5 |
+| Check-ul `ubo-threshold-explained` + test în `PlatformTests.cs` | `Features/Checks` | securitate | 1 |
+| `/privacy` și textele legale la zi pentru KYC (temei legal, retenție) | `Privacy.razor`, `LegalTexts` | securitate | 0.5 |
+| Înregistrări pentru video (`AI:Record = true`), README | `Recordings/` | dev .NET 2 | 1 |
+| ROI, scenariul video, montaj, întrebări probabile | `SUBMISSION.md` | pitch | continuu |
 
-**Regula pentru orice text nou din interfață:** se scrie în engleză, `@T("Save")` (nu `"Salvează"` direct în pagină), iar
-româna se adaugă în `Services/Lang.Ro.cs`: `["Save"] = "Salvează"`. Fără ea, `LangTests` pică în CI și ne blochează merge-ul. Conținutul lung din `SiteConfig`
-și textele legale: `Lang.Pick(ro: "...", en: "...")`.
+**Ordinea care nu se negociază:** calculatorul și diff-ul cu teste (fără ele nu avem produs), apoi agentul,
+apoi paginile. Graful vizual vine ultimul; dacă nu e gata la 22:00, rămâne tabelul indentat.
 
-## 4. Pe temă: ce construim, cât durează
+**Reguli de lucru:**
+- Branch → PR → CI verde → merge. Render publică `main` doar după CI (`autoDeployTrigger: checksPass`).
+- Orice text nou din interfață: `@T("English")` + româna în `Services/Lang.Ro.cs` (altfel `LangTests` pică).
+- Calcule doar în cod, cu teste. Modelul nu face aritmetică.
+- Doar date sintetice. Niciun certificat sau CNP real în repo (repo-ul e public).
+- Înainte de video: ascundem din `SiteConfig.Nav` paginile care nu țin de KYC (Arena, Scenarii, Calculatoare).
 
-Orele sunt de lucru efectiv (în paralel), fără primele 2 ore și fără video.
+## 4. Cine plătește și cât (calculul pentru video)
 
-### QA DNA – AI Agent Arena (prima opțiune) · ~10–12h
+Formula, ca s-o completăm cu cifrele mentorului (`RESEARCH-KYC.md`, secțiunea 4):
 
-| Pas | Piese folosite | Estimare |
-| --- | --- | --- |
-| Biblioteca de atacuri: categorii (date personale, MiFID, prompt injection, mai multe replici), câte 3–5 obiective fiecare | `ScenarioAgent.Suggestions` / seed | 1.5h |
-| `ArenaScenario : ScenarioAgent`: atacatorul pe profilul `driver` (modelul de pe server), ținta = asistentul open-source (`Targets:target`) | `ScenarioAgent`, `TargetClient` | 2h |
-| **Canary** în system prompt-ul țintei: check-ul `prompt-leak` există deja, doar îl configurăm (`Checks:Canaries`) și îl listăm în `Checks` | `prompt-leak` din `BuiltInChecks.cs` | 0.25h |
-| Reguli MiFID în plus (`Checks:PhraseRules`) | config | 0.5h |
-| Dashboard: atacuri rulate, % blocate, teste generate și aprobate | `StatCard`, `RunStore`, `RunExportService` | 2h |
-| Ciclul complet: atac reușit → export xUnit → aprobare → job CI care rulează testele aprobate pe țintă | `/exports`, `GET /api/exports?status=Approved` | 2h |
-| Înregistrări pentru demo, lustruire | `AI:Record` | 2h |
+```
+economie pe an = revizuiri de firme pe an × minute economisite pe revizuire × cost pe minut de analist
+```
 
-Argumentul de business: fiecare atac reușit devine un **test facturabil** (ei facturează pe test creat și întreținut).
-Ținta e un asistent open-source, nu unul scris de noi ca să fie vulnerabil (riscul 2).
+**Exemplu ilustrativ, nu cifră Raiffeisen** (îl înlocuim după checkpoint): 10.000 de revizuiri/an × 45 min × 0,5 €/min
+≈ **225.000 €/an**. În video spunem doar cifre confirmate sau cu sursă (1.500–3.000 $ per revizuire, Fenergo).
 
-### Raiffeisen – Operational Efficiency (KYC firme) · ~12–14h (cea mai mare)
+**Model de business:** licență per revizuire procesată sau per analist, instalare on-premise (modelul rulează la bancă).
+Banca plătește fiindcă scade costul per revizuire și riscul de amendă pentru beneficiari reali greșiți.
 
-| Pas | Piese folosite | Estimare |
-| --- | --- | --- |
-| Entități: `Company`, `Shareholding` (cine deține cât din cine), `KycDossier` | `NewFeature` | 1h |
-| Upload certificat ONRC (PDF) → extragere structurată în record tipizat, cu mock | `DocumentText`, `StructuredAi.GenerateAsync<T>` | 2h |
-| Diferențe certificat nou vs dosar vechi: **în cod**, nu în model | serviciu nou + teste | 1.5h |
-| Beneficiarul real: produsul procentelor pe fiecare lanț, suma pe persoană, prag 25%, cicluri | calculator nou cu teste (ca `FinanceCalculator`) | 2h |
-| Graful de proprietate live (Cytoscape din cdnjs, prin JS interop) | componentă nouă | 3h |
-| Agentul: extrage → compară → calculează → propune actualizarea dosarului (cu aprobare) | `ToolAgent`, `needsApproval` | 1.5h |
-| Raport KYC exportabil | `IRunExporter` nou | 1h |
+## 5. GDPR: răspunsurile pregătite
 
-Riscul principal e graful: dacă nu e gata în 3h, arătăm lanțurile ca tabel indentat.
-
-### Raiffeisen – Scaling & Growth (anti-țeapă înainte de transfer) · ~9–10h
-
-| Pas | Piese folosite | Estimare |
-| --- | --- | --- |
-| Entități: `Transfer`, `Payee`, istoric | `NewFeature`, `SyntheticData` | 1h |
-| Semnale de țeapă în cod: IBAN nou, sumă neobișnuită, urgență, „cont sigur”, „angajat BNR” | `Check` / `PhraseRule`, `Iban` | 2h |
-| Copilotul: evaluează transferul, explică riscul, cere confirmare (aprobare) | `ToolAgent`, `needsApproval` | 2h |
-| Demo: **escroc simulat contra copilot** pe mai multe replici | `ScenarioAgent` cu țintă `Agent` | 1.5h |
-| Ecranul de transfer (mobil, 390px) | MudBlazor, PWA | 2h |
-
-### Stripe – Financial Confidence (Pilonul III prin angajator) · ~9–10h
-
-| Pas | Piese folosite | Estimare |
-| --- | --- | --- |
-| **De verificat întâi legea în vigoare** (plafoanele de deducere de 400 € + 400 €/an din research) | – | 0.5h |
-| Calcule de deducere și economie fiscală în `FinanceCalculator`, cu teste | `FinanceCalculator`, `expected-number` | 2h |
-| Entități: `Employee`, `Contribution`, `Plan` | `NewFeature` | 1h |
-| Plăți în **modul test Stripe** (chei `sk_test_…`, niciodată live) | ținta `Http` sau SDK-ul Stripe | 2.5h |
-| Agentul: explică angajatului, simulează, propune înscrierea (aprobare) | `ToolAgent`, `RetirementPlan` | 2h |
-
-### Orice altă temă
-
-1. Ce date? → entități cu `NewFeature`, seed cu `SyntheticData`.
-2. Ce decide agentul și ce decide omul? → unelte, iar ce are efecte în afara aplicației primește `needsApproval`.
-3. Ce trebuie să fie mereu corect? → calcul în cod și verificare (`Check`), nu în model.
-4. Ce sistem extern? → `Targets:<nume>`.
-5. Există o conversație de simulat? → `ScenarioAgent`.
-6. Ce livrabil rămâne după? → un `IRunExporter`.
-
-## 5. Împărțirea echipei (5 oameni)
-
-| Rol | Răspunde de |
+| Întrebare | Răspuns |
 | --- | --- |
-| Securitate + dev .NET (în pereche, riscul 5) | domeniul: entități, calcule, verificări, teste |
-| Dev .NET 2 | agentul, uneltele, scenariile, înregistrările |
-| Frontend | `SiteConfig`, pagini, dashboard, mobil, proiector |
-| Pitch | research, ROI, deck, scenariul video, montaj, răspunsuri la întrebări |
+| Pe ce temei prelucrați datele beneficiarilor? | Obligație legală (art. 6 alin. 1 lit. c GDPR): Legea 129/2019 obligă banca să identifice beneficiarul real. Noi nu adăugăm date noi; procesăm ce banca are deja obligația să verifice. |
+| Unde ajung datele? | CNP, IBAN etc. sunt mascate înainte de model. Modelul poate rula pe serverul băncii; în demo arătăm `/privacy`, care citește configurația live. |
+| Cât le păstrați? | Cât cere legea AML pentru dosarul clientului (5 ani de la încetarea relației, art. 40 din Directiva 2015/849); rulările agentului au retenție separată, configurabilă. |
+| Decide AI-ul? | Nu. Agentul propune; actualizarea dosarului pleacă doar cu aprobarea analistului (art. 22 GDPR: fără decizii exclusiv automate). |
+| Ce date ați folosit? | Doar sintetice: firme, persoane și certificate generate. Nu ne-a trebuit nicio dată Raiffeisen. |
 
-Regula: `main` = producție. Lucrăm pe branch-uri, facem merge doar cu CI verde, iar înainte de video intră code freeze.
+## 6. Riscuri
 
-## 6. De făcut azi (deploy și verificări)
+| Risc | Ce facem |
+| --- | --- |
+| Certificatul real arată altfel decât credem | Întrebăm mentorul la primul checkpoint; extragerea are mock, deci demo-ul nu depinde de format. |
+| Modelul extrage greșit un procent | Analistul vede fiecare câmp cu pagina-sursă; diff-ul și calculul sunt în cod, cu teste. |
+| Nu terminăm graful | Tabel indentat (e deja must-have). |
+| Pică modelul în timpul filmării | Înregistrări + `AgentMode = Replay`; în video nu trebuie să apară eticheta „Simulare”, deci testăm conexiunea înainte. |
 
-Rămânem pe **planul gratuit Render**, fără costuri. Consecințe: serviciul adoarme fără trafic, e lent dacă mulți îl
-folosesc odată și fiecare push pe `main` îl repornește (și rupe conexiunile deschise).
+## 7. Program
 
-1. **Render** e creat (`https://hackathon-starter-sjmj.onrender.com`). Completăm în *Environment* variabilele cerute
-   (`AI__…`, `AI__Profiles__driver__…`, `Targets__target__…`, `Security__AccessCode`). Verificăm `/health` → `ok`.
-2. **Keep-awake:** GitHub → *Settings → Secrets and variables → Actions → Variables* → **Repository variable**
-   `APP_URL` = URL-ul Render, fără `/` la final (setat; rularea manuală a ieșit verde).
-   **Obligatoriu și UptimeRobot** (gratuit, HTTP, la 5 min, pe `/health`): cron-ul GitHub n-a pornit nicio rulare
-   programată pe 27 oct., deci singur nu ține serviciul treaz. Le oprim pe amândouă după finală.
-3. Serverul cu modelul open-source **accesibil din internet** (IP public, Tailscale sau tunel), pentru că Render și sala
-   de hackathon nu sunt în rețeaua noastră. Verificăm cu **Settings → Test connections** pe URL-ul public, nu pe localhost.
-4. **Laptopul de demo:** `git pull`, `dotnet run --project src/HackathonStarter`. Rulăm o dată cu Wi-Fi-ul oprit: trebuie să
-   cadă singur pe înregistrare / mock. Pe scenă și în video prezentăm de pe laptop; Render rămâne linkul pentru juriu.
-5. Toți: `git pull`, `dotnet watch --project src/HackathonStarter`, aplicația pornește local.
-6. **După video, fără push pe `main`** până după finală (repornește Render în timpul jurizării).
+| Când | Ce |
+| --- | --- |
+| Miercuri 09:00–10:00 | Kickoff, citim regulamentul (cod scris dinainte? date?), confirmăm ideea. Branch-uri pe roluri. |
+| 10:00–13:00 | Calculator + diff cu teste; entități și seed; certificate sintetice. |
+| 13:00–17:00 | Extragere, agent, primele pagini. **Checkpoint mentor:** întrebările din `RESEARCH-KYC.md`. |
+| 17:00–22:00 | Pagini complete, dashboard, check nou, `/privacy`; graful dacă e timp. |
+| 22:00–02:00 | Înregistrări, lustruire pe calea de demo, README, scenariul video scris cuvânt cu cuvânt. |
+| Joi 07:00 | **Code freeze**: doar reparații pe calea de demo. |
+| 07:00–09:30 | Filmare (mai multe duble, `AgentMode = Replay`), montaj, voce. |
+| 09:30–10:30 | `dotnet build` (0 warnings) + teste, deploy, link în README. **Predare până la 10:30.** |
+
+## 8. Ce avem deja în template (nu se mai scrie)
+
+| Nevoie | Piesa | Unde |
+| --- | --- | --- |
+| Agent cu unelte, aprobare, istoric | `ToolAgent`, `needsApproval`, `/runs` | `Agents/` |
+| PDF → text, extragere tipizată | `DocumentText`, `StructuredAi` | `Services/` |
+| Verdicte deterministe | `Check`, `expected-number`, `pii-leak` | `Features/Checks` |
+| Mascare date personale, retenție, `/privacy` | `PiiVault`, `RunRedaction`, `RetentionService` | `Services/` |
+| Date sintetice valide (CNP, CUI, IBAN) | `SyntheticData` | `Features/Synthetic` |
+| Export (teste, rapoarte), cu aprobare | `IRunExporter`, `/exports` | `Features/Exports` |
+| Demo care nu pică | live → înregistrare → mock | `AI:Record`, `Recordings/` |
+| Pagina principală, pagini publice, RO/EN | `SiteConfig.Landing`, `PublicLayout`, `Lang` | `Config/`, `Components/` |
