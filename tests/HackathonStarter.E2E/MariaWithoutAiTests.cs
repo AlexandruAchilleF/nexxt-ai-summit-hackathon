@@ -112,7 +112,8 @@ public class MariaWithoutAiTests(AppFixture app)
         await Assertions.Expect(page.GetByRole(AriaRole.Heading, new() { Name = "Cases" })).ToBeVisibleAsync();
 
         // Verify case CRS-2026-0001 is listed (may be newly created or from a previous test setup).
-        await Assertions.Expect(page.GetByText("CRS-2026-0001")).ToBeVisibleAsync(new() { Timeout = 15_000 });
+        var caseRow = page.GetByText("CRS-2026-0001", new() { Exact = true }).First;
+        await Assertions.Expect(caseRow).ToBeVisibleAsync(new() { Timeout = 15_000 });
     }
 
     [Fact]
