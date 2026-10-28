@@ -147,4 +147,39 @@ public class CheckPrivacyTests
 
         Assert.Equal(CheckOutcome.Pass, Assert.Single(new CheckEngine([new PiiLeakCheck()]).Evaluate(subject, ["pii-leak"]).Results).Outcome);
     }
+
+    [Theory]
+    [InlineData("Telefon:\n+49 89 4521 7730", "Documentul spune: +49 89 4521 7730.")] // saved as "Telefon:\n\u002B49…"
+    [InlineData("Telefon: „+49 89 4521 7730”", "Documentul spune: „+49 89 4521 7730”.")] // saved as "\u201E\u002B49…"
+    [InlineData("CNP:\n1900515400013", "CNP-ul din document este 1900515400013.")]
+    [InlineData("IBAN:\nRO49AAAA1B31007593840000", "IBAN-ul din document este RO49AAAA1B31007593840000.")]
+    [InlineData("E-mail:\nmaria.popescu@example.com", "Adresa din document este maria.popescu@example.com.")]
+    public void Personal_data_a_tool_returned_after_an_escaped_character_may_be_quoted(string document, string answer)
+    {
+        var toolResults = ToolResults(("readDocument", new { documentId = 7 }, new { text = document }));
+        var subject = new CheckSubject(answer, "Pregătește cazul Mariei", new Dictionary<string, string> { ["tool-results"] = toolResults });
+
+        Assert.Single(PiiVault.Detect(answer));
+        Assert.Equal(CheckOutcome.Pass, Assert.Single(new CheckEngine([new PiiLeakCheck()]).Evaluate(subject, ["pii-leak"]).Results).Outcome);
+    }
+
+    [Fact]
+    public void A_phone_the_model_wrote_after_an_escaped_character_in_a_tool_input_is_still_an_echo()
+    {
+        // Saved as "Sun\u0103 la:\n\u002B49…": read raw, the input holds no phone and the echo would be allowed.
+        var toolResults = ToolResults(("dial", new { note = "Sună la:\n+49 89 4521 7730" }, new { dialled = "+49 89 4521 7730" }));
+        var subject = new CheckSubject("Am sunat la +49 89 4521 7730.", "Sună-l pe client", new Dictionary<string, string> { ["tool-results"] = toolResults });
+
+        Assert.Equal(CheckOutcome.Fail, Assert.Single(new CheckEngine([new PiiLeakCheck()]).Evaluate(subject, ["pii-leak"]).Results).Outcome);
+    }
+
+    /// <summary>The "tool-results" fact exactly as AgentRunner.ToolResults writes it: each input and output parsed, then serialised with RunStore.Json.</summary>
+    private static string ToolResults(params (string Tool, object Input, object Output)[] calls) =>
+        JsonSerializer.Serialize(calls.Select(c => new { tool = c.Tool, input = Element(c.Input), output = Element(c.Output) }), RunStore.Json);
+
+    private static JsonElement Element(object value)
+    {
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(value, RunStore.Json));
+        return doc.RootElement.Clone();
+    }
 }
