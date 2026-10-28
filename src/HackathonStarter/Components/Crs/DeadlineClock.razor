@@ -1,0 +1,158 @@
+@using HackathonStarter.Features.Cases
+@using HackathonStarter.Features.Deadlines
+@inject ISimClock Clock
+
+@* The case deadline on the demo date (docs/PLAN.md 15): the days left, the ruler from the day the bank knew to the deadline,
+   the milestones on it. The dates come from the
+   case (code, DeadlineCalculator); this component only places them. The demo-date jumps live in the Demo menu. *@
+<MudPaper Outlined="true" Class="@($"pa-4 crs-clock {State}")" aria-label="@T("Legal deadline")">
+    <div class="crs-clock-top">
+        <div>
+            <div class="crs-clock-days">
+                @if (Case.DueAt is null)
+                {
+                    <span class="crs-roll">@T("No deadline")</span>
+                }
+                else if (Case.Status == CaseStatus.Closed)
+                {
+                    var spare = Math.Max(0, CrsUi.DaysBetween(Cursor, Case.DueAt.Value));
+                    <span class="crs-roll">@spare</span>
+                    <span class="unit">@(spare == 1 ? T("day to spare · closed on {0}", CrsUi.Date(Cursor)) : T("days to spare · closed on {0}", CrsUi.Date(Cursor)))</span>
+                }
+                else if (Case.Status == CaseStatus.Expired)
+                {
+                    <span class="crs-roll">@TotalDays</span>
+                    <span class="unit">@T("of {0} days used · expired on {1}", TotalDays, CrsUi.Date(Cursor))</span>
+                }
+                else if (DaysLeft < 0)
+                {
+                    <span class="crs-roll">@T("Overdue")</span>
+                    <span class="unit">@T("since {0}; the deadline check runs on the next tick", CrsUi.Date(Case.DueAt.Value))</span>
+                }
+                else
+                {
+                    <span class="crs-roll" @key="DaysLeft">@DaysLeft</span>
+                    <span class="unit">@(DaysLeft == 1 ? T("day left, until {0}", CrsUi.Date(Case.DueAt.Value)) : T("days left, until {0}", CrsUi.Date(Case.DueAt.Value)))</span>
+                }
+            </div>
+        </div>
+        <div class="crs-clock-today">
+            @T("Today on the demo date:") <b class="crs-roll" @key="@CrsUi.Date(Now)">@CrsUi.Date(Now)</b>
+            @if (OffsetDays > 0)
+            {
+                <span class="tabular"> (+@OffsetDays @T("d"))</span>
+            }
+            <br />
+            @if (Case.DueAt is null)
+            {
+                @T("FATCA: the guide gives no deadline (FATCA-SC, p. 38).")
+            }
+            else
+            {
+                @(Case.IsPreexisting ? T("Preexisting account") : T("New account")) <span> · </span>
+                <span class="crs-code">@Case.DeadlineRuleId</span> <span>, @CrsUi.Page(Case.DeadlineGuidePage)</span>
+            }
+        </div>
+    </div>
+
+    @if (Case.DueAt is { } due)
+    {
+        var total = Math.Max(1, (due - Case.OpenedAt).TotalDays);
+        var p = Math.Clamp((Cursor - Case.OpenedAt).TotalDays / total, 0, 1);
+        var step = total <= 120 ? 15 : 30;
+        <div class="@($"crs-ruler{(p > .9 ? " is-near-end" : p < .1 ? " is-near-start" : "")}")" style="@($"--p:{Inv(p)};--tick:{Inv(100.0 * step / total)}%")"
+             role="img" aria-label="@T("Day {0} of {1}", DayOf(Cursor), TotalDays)">
+            <div class="crs-ruler-track">
+                <div class="crs-ruler-fill"></div>
+                <div class="crs-ruler-glint" @key="DayOf(Cursor)"></div>
+            </div>
+            <div class="crs-ruler-ticks"></div>
+            @foreach (var m in Milestones().Where(m => m.At is not null))
+            {
+                var at = Math.Clamp((m.At!.Value - Case.OpenedAt).TotalDays / total, 0, 1);
+                <span class="@($"crs-mark{(m.At <= Cursor ? " is-passed" : "")}{(m.Kind == "due" ? " is-due" : m.Kind == "good" ? " is-good" : "")}")"
+                      style="@($"left:{Inv(at * 100)}%")" title="@($"{T("Day {0}", DayOf(m.At.Value))}: {m.Text}")" aria-hidden="true"></span>
+            }
+            <div class="crs-ruler-cursor"><span class="crs-ruler-now">@(Case.IsOpen ? T("Today") : T("End")) · @T("day {0}", DayOf(Cursor))</span></div>
+            <div class="crs-ruler-days" aria-hidden="true">
+                @for (var d = 0; d < total - step / 3.0; d += step)
+                {
+                    <span style="@($"left:{Inv(100.0 * d / total)}%")">@d</span>
+                }
+                <span style="left:100%">@TotalDays</span>
+            </div>
+        </div>
+    }
+
+    <ol class="crs-events">
+        @{ var shown = Milestones(); var lastPassed = shown.LastOrDefault(m => m.At is not null && m.At <= Cursor); }
+        @foreach (var m in shown)
+        {
+            var passed = m.At is not null && m.At <= Cursor;
+            <li class="@(passed ? m == lastPassed ? "is-passed is-now" : "is-passed" : "is-future")" @key="m.Key">
+                <b>@(m.At is null ? T("No date") : T("Day {0}", DayOf(m.At.Value))) · @CrsUi.DateShort(m.At ?? Now)</b>
+                @m.Text
+            </li>
+        }
+    </ol>
+
+</MudPaper>
+
+@code {
+    [Parameter, EditorRequired] public Case Case { get; set; } = default!;
+    [Parameter, EditorRequired] public DateTime Now { get; set; }
+
+    private sealed record Milestone(string Key, DateTime? At, string Text, string Kind = "");
+
+    private int OffsetDays => (int)Math.Round(Clock.Offset.TotalDays);
+    private int TotalDays => Case.DueAt is { } due ? (int)Math.Round((due - Case.OpenedAt).TotalDays) : 0;
+    private int DaysLeft => Case.DueAt is { } due ? CrsUi.DaysBetween(Now, due) : 0;
+    /// <summary>Where the cursor stops: today while the case is open, the closing or expiry moment after.</summary>
+    private DateTime Cursor => Case.ClosedAt ?? Case.ExpiredAt ?? Now;
+    private int DayOf(DateTime at) => CrsUi.DayNumber(Case.OpenedAt, at);
+
+    private string State => Case.Status switch
+    {
+        CaseStatus.Closed => "is-done",
+        CaseStatus.Expired => "is-over",
+        _ when Case.DueAt is null => "",
+        _ when DaysLeft < 0 => "is-over",
+        _ when DaysLeft <= 7 => "is-urgent",
+        _ => "",
+    };
+
+    private List<Milestone> Milestones()
+    {
+        var list = new List<Milestone> { new("open", Case.OpenedAt, T("Change received, case opened")) };
+        foreach (var r in Case.Requests.Where(r => r.ApprovedAt is not null))
+            list.Add(new($"req{r.Id}", r.ApprovedAt, r.Kind == RequestKind.Reminder
+                ? T("Reminder approved by {0}, sent via {1}", r.ApprovedBy, CrsUi.Channel(r.Channel))
+                : T("Request approved by {0}, sent via {1}", r.ApprovedBy, CrsUi.Channel(r.Channel))));
+        if (Case.RemindedAt is { } reminded)
+            list.Add(new("remind", reminded, T("Reminder drafted, escalated to the tax department")));
+        else if (Case.RemindAt is { } remind && Case.IsOpen)
+            list.Add(new("remind", remind, T("Reminder day: reminder and escalation to the tax department")));
+        else if (Case.EscalatedAt is { } escalated)
+            list.Add(new("esc", escalated, T("Escalated to the tax department")));
+        foreach (var r in Case.Responses)
+            list.Add(new($"resp{r.Id}", r.ReceivedAt, T("Answer received: {0}", CrsUi.Label(r.Kind))));
+        if (Case.ClosedAt is { } closed)
+            list.Add(new("closed", closed, T("Closed with proof of confirmation"), "good"));
+        if (Case.DueAt is { } due && Case.Status != CaseStatus.Closed)
+            list.Add(new("due", due, Case.Status == CaseStatus.Expired ? T("Deadline passed without a valid answer") : Consequence(), "due"));
+        if (Case.DueAt is null && Case.Status != CaseStatus.Closed)
+            list.Add(new("due", null, T("No deadline in the guide: the case stays open until the answer")));
+        return list.OrderBy(m => m.At ?? DateTime.MaxValue).ToList();
+    }
+
+    private string Consequence()
+    {
+        var indicia = string.Join(", ", Case.Indicia.Where(i => i.Regime != Features.Rules.Regime.Fatca).Select(i => i.Jurisdiction).Distinct());
+        if (indicia.Length == 0) return T("Deadline");
+        return Case.IsPreexisting
+            ? T("Deadline. Without an answer: resident at least in {0} (p. 29)", indicia)
+            : T("Deadline. Without an answer: resident in the original jurisdiction and in {0} (p. 35-36)", indicia);
+    }
+
+    private static string Inv(double v) => v.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture);
+}

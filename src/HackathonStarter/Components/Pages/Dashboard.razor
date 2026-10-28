@@ -1,21 +1,32 @@
 @page "/dashboard"
-@using HackathonStarter.Features.Items
-@inject ItemService Items
+@using System.Text.Json
+@using HackathonStarter.Features.Audit
+@using HackathonStarter.Features.Cases
+@using HackathonStarter.Features.Changes
+@using HackathonStarter.Features.Clients
+@using HackathonStarter.Features.Deadlines
+@using HackathonStarter.Features.Rules
+@implements IDisposable
+@inject ICaseService Cases
+@inject IClientService Clients
+@inject IAuditLog Audit
+@inject ISimClock Clock
 @inject CurrentUser CurrentUser
 
 <PageTitle>@T("Dashboard") · @SiteConfig.Name</PageTitle>
 
 <PageHeader Title="@T("Welcome back, {0}", _user?.Name.Split(' ')[0])" Description="@SiteConfig.Description">
     <Actions>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.AutoAwesome" Href="/assistant">@T("Assistant")</MudButton>
+        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Rounded.AssignmentLate" Href="/cases">@T("Cases")</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.EditNote" Href="/changes/new">@T("New change")</MudButton>
     </Actions>
 </PageHeader>
 
 @if (_error is not null)
 {
-    <ErrorState Message="@_error" OnRetry="Load" />
+    <ErrorState Message="@_error" OnRetry="LoadAsync" />
 }
-else if (_stats is null)
+else if (_cases is null)
 {
     <MudGrid Spacing="3">
         @for (var i = 0; i < 4; i++)
@@ -26,46 +37,112 @@ else if (_stats is null)
         <MudItem xs="12" md="4"><MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="320px" Style="border-radius:20px" /></MudItem>
     </MudGrid>
 }
+else if (_cases.Count == 0 && _changes.Count == 0)
+{
+    <MudPaper Outlined="true" Class="pa-4 app-enter crs-start">
+        <div class="crs-grid two" style="align-items:center">
+            <div>
+                <div class="crs-verdict-title" style="font-size:1.75rem">@T("Nothing to decide yet")</div>
+                <p class="crs-hint mt-2 mb-5" style="font-size:15px;max-width:52ch">@T("Cases appear here when a change to a client's data touches an indicium from the ANAF guide. Record one to see the rules, the deadline and the approvals at work.")</p>
+                <div class="d-flex flex-wrap gap-2">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" Href="/changes/new?scenario=4" EndIcon="@Icons.Material.Rounded.ArrowForward">@T("Start with Maria's move to Munich")</MudButton>
+                    <MudButton Variant="Variant.Text" Href="/changes/new">@T("Record another change")</MudButton>
+                </div>
+            </div>
+            <ol class="crs-steps">
+                @foreach (var step in SiteConfig.Landing.Steps)
+                {
+                    <li><b>@step.Title</b><span>@step.Description</span></li>
+                }
+            </ol>
+        </div>
+    </MudPaper>
+}
 else
 {
+    var open = _cases.Where(c => c.IsOpen).ToList();
+    var urgent = open.Count(c => c.DueAt is { } d && CrsUi.DaysBetween(_now, d) <= 7);
+    var escalated = open.Count(c => c.Status == CaseStatus.Escalated);
     <MudGrid Spacing="3">
-        <MudItem xs="6" md="3"><StatCard Label="@T("Total items")" Value="@Format.Number(_stats.Total)" Icon="@Icons.Material.Rounded.Checklist" Href="/items"
-                                         Hint="@T("{0} created this week", _stats.PerDay.TakeLast(7).Sum(d => d.Count))" Series="_spark" /></MudItem>
-        <MudItem xs="6" md="3"><StatCard Label="@T("Active items")" Value="@Format.Number(_stats.ByStatus[ItemStatus.Active])" Icon="@Icons.Material.Rounded.TrendingUp" Delay="70" /></MudItem>
-        <MudItem xs="6" md="3"><StatCard Label="@T("High priority")" Value="@Format.Number(_stats.ByPriority[ItemPriority.High])" Icon="@Icons.Material.Rounded.LocalFireDepartment" Delay="140" /></MudItem>
-        <MudItem xs="6" md="3"><StatCard Label="@T("Total value")" Value="@Format.Money(_stats.TotalValue, compact: true)" Icon="@Icons.Material.Rounded.Payments" Delay="210" /></MudItem>
+        <MudItem xs="6" md="3"><StatCard Label="@T("Open cases")" Value="@Format.Number(open.Count)" Icon="@Icons.Material.Rounded.AssignmentLate" Href="/cases"
+                                         Hint="@T("{0} closed or expired", _cases.Count - open.Count)" /></MudItem>
+        <MudItem xs="6" md="3"><StatCard Label="@T("Due in 7 days")" Value="@Format.Number(urgent)" Icon="@Icons.Material.Rounded.Timer" Delay="70" Href="/cases?view=urgent"
+                                         Hint="@(urgent > 0 ? T("Reminder day has passed") : T("Nothing close to its deadline"))" Tone="@(urgent > 0 ? "warning" : null)" /></MudItem>
+        <MudItem xs="6" md="3"><StatCard Label="@T("Waiting for approval")" Value="@Format.Number(_drafts.Count)" Icon="@Icons.Material.Rounded.HowToReg" Delay="140"
+                                         Href="@(_drafts.Count == 1 ? $"/cases/{_drafts[0]}" : "/cases?view=approval")" Hint="@T("Drafts only the operator can send")" /></MudItem>
+        <MudItem xs="6" md="3"><StatCard Label="@T("Escalated")" Value="@Format.Number(escalated)" Icon="@Icons.Material.Rounded.PriorityHigh" Delay="210" Href="/cases?view=urgent"
+                                         Hint="@T("With the tax department")" Tone="@(escalated > 0 ? "warning" : null)" /></MudItem>
 
         <MudItem xs="12" md="8">
             <MudPaper Outlined="true" Class="pa-4 app-enter" Style="height:100%;animation-delay:280ms">
-                <div class="app-card-title">@T("Created per day")</div>
-                <div class="app-card-sub">@T("Last 14 days")</div>
-                <div class="stat-value mb-3">@Format.Number(_stats.PerDay.Sum(d => d.Count))</div>
-                <AreaChart Points="_perDay" AriaLabel="@T("Created per day")" />
+                <div class="crs-head">
+                    <div>
+                        <div class="app-card-title">@T("Next deadlines")</div>
+                        <div class="app-card-sub">@T("Open cases on the demo date, the closest first")</div>
+                    </div>
+                    <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" Href="/cases">@T("See all")</MudButton>
+                </div>
+                @if (open.Count == 0)
+                {
+                    <div class="crs-hint">@T("No open case. Every case so far is closed or expired.")</div>
+                }
+                @{ var i = 0; }
+                @foreach (var c in open.Take(6))
+                {
+                    var total = c.DueAt is { } due ? Math.Max(1, (due - c.OpenedAt).TotalDays) : 0;
+                    var p = total == 0 ? 0 : Math.Clamp((_now - c.OpenedAt).TotalDays / total, 0, 1);
+                    var days = c.DueAt is { } d2 ? CrsUi.DaysBetween(_now, d2) : (int?)null;
+                    <a class="crs-due-row" href="@($"/cases/{c.Code}")" style="@($"--i:{i++}")">
+                        <span class="crs-due-who">
+                            <span class="crs-code">@c.Code</span>
+                            <span class="app-list-meta d-block">@_names.GetValueOrDefault(c.ClientCode, c.ClientCode) · @CrsUi.Label(c.Regime)</span>
+                        </span>
+                        <span class="crs-due-bar @(days is null ? "is-none" : days < 0 ? "is-over" : days <= 7 ? "is-urgent" : "")" style="@($"--p:{Inv(p)}")" aria-hidden="true"><i></i></span>
+                        <DaysLeft Due="c.DueAt" Now="_now" />
+                    </a>
+                }
             </MudPaper>
         </MudItem>
         <MudItem xs="12" md="4">
             <MudPaper Outlined="true" Class="pa-4 app-enter" Style="height:100%;animation-delay:340ms">
-                <div class="app-card-title">@T("By status")</div>
-                <div class="app-card-sub mb-6">@T("All items")</div>
-                <ActivityRings Segments="_byStatus" Unit="@T("Items").ToLower()" />
+                <div class="app-card-title">@T("Who the cases wait for")</div>
+                <div class="app-card-sub mb-6">@T("All cases")</div>
+                <ActivityRings Segments="_byWaiting" Unit="@T("cases")" />
             </MudPaper>
         </MudItem>
 
-        <MudItem xs="12">
-            <div class="d-flex align-center justify-space-between mt-4 mb-2">
-                <div class="app-card-title">@T("Recent items")</div>
-                <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" Href="/items">@T("See all")</MudButton>
-            </div>
-            <div class="app-list app-enter" style="animation-delay:400ms">
-                @foreach (var item in _stats.Recent)
+        <MudItem xs="12" md="4">
+            <MudPaper Outlined="true" Class="pa-4 app-enter" Style="height:100%;animation-delay:400ms">
+                <div class="app-card-title">@T("Decisions of the code")</div>
+                <div class="app-card-sub mb-4">@T("On the last {0} changes", _changes.Count)</div>
+                @{ var k = 0; var max = Math.Max(1, _decisions.Values.DefaultIfEmpty(0).Max()); }
+                @foreach (var d in Enum.GetValues<Decision>())
                 {
-                    <a class="app-list-row has-icon" href="@($"/items/{item.Id}")">
-                        <span class="app-list-icon"><MudIcon Icon="@Icons.Material.Rounded.Description" /></span>
+                    var n = _decisions.GetValueOrDefault(d);
+                    var tone = CrsUi.Tone(d);
+                    <div class="crs-decision-row">
+                        <span class="d-flex align-center gap-2"><MudIcon Icon="@CrsUi.Icon(d)" Style="@($"font-size:16px;color:{(tone is null ? "var(--mud-palette-text-secondary)" : $"var(--mud-palette-{(tone == "danger" ? "error" : tone)})")}")" /> @CrsUi.Label(d)</span>
+                        <span class="@($"crs-bar is-{tone ?? "neutral"}")" style="@($"--i:{k++}")"><i style="@($"width:{Inv(100.0 * n / max)}%")"></i></span>
+                        <b class="tabular">@n</b>
+                    </div>
+                }
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="8">
+            <div class="d-flex align-center justify-space-between mb-2">
+                <div class="app-card-title">@T("Recent changes")</div>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" Href="/audit">@T("Audit log")</MudButton>
+            </div>
+            <div class="app-list app-enter" style="animation-delay:460ms">
+                @foreach (var ch in _changes.Take(6))
+                {
+                    <a class="app-list-row has-icon" href="@(ch.CaseCode is { } code ? $"/cases/{code}" : $"/clients/{ch.Client}")">
+                        <span class="app-list-icon"><MudIcon Icon="@CrsUi.Icon(ch.Kind)" /></span>
                         <span class="app-list-main">
-                            <span class="app-list-title d-block">@item.Title</span>
-                            <span class="app-list-meta">@Format.Relative(item.CreatedAt)</span>
+                            <span class="app-list-title d-block">@CrsUi.Label(ch.Kind) · @_names.GetValueOrDefault(ch.Client, ch.Client)</span>
+                            <span class="app-list-meta">@CrsUi.DateTimeText(ch.At) · @CrsUi.Channel(ch.Channel)@(ch.CaseCode is { } cc ? $" · {cc}" : "")</span>
                         </span>
-                        <ItemStatusChip Status="item.Status" />
+                        <DecisionPill Decision="ch.Decision" />
                         <MudIcon Icon="@Icons.Material.Rounded.ChevronRight" Class="app-chevron" />
                     </a>
                 }
@@ -75,40 +152,75 @@ else
 }
 
 @code {
-    private DemoUser? _user;
-    private ItemStats? _stats;
-    private string? _error;
-    private IReadOnlyList<(string Label, double Value)> _perDay = [];
-    private IReadOnlyList<double> _spark = [];
-    private IReadOnlyList<(string Label, double Value, string Color)> _byStatus = [];
+    private sealed record ChangeRow(DateTime At, string Client, ChangeKind Kind, string Channel, Decision Decision, string? CaseCode);
 
-    // Red and orange stay reserved for failures and risk; the other states are greys, like their pills.
-    private static string StatusColor(ItemStatus status) => status switch
-    {
-        ItemStatus.Active => "var(--app-accent)",
-        ItemStatus.Draft => "var(--mud-palette-text-secondary)",
-        _ => "color-mix(in srgb, var(--mud-palette-text-secondary) 40%, transparent)",
-    };
+    private DemoUser? _user;
+    private List<Case>? _cases;
+    private List<string> _drafts = [];
+    private List<ChangeRow> _changes = [];
+    private Dictionary<Decision, int> _decisions = [];
+    private Dictionary<string, string> _names = [];
+    private IReadOnlyList<(string Label, double Value, string Color)> _byWaiting = [];
+    private DateTime _now;
+    private string? _error;
 
     protected override async Task OnInitializedAsync()
     {
         _user = await CurrentUser.GetAsync();
-        await Load();
+        CrsSignals.Changed += OnSignal;
+        await LoadAsync();
     }
 
-    private async Task Load()
+    private Task OnSignal() => InvokeAsync(async () => { await LoadAsync(); StateHasChanged(); });
+
+    private async Task LoadAsync()
     {
         try
         {
             _error = null;
-            _stats = await Items.StatsAsync();
-            _perDay = _stats.PerDay.Select(d => (d.Day.ToString("d MMM", Format.Culture), (double)d.Count)).ToList();
-            _spark = _stats.PerDay.Select(d => (double)d.Count).ToList();
-            _byStatus = _stats.ByStatus.OrderByDescending(s => s.Value).Select(s => (T(s.Key.ToString()), (double)s.Value, StatusColor(s.Key))).ToList();
+            _now = Clock.UtcNow;
+            var cases = await Cases.QueueAsync(new CaseQueueFilter(OpenOnly: false));
+            _names = (await Clients.ListAsync()).ToDictionary(c => c.Code, c => c.FullName);
+
+            // Drafts live on the full case; the queue carries the indicia only.
+            var drafts = new List<string>();
+            foreach (var c in cases.Where(c => c.IsOpen))
+                if (await Cases.GetAsync(c.Code) is { } full && full.Requests.Any(r => r.Status == RequestStatus.Draft)) drafts.Add(c.Code);
+            _drafts = drafts;
+
+            // The decision of each change is in its audit entry (codes only, masked like every payload).
+            var codes = cases.ToDictionary(c => c.Id, c => c.Code);
+            _changes = [.. (await Audit.ListAsync(take: 500)).Where(e => e.Kind == AuditKinds.ChangeReceived)
+                .Select(e => Parse(e, codes)).OfType<ChangeRow>().OrderByDescending(r => r.At).Take(50)];
+            _decisions = _changes.GroupBy(r => r.Decision).ToDictionary(g => g.Key, g => g.Count());
+
+            static bool Operator(Case c) => c.Status is CaseStatus.Open or CaseStatus.ResponseReceived;
+            _byWaiting =
+            [
+                (T("The bank"), cases.Count(c => Operator(c)), "var(--app-accent)"),
+                (T("The client"), cases.Count(c => c.IsOpen && !Operator(c)), "var(--mud-palette-warning)"),
+                (T("Done"), cases.Count(c => !c.IsOpen), "color-mix(in srgb, var(--mud-palette-text-secondary) 40%, transparent)"),
+            ];
+            _cases = cases;
         }
-        catch (Exception ex)
-        {
-            _error = ex.Message;
-        }
+        catch (Exception ex) { _error = ex.Message; }
     }
+
+    private static ChangeRow? Parse(AuditEntry e, Dictionary<int, string> codes)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(e.PayloadJson);
+            var root = doc.RootElement;
+            string? Str(string name) => root.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
+            if (!Enum.TryParse<ChangeKind>(Str("kind"), out var kind) || !Enum.TryParse<Decision>(Str("decision"), out var decision)) return null;
+            return new ChangeRow(e.At, Str("client") ?? "-", kind, Str("channel") ?? "", decision,
+                e.CaseId is { } id && codes.TryGetValue(id, out var code) ? code : null);
+        }
+        catch (JsonException) { return null; }
+    }
+
+    private static string Inv(double v) => v.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+
+    public void Dispose() => CrsSignals.Changed -= OnSignal;
 }

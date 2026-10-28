@@ -1,7 +1,233 @@
 @page "/metrics"
+@using HackathonStarter.Features.Evaluation
+@using HackathonStarter.Features.Rules
+@using HackathonStarter.Features.Synthetic
+@inject IEvaluationService Evaluation
 
 <PageTitle>@T("Metrics") · @SiteConfig.Name</PageTitle>
 
-<PageHeader Title="@T("Metrics")" Description="@T("Caught, missed and false alarms on the golden cases and the synthetic clients.")" />
+<PageHeader Title="@T("Metrics")" Description="@T("Measured now, by code, on the golden cases, the synthetic clients and the generated PDFs. Each part says where its numbers come from; only a real run is a result.")">
+    <Actions>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.Refresh" Disabled="_running" OnClick="RunAsync">
+            @(_running ? T("Measuring…") : T("Measure again"))
+        </MudButton>
+    </Actions>
+</PageHeader>
 
-<EmptyState Icon="@Icons.Material.Rounded.Insights" Title="@T("Coming in the next phase")" Description="@T("The backend for this page is being built.")" />
+@if (_error is not null)
+{
+    <ErrorState Message="@_error" OnRetry="RunAsync" />
+}
+else if (_report is null)
+{
+    <MudGrid Spacing="3">
+        @for (var i = 0; i < 4; i++)
+        {
+            <MudItem xs="6" md="3"><MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="132px" Style="border-radius:20px" /></MudItem>
+        }
+        <MudItem xs="12"><MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="360px" Style="border-radius:20px" /></MudItem>
+    </MudGrid>
+}
+else
+{
+    var r = _report;
+    var g = r.Spec.GoldenTotals;
+    var s = r.Spec.SyntheticTotals;
+    <div class="crs-meta mb-4" style="margin-top:-16px" @key="@($"meta{r.RanAt.Ticks}")">
+        <span>@T("Measured on the demo date {0}", CrsUi.DateTimeText(r.RanAt))</span>
+        <span>@T("in {0} ms", Math.Round(r.Duration.TotalMilliseconds))</span>
+        <span>@T("Engine {0}", r.Spec.EngineVersion)</span>
+    </div>
+
+    <div class="crs-stack" @key="r.RanAt">
+        <MudPaper Outlined="true" Class="pa-4 app-enter">
+            <div class="crs-head">
+                <div>
+                    <div class="app-card-title">@T("The rules of the guide")</div>
+                    <div class="crs-hint" style="max-width:72ch">@Lang.Pick(r.Spec.Source.ReasonRo, r.Spec.Source.Reason)</div>
+                </div>
+                @SourcePill(r.Spec.Source)
+            </div>
+            <div class="crs-metrics">
+                @Metric(T("Golden cases passed"), g.Passed, g.Evaluated, g.Passed == g.Evaluated ? "success" : "warning", T("{0} without input yet", g.NoInput))
+                @Metric(T("Synthetic clients passed"), s.Passed, s.Evaluated, s.Passed == s.Evaluated ? "success" : "warning", T("{0} clients", s.Cases))
+                @Metric(T("Actions caught"), g.Caught + s.Caught, g.ActionsExpected + s.ActionsExpected, g.Missed + s.Missed == 0 ? "success" : "warning", T("{0} missed", g.Missed + s.Missed))
+                @Metric(T("False alarms"), g.FalseAlarms + s.FalseAlarms, null, g.FalseAlarms + s.FalseAlarms == 0 ? "success" : "danger", T("A case opened where none was expected"))
+            </div>
+
+            <div class="crs-title mt-6 mb-2">@T("Golden cases")</div>
+            <div class="crs-golden">
+                @{ var i = 0; }
+                @foreach (var row in r.Spec.Golden)
+                {
+                    var title = GoldenCases.All.FirstOrDefault(x => x.Id == row.Id)?.Title ?? row.Id;
+                    <div class="@($"crs-golden-row is-{row.Status.ToString().ToLowerInvariant()}")" style="@($"--i:{i++}")">
+                        <span class="crs-golden-id crs-code">@row.Id</span>
+                        <span class="crs-golden-title">@T(title)</span>
+                        <span class="crs-golden-decision">
+                            <DecisionPill Decision="row.Expected" />
+                            @if (row.Actual is { } actual && actual != row.Expected)
+                            {
+                                <MudIcon Icon="@Icons.Material.Rounded.ArrowForward" Style="font-size:14px" />
+                                <DecisionPill Decision="actual" />
+                            }
+                        </span>
+                        <span class="crs-golden-checks">
+                            @Check(T("Indicia"), row.IndiciaMatch)
+                            @Check(T("Cleared"), row.ClearedMatch)
+                            @Check(T("Deadline"), row.Deadline?.Matches)
+                        </span>
+                        <span class="crs-golden-status">@StatusPill(row)</span>
+                    </div>
+                }
+            </div>
+        </MudPaper>
+
+        <div class="crs-grid two">
+            <MudPaper Outlined="true" Class="pa-4 app-enter" Style="animation-delay:80ms">
+                <div class="crs-head">
+                    <div>
+                        <div class="app-card-title">@T("The hidden-text shield")</div>
+                        <div class="crs-hint">@Lang.Pick(r.Uncertainty.Shield.Source.ReasonRo, r.Uncertainty.Shield.Source.Reason)</div>
+                    </div>
+                    @SourcePill(r.Uncertainty.Shield.Source)
+                </div>
+                @{ var k = 0; }
+                @foreach (var t in r.Uncertainty.Shield.ByConcealment)
+                {
+                    <div class="crs-decision-row">
+                        <span>@Concealment(t.Concealment)</span>
+                        <span class="@($"crs-bar is-{(t.Missed == 0 ? "success" : "warning")}")" style="@($"--i:{k++}")"><i style="@($"width:{Pct(t.Detected, t.Hidden)}%")"></i></span>
+                        <b class="tabular">@t.Detected/@t.Hidden</b>
+                    </div>
+                }
+                <div class="crs-hint mt-3">
+                    @T("{0} clean documents, {1} false alarm(s).", r.Uncertainty.Shield.CleanDocuments, r.Uncertainty.Shield.FalseAlarms)
+                    @T("Covered text is not detected")
+                </div>
+            </MudPaper>
+
+            <MudPaper Outlined="true" Class="pa-4 app-enter" Style="animation-delay:140ms">
+                <div class="crs-head">
+                    <div>
+                        <div class="app-card-title">@T("The quote verifier")</div>
+                        <div class="crs-hint">@Lang.Pick(r.Uncertainty.Quotes.Source.ReasonRo, r.Uncertainty.Quotes.Source.Reason)</div>
+                    </div>
+                    @SourcePill(r.Uncertainty.Quotes.Source)
+                </div>
+                @Quotes(T("True quotes verified"), r.Uncertainty.Quotes.True.Verified, r.Uncertainty.Quotes.True.Quotes, "success", 0)
+                @Quotes(T("Quotes only in hidden text, rejected"), r.Uncertainty.Quotes.Hidden.Rejected, r.Uncertainty.Quotes.Hidden.Quotes, "success", 1)
+                @Quotes(T("Invented quotes, rejected"), r.Uncertainty.Quotes.Invented.Rejected, r.Uncertainty.Quotes.Invented.Quotes, "success", 2)
+                <div class="crs-hint mt-3">@T("Fixed quotes on the generated PDFs: this measures the code, not a model.")</div>
+            </MudPaper>
+        </div>
+
+        <div class="crs-grid two">
+            <MudPaper Outlined="true" Class="pa-4 app-enter" Style="animation-delay:200ms">
+                <div class="crs-head">
+                    <div>
+                        <div class="app-card-title">@T("Context signals")</div>
+                        <div class="crs-hint">@Lang.Pick(r.Uncertainty.Signals.Source.ReasonRo, r.Uncertainty.Signals.Source.Reason)</div>
+                    </div>
+                    @SourcePill(r.Uncertainty.Signals.Source)
+                </div>
+                <div class="crs-metrics two">
+                    @Metric(T("Decisions changed by a signal"), r.Uncertainty.Signals.ChangedDecision ?? 0, null, "success",
+                            r.Uncertainty.Signals.EngineTakesSignals ? T("The engine can receive a signal") : T("The engine cannot receive a signal: 0 by construction"))
+                    @Metric(T("Cases with a signal"), r.Uncertainty.Signals.CasesWithSignal.Count, null, null, string.Join(", ", r.Uncertainty.Signals.CasesWithSignal.Take(6)))
+                </div>
+                <div class="crs-title mt-5">@T("AI extraction")</div>
+                <div class="crs-hint d-flex align-center gap-2 mt-1">@SourcePill(r.Uncertainty.Extraction.Source) @Lang.Pick(r.Uncertainty.Extraction.Source.ReasonRo, r.Uncertainty.Extraction.Source.Reason)</div>
+            </MudPaper>
+
+            <MudPaper Outlined="true" Class="pa-4 app-enter" Style="animation-delay:260ms">
+                <div class="app-card-title mb-1">@T("Time per case")</div>
+                <div class="crs-hint mb-4">@T("No number is made up: without a real run or a mentor's estimate, the part says so.")</div>
+                <div class="crs-fact">
+                    <MudIcon Icon="@Icons.Material.Rounded.SmartToy" />
+                    <div>
+                        <div><b class="tabular">@(r.Efficiency.AgentMinutesPerCase is { } a ? T("{0} min", a.ToString("0.#", Format.Culture)) : "-")</b> <span class="crs-hint">@T("with the agent")</span></div>
+                        <div class="crs-hint">@Lang.Pick(r.Efficiency.Agent.ReasonRo, r.Efficiency.Agent.Reason)</div>
+                    </div>
+                    @SourcePill(r.Efficiency.Agent)
+                </div>
+                <div class="crs-fact">
+                    <MudIcon Icon="@Icons.Material.Rounded.Person" />
+                    <div>
+                        <div><b class="tabular">@(r.Efficiency.ManualMinutesPerCase is { } m ? T("{0} min", m.ToString("0.#", Format.Culture)) : "-")</b> <span class="crs-hint">@T("by hand")</span></div>
+                        <div class="crs-hint">@Lang.Pick(r.Efficiency.Manual.ReasonRo, r.Efficiency.Manual.Reason)</div>
+                    </div>
+                    @SourcePill(r.Efficiency.Manual)
+                </div>
+            </MudPaper>
+        </div>
+    </div>
+}
+
+@code {
+    private EvaluationReport? _report;
+    private string? _error;
+    private bool _running;
+
+    protected override Task OnInitializedAsync() => RunAsync();
+
+    private async Task RunAsync()
+    {
+        _running = true;
+        try
+        {
+            _error = null;
+            _report = await Evaluation.RunAsync();
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _running = false; }
+    }
+
+    private static string Pct(int part, int total) => total == 0 ? "0" : (100.0 * part / total).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+
+    private static RenderFragment SourcePill(SourceNote note) => @<Pill Tone="@(note.Source switch { EvaluationSource.Real => "success", EvaluationSource.Phase0Placeholder => "warning", _ => null })"
+                                                                       Icon="@(note.Source == EvaluationSource.Real ? Icons.Material.Rounded.Verified : Icons.Material.Rounded.HelpOutline)">
+        @(note.Source switch { EvaluationSource.Real => T("Real run"), EvaluationSource.Phase0Placeholder => T("Placeholder"), _ => T("Not available") })
+    </Pill>;
+
+    private static RenderFragment Metric(string label, int value, int? of, string? tone, string? hint) => @<div class="crs-metric">
+        <div class="stat-label">@label</div>
+        <div class="stat-value" style="@(tone is null ? null : $"color:var(--mud-palette-{(tone == "danger" ? "error" : tone)})")">
+            <CountUp Value="value" />@if (of is { } total)
+            {
+                <span class="crs-metric-of">/ @total</span>
+            }
+        </div>
+        @if (!string.IsNullOrEmpty(hint))
+        {
+            <div class="stat-hint">@hint</div>
+        }
+    </div>;
+
+    private static RenderFragment Quotes(string label, int part, int total, string tone, int i) => @<div class="crs-decision-row" style="grid-template-columns:minmax(0,1fr) 120px 56px">
+        <span>@label</span>
+        <span class="@($"crs-bar is-{tone}")" style="@($"--i:{i}")"><i style="@($"width:{Pct(part, total)}%")"></i></span>
+        <b class="tabular">@part/@total</b>
+    </div>;
+
+    private static RenderFragment Check(string label, bool? ok) => @<span class="@($"crs-check{(ok is null ? " is-skip" : ok.Value ? " is-ok" : " is-bad")}")" title="@(ok is null ? T("Not compared") : ok.Value ? T("Matches") : T("Differs"))">
+        <MudIcon Icon="@(ok is null ? Icons.Material.Rounded.Remove : ok.Value ? Icons.Material.Rounded.Check : Icons.Material.Rounded.Close)" />@label
+    </span>;
+
+    private static RenderFragment StatusPill(CoverageRow row) => row.Status switch
+    {
+        CoverageStatus.Passed => @<Pill Tone="success" Icon="@Icons.Material.Rounded.TaskAlt">@T("Passed")</Pill>,
+        CoverageStatus.Failed => @<Pill Tone="danger" Icon="@Icons.Material.Rounded.Close">@T("Failed")</Pill>,
+        CoverageStatus.Shield => @<Pill Icon="@Icons.Material.Rounded.Shield">@T("Measured by the shield")</Pill>,
+        _ => @<Pill Icon="@Icons.Material.Rounded.HourglassEmpty">@T("No input yet")</Pill>,
+    };
+
+    private static string Concealment(Concealment c) => c switch
+    {
+        Features.Synthetic.Concealment.White => T("white text"),
+        Features.Synthetic.Concealment.Tiny => T("font under 2 pt"),
+        Features.Synthetic.Concealment.OffPage => T("outside the page"),
+        Features.Synthetic.Concealment.Invisible => T("invisible text"),
+        _ => c.ToString(),
+    };
+}

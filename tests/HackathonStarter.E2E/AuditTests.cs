@@ -10,7 +10,7 @@ public class AuditTests(AppFixture app)
     public async Task Tampering_an_entry_breaks_the_chain_exactly_there()
     {
         var page = await app.NewPageAsync();
-        await app.GoAsync(page, "/audit");
+        await app.GoAsync(page, "/audit?tamper=1"); // tamper mode is a demo switch (also in the Demo menu)
 
         await page.GetByRole(AriaRole.Button, new() { Name = "Verify" }).ClickAsync();
         await Assertions.Expect(page.GetByText("Chain intact")).ToBeVisibleAsync();

@@ -1,0 +1,8 @@
+@* A whole number that counts up from 0 when it first appears (CSS @property; reduced motion shows the value at once).
+   The real value is in the text for screen readers and tests; the animated digits are decoration. *@
+<span class="@Class" style="position:relative"><span class="crs-sr">@Value</span><span class="crs-count" style="@($"--to:{Value}")" aria-hidden="true"></span></span>
+
+@code {
+    [Parameter, EditorRequired] public int Value { get; set; }
+    [Parameter] public string? Class { get; set; }
+}

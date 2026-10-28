@@ -1,9 +1,12 @@
 @page "/audit"
 @using HackathonStarter.Features.Audit
+@using HackathonStarter.Features.Cases
 @inject IAuditLog Audit
+@inject ICaseService Cases
 @inject IDialogService Dialogs
 @inject ISnackbar Snackbar
 @inject CurrentUser CurrentUser
+@implements IDisposable
 
 <PageTitle>@T("Audit log") · @SiteConfig.Name</PageTitle>
 
@@ -16,7 +19,7 @@
 
 @if (_verification is { } v)
 {
-    <MudAlert Severity="@(v.Ok ? Severity.Success : Severity.Error)" Class="mb-4">
+    <MudAlert Severity="@(v.Ok ? Severity.Success : Severity.Error)" Class="mb-4 crs-swap" Style="display:flex" @key="_sweep">
         @(v.Ok ? T("Chain intact: {0} entries checked", v.Checked) : T("Chain broken at entry #{0}", v.FirstBrokenSeq))
     </MudAlert>
 }
@@ -27,16 +30,25 @@
 }
 else if (_entries is null)
 {
-    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="44px" Width="360px" Style="border-radius:12px" Class="mb-4" />
+    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="360px" Style="border-radius:20px" />
 }
 else if (_entries.Count == 0)
 {
-    <EmptyState Title="@T("No entries yet")" Description="@T("Every change, rule, case step, evidence check and approval is written here.")" Icon="@Icons.Material.Rounded.Verified" />
+    <EmptyState Title="@T("No entries yet")" Description="@T("Every change, rule, case step, evidence check and approval is written here.")" Icon="@Icons.Material.Rounded.Verified">
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Href="/changes/new">@T("Record a change")</MudButton>
+    </EmptyState>
 }
 else
 {
-    <div class="audit-table">
-        <MudTable T="AuditEntry" Items="_entries" Breakpoint="Breakpoint.Sm" Dense="true" Hover="true" Outlined="true" Elevation="0" RowStyleFunc="RowStyle">
+    <div class="d-flex flex-wrap align-center gap-3 mb-4">
+        <Segmented Label="@T("Audit log")" @bind-Value="_view" Options="@([
+            new("steps", T("Steps and decisions"), _entries.Count(e => e.Kind != AuditKinds.RuleApplied)),
+            new("all", T("Everything"), _entries.Count)])" />
+        <span class="crs-hint" style="margin:0">@(_view == "steps" ? T("The rule checks of each change are hidden; they stay in the chain.") : T("Including every rule checked on every change."))</span>
+    </div>
+    <div class="@($"audit-table{(_verification is null ? "" : _verification.Ok ? " is-swept" : " is-broken")}")" @key="@($"{_sweep}|{_view}")">
+        <MudTable T="AuditEntry" Items="Shown" Breakpoint="Breakpoint.Sm" Dense="true" Hover="true" Outlined="true" Elevation="0" RowStyleFunc="RowStyle" RowClassFunc="RowClass">
             <HeaderContent>
                 <MudTh>#</MudTh>
                 <MudTh>@T("When")</MudTh>
@@ -45,13 +57,14 @@ else
                 <MudTh>@T("Kind")</MudTh>
                 <MudTh>@T("Payload")</MudTh>
                 <MudTh>@T("Hash")</MudTh>
-                @if (_isAdmin)
+                @if (_isAdmin && _tamperMode)
                 {
                     <MudTh></MudTh>
                 }
             </HeaderContent>
             <RowTemplate>
-                <MudTd DataLabel="#">
+                <MudTd DataLabel="#" Style="white-space:nowrap">
+                    <span class="audit-link" aria-hidden="true"><MudIcon Icon="@Icons.Material.Rounded.Link" /></span>
                     <span class="audit-seq mono">@context.Seq</span>
                     @if (context.Seq == _verification?.FirstBrokenSeq)
                     {
@@ -62,13 +75,22 @@ else
                         <Pill>@T("after a break")</Pill>
                     }
                 </MudTd>
-                <MudTd DataLabel="@T("When")"><span style="white-space:nowrap">@Format.DateTime(DateTime.SpecifyKind(context.At, DateTimeKind.Utc))</span></MudTd>
-                <MudTd DataLabel="@T("Actor")">@context.Actor</MudTd>
-                <MudTd DataLabel="@T("Case")">@(context.CaseId?.ToString() ?? "—")</MudTd>
-                <MudTd DataLabel="@T("Kind")"><span class="mono">@context.Kind</span></MudTd>
-                <MudTd DataLabel="@T("Payload")" Class="audit-payload"><span class="mono audit-ellipsis" title="@context.PayloadJson">@context.PayloadJson</span></MudTd>
+                <MudTd DataLabel="@T("When")"><span style="white-space:nowrap">@CrsUi.DateTimeText(context.At)</span></MudTd>
+                <MudTd DataLabel="@T("Actor")"><span style="white-space:nowrap">@CrsUi.Actor(context.Actor)</span></MudTd>
+                <MudTd DataLabel="@T("Case")">
+                    @if (context.CaseId is { } id && _codes.TryGetValue(id, out var caseCode))
+                    {
+                        <a class="crs-code" href="@($"/cases/{caseCode}")" style="white-space:nowrap">@caseCode</a>
+                    }
+                    else
+                    {
+                        <span class="crs-hint">-</span>
+                    }
+                </MudTd>
+                <MudTd DataLabel="@T("Kind")"><span style="white-space:nowrap" title="@context.Kind">@CrsUi.AuditKind(context.Kind)</span></MudTd>
+                <MudTd DataLabel="@T("Payload")" Class="audit-payload"><span class="audit-ellipsis" title="@context.PayloadJson">@Readable(context.PayloadJson)</span></MudTd>
                 <MudTd DataLabel="@T("Hash")"><span class="mono" title="@context.Hash">@context.Hash[..Math.Min(12, context.Hash.Length)]</span></MudTd>
-                @if (_isAdmin)
+                @if (_isAdmin && _tamperMode)
                 {
                     <MudTd>
                         <MudIconButton Icon="@Icons.Material.Rounded.EditNote" Size="Size.Small" Color="Color.Error" aria-label="@T("Tamper")"
@@ -82,13 +104,25 @@ else
 
 @code {
     private IReadOnlyList<AuditEntry>? _entries;
+    private Dictionary<int, string> _codes = [];
     private AuditVerification? _verification;
+    private string _view = "steps";
     private string? _error;
     private bool _isAdmin, _verifying;
+    private int _sweep;
+    private bool _tamperMode;
+
+    [CascadingParameter] public DemoContext? Demo { get; set; }
+    /// <summary>?tamper=1 turns tamper mode on (also from the Demo menu).</summary>
+    [SupplyParameterFromQuery(Name = "tamper")] public string? Tamper { get; set; }
+
+    private IEnumerable<AuditEntry> Shown => _view == "all" ? _entries! : _entries!.Where(e => e.Kind != AuditKinds.RuleApplied);
 
     protected override async Task OnInitializedAsync()
     {
         _isAdmin = (await CurrentUser.GetAsync()).Role == Roles.Admin; // the service checks it again
+        _tamperMode = Tamper is not null;
+        OfferDemo();
         await LoadAsync();
     }
 
@@ -98,6 +132,7 @@ else
         {
             _error = null;
             _entries = await Audit.ListAsync();
+            _codes = (await Cases.QueueAsync(new CaseQueueFilter(OpenOnly: false))).ToDictionary(c => c.Id, c => c.Code);
         }
         catch (Exception ex) { _error = ex.Message; }
     }
@@ -108,6 +143,7 @@ else
         try
         {
             _verification = await Audit.VerifyAsync();
+            _sweep++; // restarts the sweep down the chain
             await LoadAsync();
         }
         catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
@@ -129,6 +165,37 @@ else
         catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
     }
 
-    private string RowStyle(AuditEntry entry, int _) =>
-        entry.Seq == _verification?.FirstBrokenSeq ? "background: var(--app-danger-tint)" : "";
+    /// <summary>Tamper is a demo of the hash chain, not an operator task: it is switched on from the Demo menu.</summary>
+    private void OfferDemo()
+    {
+        if (Demo is null || !_isAdmin) return;
+        Demo.Offer(this, T("Audit log"),
+        [
+            new(_tamperMode ? T("Hide the tamper buttons") : T("Tamper mode"), Icons.Material.Rounded.EditNote,
+                () => { _tamperMode = !_tamperMode; OfferDemo(); return InvokeAsync(StateHasChanged); },
+                _tamperMode ? null : T("edit an entry behind the app's back"), Destructive: !_tamperMode),
+        ]);
+    }
+
+    /// <summary>The payload as "key: value" pairs (codes, IDs, statuses; already masked); the raw JSON stays in the tooltip.</summary>
+    private static string Readable(string json)
+    {
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            if (doc.RootElement.ValueKind != System.Text.Json.JsonValueKind.Object) return json;
+            return string.Join(" · ", doc.RootElement.EnumerateObject()
+                .Where(p => p.Value.ValueKind is not (System.Text.Json.JsonValueKind.Null or System.Text.Json.JsonValueKind.Undefined))
+                .Select(p => $"{p.Name}: {(p.Value.ValueKind == System.Text.Json.JsonValueKind.Array ? string.Join(", ", p.Value.EnumerateArray().Select(v => v.ToString())) : p.Value.ToString())}"));
+        }
+        catch (System.Text.Json.JsonException) { return json; }
+    }
+
+    public void Dispose() => Demo?.Withdraw(this);
+
+    private string RowStyle(AuditEntry entry, int index) =>
+        $"--i:{Math.Min(index, 40)}" + (entry.Seq == _verification?.FirstBrokenSeq ? ";background: var(--app-danger-tint)" : "");
+
+    private string RowClass(AuditEntry entry, int _) =>
+        entry.Seq == _verification?.FirstBrokenSeq ? "is-break" : entry.Seq > _verification?.FirstBrokenSeq ? "is-after" : "";
 }
