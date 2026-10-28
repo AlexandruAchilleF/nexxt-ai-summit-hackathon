@@ -333,8 +333,12 @@ public class GoldenCasesDataTests
         Assert.Equal(["CRS-IND-CO:IT", "CRS-IND-MAIL:IT"], GoldenCases.Get("12").ExpectedHits);
 
         // Î12: the cleared CRS rule of 5c and 14 gives the guide's reason first; "SUA nu e jurisdicție CRS raportabilă" comes after.
-        Assert.StartsWith("ordin dintr-un cont de depozit, exceptat la CRS", Assert.Single(GoldenCases.Get("5c").ExpectedClearedRules).Reason, StringComparison.Ordinal);
-        Assert.StartsWith("există și un telefon în România", Assert.Single(GoldenCases.Get("14").ExpectedClearedRules).Reason, StringComparison.Ordinal);
+        foreach (var (id, guideReason) in new[] { ("5c", "ordin dintr-un cont de depozit, exceptat la CRS"), ("14", "există și un telefon în România") })
+        {
+            var reason = Assert.Single(GoldenCases.Get(id).ExpectedClearedRules).Reason;
+            Assert.StartsWith(guideReason, reason, StringComparison.Ordinal);
+            Assert.EndsWith("; în plus, SUA nu e jurisdicție CRS raportabilă", reason, StringComparison.Ordinal);
+        }
     }
 
     [Fact]
