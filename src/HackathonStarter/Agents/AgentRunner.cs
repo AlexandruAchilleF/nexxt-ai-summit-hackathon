@@ -81,9 +81,26 @@ public class AgentRunner(
                 }
                 catch (Exception ex) when (!ct.IsCancellationRequested && !Options.AgentMode.Equals("Live", StringComparison.OrdinalIgnoreCase))
                 {
-                    logger.LogWarning("Agent {Agent} live run failed ({Message}), falling back", agent.Name, ex.Message);
-                    vault = null;
-                    await FallbackAsync(agent, input, ctx, w, ex.Message, ct);
+                    // A fallback starts over: once tools ran or an action was proposed, it would run them a second time.
+                    var acted = run.Snapshot().Where(s => s.Kind is StepKind.ToolCall or StepKind.Approval).ToList();
+                    if (acted.Count == 0)
+                    {
+                        logger.LogWarning("Agent {Agent} live run failed ({Message}), falling back", agent.Name, ex.Message);
+                        vault = null;
+                        await FallbackAsync(agent, input, ctx, w, ex.Message, ct);
+                    }
+                    else if (acted.Any(s => s is { Kind: StepKind.Approval, State: ApprovalState.Pending }))
+                    {
+                        // It failed in the turn after the proposal, which only tells the user about it: the proposal stands.
+                        logger.LogWarning("Agent {Agent} live run failed after a proposal ({Message}), keeping it", agent.Name, ex.Message);
+                        await w.TypeAsync(ProposedAnswer, ct: ct);
+                    }
+                    else
+                    {
+                        // Tools ran and nothing is proposed: the run fails and keeps its steps.
+                        var reason = timeout.IsCancellationRequested ? $"no answer within {Options.TimeoutSeconds}s" : ex.Message;
+                        throw new InvalidOperationException($"The live model failed after tools had run ({reason}). The steps above were kept and not run again.", ex);
+                    }
                 }
             }
             run.Status = run.Snapshot().Any(s => s is { Kind: StepKind.Approval, State: ApprovalState.Pending })

@@ -203,6 +203,54 @@ public class AgentRunnerTests
     }
 
     [Fact]
+    public async Task A_model_failing_after_a_proposal_keeps_the_proposal_and_runs_no_tool_twice()
+    {
+        var agent = new NotesAgent();
+        var model = new FakeChatClient().CallTool("addNote", new { }).CallTool("publish", new { }).Fail("model overloaded");
+        await using var host = await TestHost.CreateAsync(model, extraAgents: agent);
+
+        var run = await host.RunAsync("notes-agent", "Note it, then publish");
+
+        Assert.Equal(1, agent.Notes); // the fallback mock would add the note a second time
+        Assert.Equal(RunStatus.AwaitingApproval, run.Status);
+        Assert.Equal(RunSource.Live, run.Source);
+        Assert.Null(run.FallbackReason);
+        Assert.Single(run.Steps, s => s is { Kind: StepKind.ToolResult, Tool: "addNote" });
+        Assert.Single(run.Steps, s => s is { Kind: StepKind.Approval, Tool: "publish", State: ApprovalState.Pending });
+        Assert.Equal("The proposed action needs human approval before it runs.", run.Steps.Last(s => s.Kind == StepKind.Text).Text);
+    }
+
+    [Fact]
+    public async Task A_model_failing_after_tools_ran_fails_the_run_instead_of_running_them_again()
+    {
+        var agent = new NotesAgent();
+        var model = new FakeChatClient().CallTool("addNote", new { }).Fail("model overloaded");
+        await using var host = await TestHost.CreateAsync(model, extraAgents: agent);
+
+        var run = await host.RunAsync("notes-agent", "Note it, then publish");
+
+        Assert.Equal(1, agent.Notes);
+        Assert.Equal(RunStatus.Error, run.Status);
+        Assert.Equal("The live model failed after tools had run (model overloaded). The steps above were kept and not run again.", run.Error);
+        Assert.Equal(RunSource.Live, run.Source);
+        Assert.Single(run.Steps, s => s is { Kind: StepKind.ToolResult, Tool: "addNote" });
+        Assert.DoesNotContain(run.Steps, s => s.Kind == StepKind.Approval);
+    }
+
+    [Fact]
+    public async Task A_live_run_timing_out_after_a_tool_started_says_so_instead_of_falling_back()
+    {
+        var model = new FakeChatClient().CallTool("slow", new { });
+        await using var host = await TestHost.CreateAsync(model, ai => ai.TimeoutSeconds = 1, extraAgents: new SlowAgent());
+
+        var run = await host.RunAsync("slow-agent", "go");
+
+        Assert.Equal(RunStatus.Error, run.Status);
+        Assert.Contains("(no answer within 1s)", run.Error);
+        Assert.DoesNotContain(run.Steps, s => s.Text == "mock");
+    }
+
+    [Fact]
     public async Task Checks_get_the_successful_tool_results_of_the_run()
     {
         var model = new FakeChatClient().CallTool("lookupClient", new { id = 7 }).CallTool("broken", new { }).Reply("Ana has 1200.50 EUR.");
@@ -464,6 +512,27 @@ public class AgentRunnerTests
         public override string Title => "Echo tool results";
         public override string Description => "Returns the tool-results fact.";
         public override CheckResult Evaluate(CheckSubject subject) => Pass(subject.Fact("tool-results") ?? "missing");
+    }
+
+    /// <summary>A tool that changes data without approval (counted) and one that needs approval; its mock calls both.</summary>
+    private sealed class NotesAgent : ToolAgent
+    {
+        public int Notes;
+        public override string Name => "notes-agent";
+        public override string Label => "Notes";
+        public override string Description => "Adds a note, then proposes to publish it.";
+        public override string SystemPrompt(ToolContext ctx) => "Test agent.";
+        public override IEnumerable<AgentTool> Tools(ToolContext ctx) =>
+        [
+            AgentTool.Create("addNote", "Adds a note.", () => ++Notes),
+            AgentTool.Create("publish", "Publishes the notes.", () => "published", needsApproval: true),
+        ];
+        public override async Task MockAsync(MockContext mock)
+        {
+            await mock.CallAsync("addNote", new { });
+            await mock.CallAsync("publish", new { });
+            await mock.SayAsync("mock");
+        }
     }
 
     private sealed class SlowAgent : ToolAgent
