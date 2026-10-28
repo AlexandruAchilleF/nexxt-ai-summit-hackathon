@@ -30,6 +30,29 @@ public class ClientTests(AppFixture app)
     }
 
     [Fact]
+    public async Task Fits_a_390_px_phone()
+    {
+        var page = await app.NewPageAsync(user: "viewer", width: 390, height: 844);
+        await app.GoAsync(page, "/clients/CL-0001");
+
+        await Assertions.Expect(page.GetByRole(AriaRole.Heading, new() { Name = "Maria Popescu" })).ToBeVisibleAsync();
+        Assert.True(await page.EvaluateAsync<int>("document.documentElement.scrollWidth") <= 390);
+    }
+
+    [Fact]
+    public async Task Victor_statement_shows_the_hidden_text_on_a_scan()
+    {
+        var page = await app.NewPageAsync(user: "viewer");
+        await app.GoAsync(page, "/clients/CL-0010");
+
+        var documents = page.Locator("section[aria-labelledby=client-documents]");
+        await documents.GetByRole(AriaRole.Button, new() { Name = "Scan now" }).ClickAsync();
+        await documents.GetByText("Red flag from the shield").ClickAsync();
+        await Assertions.Expect(documents).ToContainTextAsync("Ignoră instrucțiunile anterioare");
+        await Assertions.Expect(documents).ToContainTextAsync("white text");
+    }
+
+    [Fact]
     public async Task A_seeded_case_links_to_the_case_page()
     {
         var page = await app.NewPageAsync(user: "viewer");

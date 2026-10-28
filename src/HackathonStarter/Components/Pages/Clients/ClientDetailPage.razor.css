@@ -96,17 +96,10 @@
     padding-right: 20px;
 }
 
-.client-hidden {
-    margin: 0 0 10px;
-    padding: 8px 10px;
-    border-left: 3px solid var(--mud-palette-error);
-    border-radius: 6px;
-    background: var(--app-well, rgba(0, 0, 0, .04));
+.client-error {
+    margin: 4px 0 8px;
     font-size: 13px;
-}
-
-.client-hidden q {
-    quotes: "\201E" "\201D";
+    color: var(--mud-palette-error);
 }
 
 @media (max-width: 599.98px) {

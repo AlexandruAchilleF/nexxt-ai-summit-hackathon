@@ -16,7 +16,6 @@ public static partial class Lang
         ro["channel not recorded"] = "canal neînregistrat";
         ro["Check the code or pick the client from the list."] = "Verifică codul sau alege clientul din listă.";
         ro["citizenship {0}"] = "cetățenie {0}";
-        ro["Clean"] = "Curat";
         ro["Clients"] = "Clienți";
         ro["Closed"] = "Închis";
         ro["closed {0}"] = "închis {0}";
@@ -33,10 +32,10 @@ public static partial class Lang
         ro["expired {0}"] = "expirat {0}";
         ro["Former"] = "Anterior";
         ro["from the account above"] = "din contul de mai sus";
-        ro["Hidden text removed"] = "Text ascuns scos";
         ro["Hold mail"] = "Păstrare corespondență (hold mail)";
         ro["Identity card"] = "Carte de identitate";
         ro["In care of (c/o)"] = "În grija (c/o)";
+        ro["In force"] = "În vigoare";
         ro["Insurance contract"] = "Contract de asigurare";
         ro["Letter"] = "Scrisoare";
         ro["Mailing address"] = "Adresă de corespondență";
@@ -50,13 +49,11 @@ public static partial class Lang
         ro["No client with this code"] = "Niciun client cu acest cod";
         ro["no deadline in the guide"] = "fără termen în ghid";
         ro["No document on file."] = "Niciun document la dosar.";
-        ro["No hidden fragment was found on a new scan."] = "La o nouă scanare nu s-a găsit niciun fragment ascuns.";
         ro["No phone on file."] = "Niciun telefon la dosar.";
         ro["No power of attorney."] = "Nicio împuternicire.";
         ro["no reason given"] = "niciun motiv dat";
         ro["No self-certification on file."] = "Nicio autocertificare la dosar.";
         ro["No TIN"] = "Fără TIN";
-        ro["Not scanned"] = "Nescanat";
         ro["Open"] = "Deschis";
         ro["opened {0}"] = "deschis {0}";
         ro["Other account"] = "Alt cont";
@@ -74,6 +71,8 @@ public static partial class Lang
         ro["Residence"] = "Domiciliu";
         ro["Response received"] = "Răspuns primit";
         ro["Revoked"] = "Revocată";
+        ro["Scan now"] = "Scanează acum";
+        ro["Scanned now for this view; the saved verdict changes only when the document goes through a change."] = "Scanat acum doar pentru afișare; verdictul salvat se schimbă doar când documentul trece printr-o modificare.";
         ro["Search by code or name"] = "Caută după cod sau nume";
         ro["Self-certification form"] = "Formular de autocertificare";
         ro["Self-certifications"] = "Autocertificări";
@@ -85,6 +84,7 @@ public static partial class Lang
         ro["Superseded"] = "Înlocuită";
         ro["Synthetic demo clients. Open one to see its data, documents and cases."] = "Clienți sintetici de demo. Deschide unul ca să vezi datele, documentele și cazurile lui.";
         ro["Tax residence"] = "Rezidență fiscală";
+        ro["The document is no longer on file."] = "Documentul nu mai este la dosar.";
         ro["The shield removes hidden text before any model reads a document."] = "Scutul scoate textul ascuns înainte ca vreun model să citească documentul.";
         ro["TIN checks say \"format valid\": they check the format, not that the number exists."] = "Verificarea TIN spune „format valid”: verifică formatul, nu că numărul există.";
         ro["Try another code or name."] = "Încearcă alt cod sau alt nume.";

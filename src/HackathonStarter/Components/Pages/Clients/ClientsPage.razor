@@ -42,6 +42,7 @@ else
     private List<Client>? _clients;
     private string? _search;
     private string? _error;
+    private int _version;
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
@@ -53,14 +54,17 @@ else
 
     private async Task LoadAsync()
     {
+        // The last search typed wins, not the last answer to arrive.
+        var version = ++_version;
         _error = null;
         try
         {
-            _clients = await Clients.ListAsync(_search);
+            var clients = await Clients.ListAsync(_search);
+            if (version == _version) _clients = clients;
         }
         catch (Exception ex)
         {
-            _error = ex.Message;
+            if (version == _version) _error = ex.Message;
         }
     }
 }

@@ -5,6 +5,7 @@
 @using HackathonStarter.Features.Rules
 @using HackathonStarter.Features.Shield
 @using HackathonStarter.Features.Tin
+@using HackathonStarter.Components.Trust
 @inject IClientService Clients
 @inject ICaseService Cases
 @inject IShieldedDocuments Shielded
@@ -90,11 +91,11 @@ else
                     <div class="client-row @(p.IsActive ? "" : "client-former")">
                         <div class="client-row-main">
                             <div>@p.HolderName</div>
-                            <div class="app-list-meta">@p.HolderAddress · @p.Scope · @T("since {0}", Day(p.ValidFrom))</div>
+                            <div class="app-list-meta">@string.Join(" · ", new[] { p.HolderAddress, p.Scope, T("since {0}", Day(p.ValidFrom)) }.Where(x => x.Length > 0))</div>
                         </div>
                         <div class="client-row-tags">
                             <span class="client-country mono">@p.HolderCountry</span>
-                            @if (p.IsActive) { <Pill Tone="success">@T("Active")</Pill> } else { <Pill>@T("Revoked")</Pill> }
+                            @if (p.IsActive) { <Pill Tone="success">@T("In force")</Pill> } else { <Pill>@T("Revoked")</Pill> }
                         </div>
                     </div>
                 }
@@ -177,7 +178,7 @@ else
                                         var check = TinFormat.Check(r.Country, r.Tin);
                                         <div class="mono client-break">@r.Tin</div>
                                         <div class="app-list-meta">@T("Tax residence")</div>
-                                        <div class="client-tin">@TinPill(check)</div>
+                                        <div class="client-tin"><TinBadge Check="check" /></div>
                                     }
                                 </div>
                             </div>
@@ -219,35 +220,36 @@ else
                 }
                 @foreach (var d in _documents)
                 {
+                    var scan = _scans.GetValueOrDefault(d.Id);
                     <div class="client-document">
                         <div class="client-row">
                             <div class="client-row-main">
                                 <div class="client-break">@d.FileName</div>
                                 <div class="app-list-meta">@DocumentKindLabel(d.Kind) · @T("{0} page(s)", d.Pages) · @T("uploaded {0}", Format.Date(d.UploadedAt))</div>
                             </div>
-                            <div class="client-row-tags">@ShieldPill(d.ShieldVerdict)</div>
+                            @if (scan is null)
+                            {
+                                <div class="client-row-tags"><ShieldBadge Verdict="@(d.ShieldVerdict == ShieldVerdict.HiddenTextRemoved ? ShieldVerdict.NotScanned : d.ShieldVerdict)" /></div>
+                            }
                         </div>
-                        @if (d.ShieldVerdict == ShieldVerdict.HiddenTextRemoved)
+                        @if (scan is not null)
                         {
-                            @if (_hidden.TryGetValue(d.Id, out var fragments))
+                            <ShieldBadge Verdict="scan.Verdict" Hidden="scan.Hidden" />
+                            @if (d.ShieldVerdict == ShieldVerdict.NotScanned)
                             {
-                                @if (fragments.Count == 0)
-                                {
-                                    <p class="client-none">@T("No hidden fragment was found on a new scan.")</p>
-                                }
-                                @foreach (var f in fragments)
-                                {
-                                    <div class="client-hidden">
-                                        <div class="app-list-meta">@T("Page {0}", f.Page) · @ReasonLabel(f.Reason)</div>
-                                        <q>@f.Text</q>
-                                    </div>
-                                }
+                                <p class="app-list-meta mt-1">@T("Scanned now for this view; the saved verdict changes only when the document goes through a change.")</p>
                             }
-                            else
-                            {
-                                <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Error" StartIcon="@Icons.Material.Rounded.VisibilityOff"
-                                           Disabled="@(_loadingDoc == d.Id)" OnClick="@(() => ShowHiddenAsync(d.Id))">@T("Show the removed text")</MudButton>
-                            }
+                        }
+                        else if (d.ShieldVerdict != ShieldVerdict.Clean)
+                        {
+                            <MudButton Variant="Variant.Text" Size="Size.Small" Color="@(d.ShieldVerdict == ShieldVerdict.HiddenTextRemoved ? Color.Error : Color.Primary)"
+                                       StartIcon="@Icons.Material.Rounded.DocumentScanner" Disabled="@(_scanning == d.Id)" OnClick="@(() => ScanAsync(d.Id))">
+                                @(d.ShieldVerdict == ShieldVerdict.HiddenTextRemoved ? T("Show the removed text") : T("Scan now"))
+                            </MudButton>
+                        }
+                        @if (_scanErrors.TryGetValue(d.Id, out var scanError))
+                        {
+                            <p class="client-error">@scanError</p>
                         }
                     </div>
                 }
@@ -262,10 +264,12 @@ else
     private Client? _client;
     private List<DocumentInfo> _documents = [];
     private List<Case> _cases = [];
-    private readonly Dictionary<int, IReadOnlyList<HiddenFragment>> _hidden = [];
+    private readonly Dictionary<int, ShieldResult> _scans = [];
+    private readonly Dictionary<int, string> _scanErrors = [];
     private bool _loading = true;
     private string? _error;
-    private int? _loadingDoc;
+    private int? _scanning;
+    private int _loadVersion;
 
     protected override void OnInitialized() => Clock.Changed += OnClockChanged;
 
@@ -273,56 +277,58 @@ else
 
     private async Task LoadAsync()
     {
+        // A newer load (another code, a retry) wins: an older one finishing late does not mix its data in.
+        var version = ++_loadVersion;
         _loading = true;
         _error = null;
         try
         {
-            _client = await Clients.GetAsync(Code.Trim());
-            if (_client is null)
+            var client = await Clients.GetAsync(Code.Trim());
+            List<DocumentInfo> documents = [];
+            List<Case> cases = [];
+            if (client is not null)
             {
-                _documents = [];
-                _cases = [];
+                documents = await Clients.ListDocumentsAsync(client.Code);
+                cases = await Cases.QueueAsync(new CaseQueueFilter(OpenOnly: false, ClientCode: client.Code));
             }
-            else
-            {
-                _documents = await Clients.ListDocumentsAsync(_client.Code);
-                _cases = await Cases.QueueAsync(new CaseQueueFilter(OpenOnly: false, ClientCode: _client.Code));
-            }
+            if (version != _loadVersion) return;
+            (_client, _documents, _cases) = (client, documents, cases);
+            _scans.Clear();
+            _scanErrors.Clear();
         }
         catch (Exception ex)
         {
-            _error = ex.Message;
+            if (version == _loadVersion) _error = ex.Message;
         }
         finally
         {
-            _loading = false;
+            if (version == _loadVersion) _loading = false;
         }
     }
 
-    private async Task ShowHiddenAsync(int documentId)
+    // Read-only: the shield scans the stored bytes in memory; the saved verdict is written only by ChangeService.
+    private async Task ScanAsync(int documentId)
     {
-        _loadingDoc = documentId;
+        _scanning = documentId;
+        _scanErrors.Remove(documentId);
         try
         {
-            var doc = await Shielded.GetAsync(documentId);
-            _hidden[documentId] = doc?.Result.Hidden ?? [];
+            if (await Shielded.GetAsync(documentId) is { } doc) _scans[documentId] = doc.Result;
+            else _scanErrors[documentId] = T("The document is no longer on file.");
         }
         catch (Exception ex)
         {
-            _error = ex.Message;
+            _scanErrors[documentId] = ex.Message;
         }
         finally
         {
-            _loadingDoc = null;
+            _scanning = null;
         }
     }
 
-    // A deadline can expire when the demo clock moves: the case list follows it.
-    private void OnClockChanged() => _ = InvokeAsync(async () =>
-    {
-        await LoadAsync();
-        StateHasChanged();
-    });
+    // The day counts follow the demo clock. Case states change only on DeadlineWatcher's tick, which runs after this event:
+    // reload the page to see them.
+    private void OnClockChanged() => _ = InvokeAsync(StateHasChanged);
 
     public void Dispose() => Clock.Changed -= OnClockChanged;
 
@@ -343,20 +349,14 @@ else
                  : k.ExpiredAt is { } expired ? T("expired {0}", Format.Date(expired))
                  : T("opened {0}", Format.Date(k.OpenedAt));
         if (k.DueAt is not { } due) return T("opened {0}", Format.Date(k.OpenedAt)) + " · " + T("no deadline in the guide");
-        var days = (int)Math.Ceiling((due - Clock.UtcNow).TotalDays);
+        var left = due - Clock.UtcNow;
         return T("opened {0}", Format.Date(k.OpenedAt)) + " · " + T("due {0}", Format.Date(due)) + " · "
-             + (days >= 0 ? T("{0} days left", days) : T("{0} days overdue", -days));
+             + (left >= TimeSpan.Zero ? T("{0} days left", (int)Math.Ceiling(left.TotalDays)) : T("{0} days overdue", (int)Math.Ceiling(-left.TotalDays)));
     }
 
     private static RenderFragment RegimePill(string regime, bool preexisting) =>
         @<Pill Tone="@(preexisting ? null : "accent")" Title="@T("Computed from the opening date (guide p. 20)")">@regime: @(preexisting ? T("preexisting") : T("new"))</Pill>;
 
-    private static RenderFragment TinPill(TinCheck check) => check.Status switch
-    {
-        TinFormatStatus.Valid => @<Pill Tone="success" Icon="@Icons.Material.Rounded.Check">@check.Label</Pill>,
-        TinFormatStatus.Invalid => @<Pill Tone="danger" Icon="@Icons.Material.Rounded.Close">@check.Label</Pill>,
-        _ => @<Pill>@check.Label</Pill>,
-    };
 
     private static RenderFragment SelfCertPill(SelfCertStatus status) => status switch
     {
@@ -365,12 +365,6 @@ else
         _ => @<Pill>@T("Superseded")</Pill>,
     };
 
-    private static RenderFragment ShieldPill(ShieldVerdict verdict) => verdict switch
-    {
-        ShieldVerdict.Clean => @<Pill Tone="success" Icon="@Icons.Material.Rounded.Shield">@T("Clean")</Pill>,
-        ShieldVerdict.HiddenTextRemoved => @<Pill Tone="danger" Icon="@Icons.Material.Rounded.GppMaybe">@T("Hidden text removed")</Pill>,
-        _ => @<Pill>@T("Not scanned")</Pill>,
-    };
 
     private static RenderFragment StatusPill(CaseStatus status) => status switch
     {
@@ -439,13 +433,4 @@ else
         _ => T("Other document"),
     };
 
-    private static string ReasonLabel(string reasons) => string.Join(", ", reasons.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-        .Select(r => r switch
-        {
-            nameof(HiddenReason.WhiteText) => T("white text"),
-            nameof(HiddenReason.TinyFont) => T("font under 2 pt"),
-            nameof(HiddenReason.OffPage) => T("outside the page"),
-            nameof(HiddenReason.Invisible) => T("invisible text"),
-            _ => r,
-        }));
 }
