@@ -319,11 +319,10 @@ else
     }
 
     // The golden cases whose change can be recorded as is, grouped by what the demo shows. Uploads that carry a FATCA fact
-    // (cases 6 and 7) are recorded as the personal data the agent would read from the passport. Case 12 is left out: its
-    // golden After also ends the residence, which an AddressChanged of kind InCareOf does not do in ChangeService.
+    // (cases 6 and 7) are recorded as the personal data the agent would read from the passport.
     private static readonly (string Id, string Group)[] Picks =
     [
-        ("4", "Opens a case"), ("18", "Opens a case"), ("16", "Opens a case"), ("17b", "Opens a case"), ("11", "Opens a case"), ("5b", "Opens a case"),
+        ("4", "Opens a case"), ("18", "Opens a case"), ("16", "Opens a case"), ("17b", "Opens a case"), ("11", "Opens a case"), ("12", "Opens a case"), ("5b", "Opens a case"),
         ("5c", "FATCA"), ("6", "FATCA"), ("7", "FATCA"), ("14", "FATCA"),
         ("15", "Traps: no case"), ("1", "Traps: no case"), ("5a", "Traps: no case"), ("13", "Traps: no case"), ("8", "Traps: no case"),
         ("2", "Self-certification"), ("3", "Self-certification"), ("9", "Self-certification"),
