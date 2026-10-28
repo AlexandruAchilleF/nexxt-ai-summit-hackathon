@@ -43,7 +43,7 @@
             if (box) { e.preventDefault(); box.focus(); }
         });
         window.focusChecked = () => requestAnimationFrame(() => document.activeElement?.closest('[role=radiogroup]')?.querySelector('[aria-checked=true]')?.focus());
-        window.revealElement = el => { if (el && el.getBoundingClientRect && el.getBoundingClientRect().top > innerHeight * .6) el.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" }); };</script>
+        window.revealElement = el => { if (matchMedia("(max-width: 959px)").matches && el && el.getBoundingClientRect && el.getBoundingClientRect().top > innerHeight * .6) el.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" }); };</script>
 </body>
 
 </html>

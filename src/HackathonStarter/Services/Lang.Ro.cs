@@ -385,6 +385,7 @@ public static partial class Lang
         };
         AddRoClients(d);
         AddRoChanges(d);
+        AddRoNewChange(d);
         AddRoRules(d);
         AddRoCases(d);
         AddRoShield(d);
@@ -400,6 +401,7 @@ public static partial class Lang
 
     static partial void AddRoClients(Dictionary<string, string> ro);
     static partial void AddRoChanges(Dictionary<string, string> ro);
+    static partial void AddRoNewChange(Dictionary<string, string> ro);
     static partial void AddRoRules(Dictionary<string, string> ro);
     static partial void AddRoCases(Dictionary<string, string> ro);
     static partial void AddRoShield(Dictionary<string, string> ro);

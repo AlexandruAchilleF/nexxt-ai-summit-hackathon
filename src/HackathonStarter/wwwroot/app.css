@@ -484,7 +484,8 @@ a.app-list-row:active, .dense-row:active { background: var(--app-fill-strong); }
 .crs-docs li { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; }
 .crs-docs .mud-icon-root { font-size: 18px; color: var(--app-accent); margin-top: 1px; }
 .crs-form { display: grid; gap: 14px; }
-@media (min-width: 600px) { .crs-form.cols-2 { grid-template-columns: 1fr 1fr; } .crs-form .span-2 { grid-column: 1 / -1; } }
+@media (min-width: 600px) { .crs-form.cols-2 { grid-template-columns: minmax(0,1fr) minmax(0,1fr); } .crs-form .span-2 { grid-column: 1 / -1; } }
+.crs-form > *, .crs-form .mud-input-control { min-width: 0; }
 .crs-form .mud-input-control { margin: 0; }
 /* Widths go on the control root through a class (MudBlazor 9 puts Style on the inner input). */
 .mud-input-control.crs-field-country { flex: 0 0 104px; width: 104px; }
@@ -506,6 +507,22 @@ a.app-list-row:active, .dense-row:active { background: var(--app-fill-strong); }
 .crs-tl-meta { font-size: 12px; color: var(--mud-palette-text-secondary); }
 
 /* The decision of the rule engine (New change): the verdict stamps in, then every rule the code checked cascades below it. */
+.crs-picker-summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.crs-picker-summary > .mud-button-root { flex-shrink: 0; white-space: nowrap; }
+.crs-picker-choice { min-width: 0; overflow-wrap: anywhere; font-size: 14px; }
+.crs-picker-choice > span:last-child { color: var(--mud-palette-text-secondary); }
+@media (min-width: 960px) { .crs-verdict-column { position: sticky; top: 72px; } }
+.crs-verdict-description { margin: 14px 0; font-size: 1rem; }
+.crs-verdict-decisive { border-left: 2px solid var(--app-separator); padding-left: 12px; }
+.crs-verdict-decisive p { margin: 6px 0; font-size: 1rem; line-height: 1.5; }
+.crs-verdict-deadline { margin-top: 14px; padding: 10px 12px; border-radius: var(--app-radius-sm); background: var(--app-fill); font-size: 14px; line-height: 1.6; }
+.crs-verdict .crs-rule.is-no-case .crs-hint { font-size: 1rem; }
+.crs-verdict .crs-rule.is-checked .crs-rule-icon { color: var(--mud-palette-text-primary); background: var(--app-fill-strong); }
+@media (max-width: 599.98px) {
+  .crs-verdict .crs-rule { grid-template-columns: 26px minmax(0,1fr); }
+  .crs-verdict .crs-rule > .app-pill { grid-column: 2; }
+  .crs-picker-summary { align-items: flex-start; }
+}
 .crs-verdict { position: relative; overflow: hidden; }
 .crs-verdict-stamp { display: flex; align-items: center; gap: 14px; animation: crs-stamp 640ms var(--crs-out) both; }
 @keyframes crs-stamp { from { opacity: 0; transform: scale(1.18); filter: blur(8px); } }

@@ -1,10 +1,12 @@
 @page "/changes/new"
+@using HackathonStarter.Features.Cases
 @using HackathonStarter.Features.Changes
 @using HackathonStarter.Features.Clients
 @using HackathonStarter.Features.Evaluation
 @using HackathonStarter.Features.Rules
 @using HackathonStarter.Features.Shield
 @using HackathonStarter.Features.Tin
+@inject ICaseService Cases
 @inject IChangeService Changes
 @inject IClientService Clients
 @inject ITinFormat TinFormat
@@ -29,7 +31,16 @@ else
 {
     @if (_showGolden)
     {
-    <MudPaper Outlined="true" Class="pa-4 mb-4 app-enter crs-demo-card">
+    <MudPaper Outlined="true" Class="pa-4 mb-4 crs-demo-card">
+        @if (_scenario is { } selected && !_pickerExpanded)
+        {
+            <div class="crs-picker-summary">
+                <div class="crs-picker-choice"><span class="crs-code">@selected.Id</span> <b>@T(selected.Title)</b> <span>@ScenarioClient(selected)</span></div>
+                <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="() => _pickerExpanded = true">@T("Change")</MudButton>
+            </div>
+        }
+        else
+        {
         <div class="crs-head" style="margin-bottom:12px;flex-wrap:wrap">
             <div>
                 <div class="app-card-title">@T("Start from a golden case")</div>
@@ -44,11 +55,12 @@ else
             {
                 <button type="button" class="@($"crs-chip crs-chip-in{(_scenario?.Id == s.Id ? " is-on" : "")}")" style="@($"--i:{n++}")" @onclick="() => UseAsync(s)" disabled="@(!_canWrite)">
                     <MudIcon Icon="@CrsUi.Icon(s.Kind)" />
-                    <span><span class="crs-code">@s.Id</span> @T(s.Title)</span>
+                    <span><span class="crs-code">@s.Id</span> @T(s.Title)<small class="d-block">@ScenarioClient(s)</small></span>
                 </button>
             }
         </div>
         <MudButton Variant="Variant.Text" Size="Size.Small" Class="mt-3" StartIcon="@Icons.Material.Rounded.Close" OnClick="HideGolden">@T("Hide the golden cases")</MudButton>
+        }
     </MudPaper>
     }
 
@@ -56,9 +68,11 @@ else
         <MudPaper Outlined="true" Class="pa-4 app-enter" Style="animation-delay:80ms">
             <div class="app-card-title mb-4">@T("The change")</div>
             <div class="crs-form cols-2">
+                <div class="span-2">
                 <MudAutocomplete T="string" Value="_clientCode" ValueChanged="SelectClientAsync" SearchFunc="SearchAsync" ToStringFunc="ClientLabel"
-                                 Label="@T("Client")" Variant="Variant.Outlined" Dense="true" Class="span-2" MaxItems="12" ResetValueOnEmptyText="true"
+                                 Label="@T("Client")" Variant="Variant.Outlined" Dense="true" MaxItems="12" ResetValueOnEmptyText="true"
                                  AdornmentIcon="@Icons.Material.Rounded.PersonSearch" Disabled="@(!_canWrite)" />
+                </div>
                 <MudSelect T="ChangeKind" Value="_kind" ValueChanged="k => { _kind = k; _result = null; }" Label="@T("What changed")" Variant="Variant.Outlined" Dense="true" Disabled="@(!_canWrite)">
                     @foreach (var k in Enum.GetValues<ChangeKind>())
                     {
@@ -99,12 +113,14 @@ else
                         @CountryField(_phone.Country, v => _phone.Country = v)
                         break;
                     case ChangeKind.StandingOrderCreated:
-                        <MudSelect T="string" @bind-Value="_fromIban" Label="@T("From account")" Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense" Class="span-2">
+                        <div class="span-2">
+                        <MudSelect T="string" @bind-Value="_fromIban" Label="@T("From account")" Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense">
                             @foreach (var a in _client?.Accounts ?? [])
                             {
                                 <MudSelectItem Value="a.Iban">@a.Product · @CrsUi.Label(a.Type) · @a.Iban</MudSelectItem>
                             }
                         </MudSelect>
+                        </div>
                         <MudTextField T="string" @bind-Value="_beneficiary" Label="@T("Beneficiary account")" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
                         @CountryField(_beneficiaryCountry, v => _beneficiaryCountry = v)
                         @if (_client?.Accounts.FirstOrDefault(a => a.Iban == _fromIban) is { Type: AccountType.Depository })
@@ -198,11 +214,12 @@ else
             }
         </MudPaper>
 
-        <div style="position:sticky;top:72px">
+        <div class="crs-verdict-column">
             @if (_result is { } res)
             {
                 var o = res.Outcome;
                 var tone = CrsUi.Tone(o.Decision);
+                var decisive = o.Uncovered.FirstOrDefault() ?? o.Cleared.FirstOrDefault() ?? o.Indicia.FirstOrDefault();
                 <div @ref="_verdict" style="scroll-margin-top:72px"></div>
                 <MudPaper Outlined="true" Class="@($"pa-4 crs-verdict{(tone is null ? "" : $" is-{tone}")}")" @key="res.Change.Id">
                     <div class="crs-verdict-stamp">
@@ -212,7 +229,46 @@ else
                             <div class="crs-verdict-title">@CrsUi.Label(o.Decision)</div>
                         </div>
                     </div>
-                    <p class="mt-4 mb-0" style="max-width:65ch">@Lang.Pick(o.ExplanationRo, o.Explanation)</p>
+                    <p class="crs-verdict-description">@CrsUi.Describe(o.Decision)</p>
+                    @if (decisive is not null)
+                    {
+                        <div class="crs-verdict-decisive">
+                            @if (o.Cleared.Contains(decisive))
+                            {
+                                <div class="mb-2"><Pill Icon="@Icons.Material.Rounded.Check">@T("Checked · does not apply")</Pill></div>
+                            }
+                            <b>@CrsUi.RuleTitle(decisive.RuleId)</b>
+                            @if (!string.IsNullOrWhiteSpace(decisive.Jurisdiction))
+                            {
+                                <span> · @CrsUi.Country(decisive.Jurisdiction)</span>
+                            }
+                            <p>@Lang.Pick(decisive.ExplanationRo, decisive.Explanation)</p>
+                            <div class="crs-quote-meta"><span class="crs-code">@decisive.RuleId</span> · @CrsUi.Page(decisive.GuidePage)</div>
+                        </div>
+                    }
+                    @if (_case is { } recordedCase)
+                    {
+                        <div class="crs-verdict-deadline">
+                            @if (recordedCase.DueAt is { } due)
+                            {
+                                <b>@T("Deadline") @Format.Date(due)</b><span> · @T("{0} days", CrsUi.DaysBetween(recordedCase.OpenedAt, due))</span>
+                                <span> · <span class="crs-code">@recordedCase.DeadlineRuleId</span> · @CrsUi.Page(recordedCase.DeadlineGuidePage)</span>
+                                @if (recordedCase.RemindAt is { } reminder)
+                                {
+                                    <span> · @T("Reminder") @Format.Date(reminder)</span>
+                                }
+                            }
+                            else if (recordedCase.Regime == Regime.Fatca)
+                            {
+                                <b>@T("The agreement sets no deadline")</b>
+                                <span> · <span class="crs-code">@recordedCase.DeadlineRuleId</span> · @CrsUi.Page(recordedCase.DeadlineGuidePage)</span>
+                            }
+                        </div>
+                    }
+                    @if (_caseError is not null)
+                    {
+                        <MudAlert Severity="Severity.Warning" Dense="true">@_caseError</MudAlert>
+                    }
 
                     @if (_scenario is { } g && _scenarioRun == res.Change.Id)
                     {
@@ -233,6 +289,8 @@ else
                     </div>
 
                     <MudDivider Class="my-4" />
+                    <div class="crs-title mb-1">@T("Engine's explanation")</div>
+                    <p class="mb-4">@Lang.Pick(o.ExplanationRo, o.Explanation)</p>
                     <div class="crs-title mb-1">@T("Rules checked")</div>
                     <div class="crs-hint mb-2">@T("Engine {0}. Same data in, same decision out.", o.EngineVersion)</div>
                     @{ var i = 0; }
@@ -251,14 +309,18 @@ else
                     }
                     @foreach (var hit in o.Cleared)
                     {
-                        <div class="crs-rule" style="@($"--i:{i++}")">
-                            <span class="crs-rule-icon"><MudIcon Icon="@Icons.Material.Rounded.Remove" /></span>
+                        <div class="@($"crs-rule is-checked{(o.Decision == Decision.NoCase ? " is-no-case" : "")}")" style="@($"--i:{i++}")">
+                            <span class="crs-rule-icon"><MudIcon Icon="@Icons.Material.Rounded.Check" /></span>
                             <div>
                                 <b style="font-weight:600">@CrsUi.RuleTitle(hit.RuleId)</b>
+                                @if (!string.IsNullOrWhiteSpace(hit.Jurisdiction))
+                                {
+                                    <span class="crs-hint"> · @CrsUi.Country(hit.Jurisdiction)</span>
+                                }
                                 <div class="crs-hint">@Lang.Pick(hit.ExplanationRo, hit.Explanation)</div>
                                 <div class="crs-quote-meta"><span class="crs-code">@hit.RuleId</span> · @CrsUi.Page(hit.GuidePage)</div>
                             </div>
-                            <Pill>@T("does not apply")</Pill>
+                            <Pill>@T("Checked · does not apply")</Pill>
                         </div>
                     }
                     @if (o.Indicia.Count == 0 && o.Cleared.Count == 0)
@@ -323,8 +385,9 @@ else
     private static readonly (string Id, string Group)[] Picks =
     [
         ("4", "Opens a case"), ("18", "Opens a case"), ("16", "Opens a case"), ("17b", "Opens a case"), ("11", "Opens a case"), ("12", "Opens a case"), ("5b", "Opens a case"),
-        ("5c", "FATCA"), ("6", "FATCA"), ("7", "FATCA"), ("14", "FATCA"),
-        ("15", "Traps: no case"), ("1", "Traps: no case"), ("5a", "Traps: no case"), ("13", "Traps: no case"), ("8", "Traps: no case"),
+        ("13", "The three traps"), ("5a", "The three traps"), ("5c", "The three traps"), ("15", "The three traps"),
+        ("6", "FATCA"), ("7", "FATCA"), ("14", "FATCA"),
+        ("1", "Traps: no case"), ("8", "Traps: no case"),
         ("2", "Self-certification"), ("3", "Self-certification"), ("9", "Self-certification"),
         ("10", "Hidden text"),
     ];
@@ -336,6 +399,9 @@ else
 
     private string _group = Picks[0].Group;
     private bool _showGolden;
+    private bool _pickerExpanded;
+    private Case? _case;
+    private string? _caseError;
     [CascadingParameter] public DemoContext? Demo { get; set; }
     /// <summary>?golden=1, from the Demo menu: also when the page is already open.</summary>
     [SupplyParameterFromQuery(Name = "golden")] public string? Golden { get; set; }
@@ -393,7 +459,7 @@ else
             else if (query.TryGetValue("client", out var client) && _clientCode is null) await SelectClientAsync(client);
             OfferDemo();
         }
-        catch (Exception ex) { _error = ex.Message; }
+        catch (Exception ex) { _error = CrsUi.Problem(ex); }
     }
 
     /// <summary>The golden cases are a demo tool: they sit behind the Demo menu, not in the bank's form.</summary>
@@ -420,12 +486,16 @@ else
             .Select(c => c.Code));
     }
 
+    private string ScenarioClient(Scenario s) => _clients?.FirstOrDefault(c => c.Code == s.Golden.ClientCode)?.FullName ?? s.Golden.ClientCode;
+
     private string ClientLabel(string? code) => code is null ? "" : _clients?.FirstOrDefault(c => c.Code == code) is { } c ? $"{c.FullName} · {c.Code}" : code;
 
     private async Task SelectClientAsync(string? code)
     {
         _clientCode = code;
         _result = null;
+        _case = null;
+        _caseError = null;
         _client = code is null ? null : await Clients.GetAsync(code);
         _documents = code is null ? [] : await Clients.ListDocumentsAsync(code);
         _fromIban = _client?.Accounts.OrderBy(a => a.Id).FirstOrDefault()?.Iban;
@@ -446,6 +516,7 @@ else
     {
         var r = s.Golden.Change!;
         _scenario = s;
+        _pickerExpanded = false;
         _submitError = null;
         await SelectClientAsync(r.ClientCode);
         _kind = s.Kind;
@@ -538,12 +609,22 @@ else
         {
             _result = await Changes.RecordAsync(Build());
             _scenarioRun = _scenario?.Golden.ClientCode == _clientCode ? _result.Change.Id : null;
+            _case = null;
+            _caseError = null;
+            if (_result.CaseCode is { } caseCode)
+            {
+                try
+                {
+                    _case = await Cases.GetAsync(caseCode) ?? throw new KeyNotFoundException(caseCode);
+                }
+                catch (Exception ex) { _caseError = CrsUi.Problem(ex); }
+            }
             // The client's data moved: refresh accounts and documents, keeping the result on screen.
             _client = await Clients.GetAsync(_clientCode!);
             _documents = await Clients.ListDocumentsAsync(_clientCode!);
             await CrsSignals.RaiseAsync();
         }
-        catch (Exception ex) { _submitError = ex.Message; }
+        catch (Exception ex) { _submitError = CrsUi.Problem(ex); }
         finally { _busy = false; }
         _reveal = _result is not null;
     }
