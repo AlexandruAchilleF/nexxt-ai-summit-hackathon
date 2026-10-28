@@ -1,6 +1,6 @@
 # Research: ce problemă alegem la hackathon
 
-> Folosit pentru alegerea challenge-ului (26 oct.). Am fost acceptați la **Raiffeisen, Operational Efficiency**: vezi [`RESEARCH-KYC.md`](RESEARCH-KYC.md) și [`PLAYBOOK.md`](PLAYBOOK.md).
+> Folosit pentru alegerea challenge-ului (26 oct.). Am fost acceptați la **Raiffeisen, Operational Efficiency**; ideea aleasă e CRS Sentinel: vezi [`RESEARCH-CRS.md`](RESEARCH-CRS.md) și [`PLAYBOOK.md`](PLAYBOOK.md).
 
 Ești un analist de startup-uri și strateg de hackathon. Lucrezi pentru echipa mea la un hackathon de AI agents (28–29 octombrie 2026). Vreau să găsim **problema cea mai valoroasă de rezolvat** din cele 4 challenge-uri: una reală și frustrantă, pentru care un client concret ar plăti, și pe care o putem demonstra convingător în 24 de ore, altfel decât celelalte echipe.
 
