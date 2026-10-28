@@ -1,0 +1,125 @@
+.client-card {
+    display: block;
+    padding: 20px;
+}
+
+.client-card h2 {
+    margin: 0 0 4px;
+}
+
+.client-card .app-card-sub {
+    margin: 0 0 8px;
+}
+
+.client-none {
+    margin: 8px 0 0;
+    font-size: 14px;
+    color: var(--mud-palette-text-secondary);
+}
+
+.client-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 0;
+}
+
+.client-row + .client-row,
+.client-account + .client-account,
+.client-selfcert + .client-selfcert,
+.client-document + .client-document,
+.client-account > .client-row:first-child,
+.client-selfcert > .client-row:first-child,
+.client-document > .client-row:first-child {
+    border-top: 1px solid var(--app-separator);
+}
+
+.client-account:first-of-type > .client-row:first-child,
+.client-selfcert:first-of-type > .client-row:first-child,
+.client-document:first-of-type > .client-row:first-child {
+    border-top: 0;
+}
+
+.client-row-main {
+    flex: 1;
+    min-width: 0;
+    font-size: 14px;
+}
+
+.client-row-tags {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    max-width: 55%;
+}
+
+.client-order {
+    padding-left: 20px;
+    border-top: 1px dashed var(--app-separator) !important;
+}
+
+::deep .client-order-icon {
+    color: var(--mud-palette-text-secondary);
+    margin-top: 2px;
+}
+
+.client-country {
+    padding: 1px 6px;
+    border-radius: 6px;
+    background: var(--app-well, rgba(0, 0, 0, .05));
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.client-break {
+    overflow-wrap: anywhere;
+}
+
+.client-tin {
+    margin-top: 4px;
+}
+
+.client-former {
+    opacity: .62;
+}
+
+.client-links {
+    margin: 0 -20px;
+}
+
+.client-links ::deep .app-list-row,
+.client-links .app-list-row {
+    padding-left: 20px;
+    padding-right: 20px;
+}
+
+.client-hidden {
+    margin: 0 0 10px;
+    padding: 8px 10px;
+    border-left: 3px solid var(--mud-palette-error);
+    border-radius: 6px;
+    background: var(--app-well, rgba(0, 0, 0, .04));
+    font-size: 13px;
+}
+
+.client-hidden q {
+    quotes: "\201E" "\201D";
+}
+
+@media (max-width: 599.98px) {
+    .client-row {
+        flex-wrap: wrap;
+    }
+
+    .client-row > .client-row-main:first-child {
+        flex-basis: 100%;
+    }
+
+    .client-row-tags {
+        max-width: 100%;
+        justify-content: flex-start;
+    }
+}

@@ -1,11 +1,451 @@
 @page "/clients/{Code}"
+@using HackathonStarter.Features.Cases
+@using HackathonStarter.Features.Clients
+@using HackathonStarter.Features.Deadlines
+@using HackathonStarter.Features.Rules
+@using HackathonStarter.Features.Shield
+@using HackathonStarter.Features.Tin
+@inject IClientService Clients
+@inject ICaseService Cases
+@inject IShieldedDocuments Shielded
+@inject ITinFormat TinFormat
+@inject ISimClock Clock
+@implements IDisposable
 
-<PageTitle>@T("Client {0}", Code) · @SiteConfig.Name</PageTitle>
+<PageTitle>@(_client?.FullName ?? T("Client {0}", Code)) · @SiteConfig.Name</PageTitle>
 
-<PageHeader Title="@T("Client {0}", Code)" Description="@T("Addresses, phones, accounts, standing orders, powers of attorney and self-certifications.")" />
+<MudButton Href="/clients" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Class="mb-4" Size="Size.Small">@T("All clients")</MudButton>
 
-<EmptyState Icon="@Icons.Material.Rounded.HowToReg" Title="@T("Coming in the next phase")" Description="@T("The backend for this page is being built.")" />
+@if (_error is not null)
+{
+    <ErrorState Message="@_error" OnRetry="LoadAsync" />
+}
+else if (_loading)
+{
+    <PageHeader Title="@T("Client {0}", Code)" />
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_client is not { } c)
+{
+    <PageHeader Title="@T("Client {0}", Code)" />
+    <EmptyState Icon="@Icons.Material.Rounded.PersonSearch" Title="@T("No client with this code")" Description="@T("Check the code or pick the client from the list.")">
+        <MudButton Href="/clients" Variant="Variant.Filled" Color="Color.Primary">@T("All clients")</MudButton>
+    </EmptyState>
+}
+else
+{
+    <PageHeader Title="@c.FullName" Description="@HeaderLine(c)" />
+
+    <MudGrid Spacing="3" Class="client-grid">
+        <MudItem xs="12" md="6">
+            <section class="app-card client-card" aria-labelledby="client-addresses">
+                <h2 id="client-addresses" class="app-card-title">@T("Addresses")</h2>
+                @if (c.Addresses.Count == 0)
+                {
+                    <p class="client-none">@T("No address on file.")</p>
+                }
+                @foreach (var a in c.Addresses.OrderByDescending(a => a.IsCurrent).ThenByDescending(a => a.ValidFrom))
+                {
+                    <div class="client-row @(a.IsCurrent ? "" : "client-former")">
+                        <div class="client-row-main">
+                            <div>@a.Line, @a.City</div>
+                            <div class="app-list-meta">@AddressKindLabel(a.Kind) · @T("since {0}", Day(a.ValidFrom))</div>
+                        </div>
+                        <div class="client-row-tags">
+                            <span class="client-country mono">@a.Country</span>
+                            @if (a.IsCurrent) { <Pill Tone="success">@T("Current")</Pill> } else { <Pill>@T("Former")</Pill> }
+                        </div>
+                    </div>
+                }
+            </section>
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <section class="app-card client-card" aria-labelledby="client-phones">
+                <h2 id="client-phones" class="app-card-title">@T("Phones")</h2>
+                @if (c.Phones.Count == 0)
+                {
+                    <p class="client-none">@T("No phone on file.")</p>
+                }
+                @foreach (var p in c.Phones.OrderByDescending(p => p.IsCurrent))
+                {
+                    <div class="client-row @(p.IsCurrent ? "" : "client-former")">
+                        <div class="client-row-main mono">@p.Number</div>
+                        <div class="client-row-tags">
+                            <span class="client-country mono">@p.Country</span>
+                            @if (p.IsCurrent) { <Pill Tone="success">@T("Current")</Pill> } else { <Pill>@T("Former")</Pill> }
+                        </div>
+                    </div>
+                }
+            </section>
+
+            <section class="app-card client-card mt-3" aria-labelledby="client-poa">
+                <h2 id="client-poa" class="app-card-title">@T("Powers of attorney")</h2>
+                @if (c.PowersOfAttorney.Count == 0)
+                {
+                    <p class="client-none">@T("No power of attorney.")</p>
+                }
+                @foreach (var p in c.PowersOfAttorney)
+                {
+                    <div class="client-row @(p.IsActive ? "" : "client-former")">
+                        <div class="client-row-main">
+                            <div>@p.HolderName</div>
+                            <div class="app-list-meta">@p.HolderAddress · @p.Scope · @T("since {0}", Day(p.ValidFrom))</div>
+                        </div>
+                        <div class="client-row-tags">
+                            <span class="client-country mono">@p.HolderCountry</span>
+                            @if (p.IsActive) { <Pill Tone="success">@T("Active")</Pill> } else { <Pill>@T("Revoked")</Pill> }
+                        </div>
+                    </div>
+                }
+            </section>
+        </MudItem>
+
+        <MudItem xs="12">
+            <section class="app-card client-card" aria-labelledby="client-accounts">
+                <h2 id="client-accounts" class="app-card-title">@T("Accounts and standing orders")</h2>
+                <p class="app-card-sub">@T("New or preexisting is computed per regime from the opening date (guide p. 20): CRS preexisting = held on 31 Dec 2015, FATCA preexisting = held on 30 Jun 2014.")</p>
+                @if (c.Accounts.Count == 0)
+                {
+                    <p class="client-none">@T("No account.")</p>
+                }
+                @foreach (var a in c.Accounts)
+                {
+                    <div class="client-account">
+                        <div class="client-row">
+                            <div class="client-row-main">
+                                <div class="mono client-break">@a.Iban</div>
+                                <div class="app-list-meta">@a.Product · @AccountTypeLabel(a.Type) · @T("opened {0}", Day(a.OpenedOn)) · <span class="tabular">@Format.Number(a.Balance, 2) @a.Currency</span></div>
+                            </div>
+                            <div class="client-row-tags">
+                                @RegimePill("CRS", Preexisting.For(Regime.Crs, a.OpenedOn))
+                                @RegimePill("FATCA", Preexisting.For(Regime.Fatca, a.OpenedOn))
+                            </div>
+                        </div>
+                        @foreach (var o in a.StandingOrders)
+                        {
+                            <div class="client-row client-order @(o.IsActive ? "" : "client-former")">
+                                <MudIcon Icon="@Icons.Material.Rounded.SubdirectoryArrowRight" Size="Size.Small" Class="client-order-icon" />
+                                <div class="client-row-main">
+                                    <div>@T("Standing order to") <span class="mono client-break">@o.BeneficiaryAccount</span></div>
+                                    <div class="app-list-meta"><span class="tabular">@Format.Number(o.Amount, 2) @a.Currency</span> · @FrequencyLabel(o.Frequency) · @T("from the account above")</div>
+                                </div>
+                                <div class="client-row-tags">
+                                    <span class="client-country mono">@o.BeneficiaryCountry</span>
+                                    @if (o.IsActive) { <Pill Tone="success">@T("Active")</Pill> } else { <Pill>@T("Stopped")</Pill> }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </section>
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <section class="app-card client-card" aria-labelledby="client-selfcerts">
+                <h2 id="client-selfcerts" class="app-card-title">@T("Self-certifications")</h2>
+                <p class="app-card-sub">@T("TIN checks say \"format valid\": they check the format, not that the number exists.")</p>
+                @if (c.SelfCertifications.Count == 0)
+                {
+                    <p class="client-none">@T("No self-certification on file.")</p>
+                }
+                @foreach (var s in c.SelfCertifications.OrderByDescending(s => s.SignedAt))
+                {
+                    <div class="client-selfcert @(s.Status == SelfCertStatus.Superseded ? "client-former" : "")">
+                        <div class="client-row">
+                            <div class="client-row-main">
+                                <div>@T("Signed {0}", Format.Date(s.SignedAt))</div>
+                                <div class="app-list-meta">@T("received {0}", Format.Date(s.ReceivedAt)) · @ChannelLabel(s.Channel)@(s.DeclaresUsPerson ? " · " + T("declares a US person") : "")</div>
+                            </div>
+                            <div class="client-row-tags">@SelfCertPill(s.Status)</div>
+                        </div>
+                        @foreach (var r in s.Residences)
+                        {
+                            <div class="client-row client-order">
+                                <span class="client-country mono">@r.Country</span>
+                                <div class="client-row-main">
+                                    @if (string.IsNullOrWhiteSpace(r.Tin))
+                                    {
+                                        <div>@T("No TIN") · @NoTinLabel(r.NoTinReason)</div>
+                                        @if (!string.IsNullOrWhiteSpace(r.NoTinExplanation))
+                                        {
+                                            <div class="app-list-meta">@r.NoTinExplanation</div>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        var check = TinFormat.Check(r.Country, r.Tin);
+                                        <div class="mono client-break">@r.Tin</div>
+                                        <div class="app-list-meta">@T("Tax residence")</div>
+                                        <div class="client-tin">@TinPill(check)</div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </section>
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <section class="app-card client-card" aria-labelledby="client-cases">
+                <h2 id="client-cases" class="app-card-title">@T("Cases")</h2>
+                @if (_cases.Count == 0)
+                {
+                    <p class="client-none">@T("No case for this client.")</p>
+                }
+                <div class="client-links">
+                    @foreach (var k in _cases)
+                    {
+                        <a class="app-list-row client-case" href="@($"/cases/{k.Code}")">
+                            <span class="app-list-main">
+                                <span class="app-list-title d-block mono">@k.Code</span>
+                                <span class="app-list-meta d-block">@RegimeLabel(k.Regime) · @string.Join(", ", k.Indicia.Select(i => i.RuleId).Distinct())</span>
+                                <span class="app-list-meta d-block">@CaseDates(k)</span>
+                            </span>
+                            @StatusPill(k.Status)
+                            <MudIcon Icon="@Icons.Material.Rounded.ChevronRight" Class="app-chevron" />
+                        </a>
+                    }
+                </div>
+            </section>
+
+            <section class="app-card client-card mt-3" aria-labelledby="client-documents">
+                <h2 id="client-documents" class="app-card-title">@T("Documents")</h2>
+                <p class="app-card-sub">@T("The shield removes hidden text before any model reads a document.")</p>
+                @if (_documents.Count == 0)
+                {
+                    <p class="client-none">@T("No document on file.")</p>
+                }
+                @foreach (var d in _documents)
+                {
+                    <div class="client-document">
+                        <div class="client-row">
+                            <div class="client-row-main">
+                                <div class="client-break">@d.FileName</div>
+                                <div class="app-list-meta">@DocumentKindLabel(d.Kind) · @T("{0} page(s)", d.Pages) · @T("uploaded {0}", Format.Date(d.UploadedAt))</div>
+                            </div>
+                            <div class="client-row-tags">@ShieldPill(d.ShieldVerdict)</div>
+                        </div>
+                        @if (d.ShieldVerdict == ShieldVerdict.HiddenTextRemoved)
+                        {
+                            @if (_hidden.TryGetValue(d.Id, out var fragments))
+                            {
+                                @if (fragments.Count == 0)
+                                {
+                                    <p class="client-none">@T("No hidden fragment was found on a new scan.")</p>
+                                }
+                                @foreach (var f in fragments)
+                                {
+                                    <div class="client-hidden">
+                                        <div class="app-list-meta">@T("Page {0}", f.Page) · @ReasonLabel(f.Reason)</div>
+                                        <q>@f.Text</q>
+                                    </div>
+                                }
+                            }
+                            else
+                            {
+                                <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Error" StartIcon="@Icons.Material.Rounded.VisibilityOff"
+                                           Disabled="@(_loadingDoc == d.Id)" OnClick="@(() => ShowHiddenAsync(d.Id))">@T("Show the removed text")</MudButton>
+                            }
+                        }
+                    </div>
+                }
+            </section>
+        </MudItem>
+    </MudGrid>
+}
 
 @code {
     [Parameter] public string Code { get; set; } = "";
+
+    private Client? _client;
+    private List<DocumentInfo> _documents = [];
+    private List<Case> _cases = [];
+    private readonly Dictionary<int, IReadOnlyList<HiddenFragment>> _hidden = [];
+    private bool _loading = true;
+    private string? _error;
+    private int? _loadingDoc;
+
+    protected override void OnInitialized() => Clock.Changed += OnClockChanged;
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            _client = await Clients.GetAsync(Code.Trim());
+            if (_client is null)
+            {
+                _documents = [];
+                _cases = [];
+            }
+            else
+            {
+                _documents = await Clients.ListDocumentsAsync(_client.Code);
+                _cases = await Cases.QueueAsync(new CaseQueueFilter(OpenOnly: false, ClientCode: _client.Code));
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task ShowHiddenAsync(int documentId)
+    {
+        _loadingDoc = documentId;
+        try
+        {
+            var doc = await Shielded.GetAsync(documentId);
+            _hidden[documentId] = doc?.Result.Hidden ?? [];
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loadingDoc = null;
+        }
+    }
+
+    // A deadline can expire when the demo clock moves: the case list follows it.
+    private void OnClockChanged() => _ = InvokeAsync(async () =>
+    {
+        await LoadAsync();
+        StateHasChanged();
+    });
+
+    public void Dispose() => Clock.Changed -= OnClockChanged;
+
+    private static string Day(DateOnly d) => d.ToString("d MMM yyyy", Format.Culture);
+
+    private static string HeaderLine(Client c)
+    {
+        var parts = new List<string> { T("Client {0}", c.Code), T("born {0}", Day(c.BirthDate)) };
+        if (c.BirthCountry is { Length: > 0 } birth) parts.Add(T("birth country {0}", birth));
+        if (c.Citizenships.Count > 0) parts.Add(T("citizenship {0}", string.Join(", ", c.Citizenships)));
+        return string.Join(" · ", parts);
+    }
+
+    private string CaseDates(Case k)
+    {
+        if (!k.IsOpen)
+            return k.ClosedAt is { } closed ? T("closed {0}", Format.Date(closed))
+                 : k.ExpiredAt is { } expired ? T("expired {0}", Format.Date(expired))
+                 : T("opened {0}", Format.Date(k.OpenedAt));
+        if (k.DueAt is not { } due) return T("opened {0}", Format.Date(k.OpenedAt)) + " · " + T("no deadline in the guide");
+        var days = (int)Math.Ceiling((due - Clock.UtcNow).TotalDays);
+        return T("opened {0}", Format.Date(k.OpenedAt)) + " · " + T("due {0}", Format.Date(due)) + " · "
+             + (days >= 0 ? T("{0} days left", days) : T("{0} days overdue", -days));
+    }
+
+    private static RenderFragment RegimePill(string regime, bool preexisting) =>
+        @<Pill Tone="@(preexisting ? null : "accent")" Title="@T("Computed from the opening date (guide p. 20)")">@regime: @(preexisting ? T("preexisting") : T("new"))</Pill>;
+
+    private static RenderFragment TinPill(TinCheck check) => check.Status switch
+    {
+        TinFormatStatus.Valid => @<Pill Tone="success" Icon="@Icons.Material.Rounded.Check">@check.Label</Pill>,
+        TinFormatStatus.Invalid => @<Pill Tone="danger" Icon="@Icons.Material.Rounded.Close">@check.Label</Pill>,
+        _ => @<Pill>@check.Label</Pill>,
+    };
+
+    private static RenderFragment SelfCertPill(SelfCertStatus status) => status switch
+    {
+        SelfCertStatus.Valid => @<Pill Tone="success">@T("Valid")</Pill>,
+        SelfCertStatus.Doubtful => @<Pill Tone="warning">@T("Doubtful")</Pill>,
+        _ => @<Pill>@T("Superseded")</Pill>,
+    };
+
+    private static RenderFragment ShieldPill(ShieldVerdict verdict) => verdict switch
+    {
+        ShieldVerdict.Clean => @<Pill Tone="success" Icon="@Icons.Material.Rounded.Shield">@T("Clean")</Pill>,
+        ShieldVerdict.HiddenTextRemoved => @<Pill Tone="danger" Icon="@Icons.Material.Rounded.GppMaybe">@T("Hidden text removed")</Pill>,
+        _ => @<Pill>@T("Not scanned")</Pill>,
+    };
+
+    private static RenderFragment StatusPill(CaseStatus status) => status switch
+    {
+        CaseStatus.Open => @<Pill Tone="accent">@T("Open")</Pill>,
+        CaseStatus.AwaitingClient => @<Pill Tone="accent">@T("Awaiting the client")</Pill>,
+        CaseStatus.Reminded => @<Pill Tone="warning">@T("Reminded")</Pill>,
+        CaseStatus.Escalated => @<Pill Tone="danger">@T("Escalated")</Pill>,
+        CaseStatus.ResponseReceived => @<Pill Tone="accent">@T("Response received")</Pill>,
+        CaseStatus.Closed => @<Pill Tone="success">@T("Closed")</Pill>,
+        _ => @<Pill Tone="danger">@T("Expired")</Pill>,
+    };
+
+    private static string RegimeLabel(Regime regime) => regime switch
+    {
+        Regime.Crs => "CRS",
+        Regime.Fatca => "FATCA",
+        _ => "CRS + FATCA",
+    };
+
+    private static string AddressKindLabel(AddressKind kind) => kind switch
+    {
+        AddressKind.Residence => T("Residence"),
+        AddressKind.Mailing => T("Mailing address"),
+        AddressKind.InCareOf => T("In care of (c/o)"),
+        _ => T("Hold mail"),
+    };
+
+    private static string AccountTypeLabel(AccountType type) => type switch
+    {
+        AccountType.Depository => T("Depository account"),
+        AccountType.Custodial => T("Custodial account"),
+        AccountType.Insurance => T("Insurance contract"),
+        _ => T("Other account"),
+    };
+
+    private static string FrequencyLabel(string frequency) => frequency switch
+    {
+        "Monthly" => T("Monthly"),
+        _ => frequency,
+    };
+
+    private static string ChannelLabel(string channel) => channel switch
+    {
+        "branch" => T("at the branch"),
+        "" => T("channel not recorded"),
+        _ => channel,
+    };
+
+    private static string NoTinLabel(NoTinReason reason) => reason switch
+    {
+        NoTinReason.A_CountryDoesNotIssue => T("reason A: the country does not issue TINs"),
+        NoTinReason.B_UnableToObtain => T("reason B: unable to obtain a TIN"),
+        NoTinReason.C_NotRequired => T("reason C: TIN not required"),
+        _ => T("no reason given"),
+    };
+
+    private static string DocumentKindLabel(DocumentKind kind) => kind switch
+    {
+        DocumentKind.Passport => T("Passport"),
+        DocumentKind.IdCard => T("Identity card"),
+        DocumentKind.Payslip => T("Payslip"),
+        DocumentKind.BankStatement => T("Bank statement"),
+        DocumentKind.SelfCertForm => T("Self-certification form"),
+        DocumentKind.UtilityBill => T("Utility bill"),
+        DocumentKind.Letter => T("Letter"),
+        _ => T("Other document"),
+    };
+
+    private static string ReasonLabel(string reasons) => string.Join(", ", reasons.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+        .Select(r => r switch
+        {
+            nameof(HiddenReason.WhiteText) => T("white text"),
+            nameof(HiddenReason.TinyFont) => T("font under 2 pt"),
+            nameof(HiddenReason.OffPage) => T("outside the page"),
+            nameof(HiddenReason.Invisible) => T("invisible text"),
+            _ => r,
+        }));
 }
