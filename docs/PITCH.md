@@ -37,9 +37,9 @@ durata segmentului ei; cele ≈ 9 s rămase până la 3:00 sunt pentru pauze și
 `AI:AgentMode = Live`. Mock: fără model, cu `AI:AgentMode = Auto`. Detaliile sunt în checklist (secțiunea 4). Replay e
 acceptabil doar pentru o întrebare care citește (ex. „Rezumă cazul”), iar scenariul de mai jos nu are niciuna.
 
-**Ce e pe main (28.10.2026, 22:10, `e0bc47c`):** `/audit` (cu istoricul din seed) și `/metrics` funcționează;
+**Ce e pe main (28.10.2026, 22:15, `eaea3f3`):** `/audit` (cu istoricul din seed) și `/metrics` funcționează;
 `/cases`, `/cases/{code}`, `/changes/new` și `/clients/{code}` sunt doar schelete („Vine în faza următoare”), `/dashboard` e
-încă cel din template, data simulată nu are butoane în UI, iar agentul are doar `getCase` (uneltele sunt în PR #44). Etichetele marcate „(după R2)”
+încă cel din template, data simulată nu are butoane în UI. Agentul are cele 14 unelte și mock-ul RO/EN (#44), dar nu e încă legat de pagina cazului. Etichetele marcate „(după R2)”
 sau „(după R3)” vin din `PLAN.md` §15 și nu există încă în cod.
 
 ## 2. Scenariul, cuvânt cu cuvânt

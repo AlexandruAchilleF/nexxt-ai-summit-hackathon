@@ -76,7 +76,7 @@ cu toți participanții: [`docs/PLAN.md` §6.3](docs/PLAN.md#63-fluxul-mariei-tr
 
 Acesta e traseul-țintă. Pe `main`, pașii 1–3 și 6 sunt cod cu teste (`ChangeService`, `CrsRuleEngine`, `CaseService`,
 `DeadlineWatcher`), iar serviciile pentru dovezi, cerere, aprobare și închidere există în `CaseService`. Uneltele agentului
-de la pașii 4, 5, 7 și 8 nu sunt încă pe `main` (sunt în PR #44, deschis), iar paginile de caz sunt doar schelete
+de la pașii 4, 5, 7 și 8 sunt pe `main` (#44), cu mock-ul care le cheamă; paginile de caz sunt încă doar schelete
 („Vine în faza următoare”); starea exactă e în [§11](#11-stare).
 
 ### Capcanele (fără alarme false)
@@ -158,8 +158,8 @@ flowchart LR
 ```
 
 Săgețile agentului sunt ținta din [`docs/PLAN.md` §13](docs/PLAN.md#13-agentul-crs-sentinel). Pe `main`,
-`CrsSentinelAgent` are o singură unealtă (`getCase`), iar mock-ul lui spune că agentul e în construcție; uneltele sunt
-în PR #44, deschis (§11).
+`CrsSentinelAgent` are 14 unelte (#44), iar mock-ul RO/EN e o mașină de stări pe starea cazului din baza de date, care
+cheamă uneltele reale (§11).
 
 - **Cod pur** (`Rules`, `Deadlines`, `Shield`, `Tin`, hashing-ul din `Audit`): fără EF, fără AI, fără HTTP. Primește un
   `ClientSnapshot` imutabil și întoarce un rezultat, deci se testează în milisecunde.
@@ -167,8 +167,8 @@ Săgețile agentului sunt ținta din [`docs/PLAN.md` §13](docs/PLAN.md#13-agent
   Tranzițiile cazului sunt doar aici, fiecare cu verificare de rol și cu intrare în jurnal.
 - **Agentul** e un agent cu unelte, orchestrat de cod, cu omul la decizie: nu atinge baza de date direct, iar cine
   deschide cazul, regulile și termenele sunt în cod. Runtime-ul cere aprobarea omului pentru uneltele marcate `needsApproval`
-  și, după aprobare, le rulează fără model; `sendClientRequest` și `closeCase` nu sunt încă pe `main`
-  (PR #44).
+  și, după aprobare, le rulează fără model; așa sunt marcate
+  `sendClientRequest` și `closeCase` (#44).
 - **Data simulată** (`SimClock`) e un serviciu separat, cu decalaj setabil („+85 de zile”). Codul CRS nu citește ora din
   altă parte; restul aplicației rămâne pe ceasul real.
 - Entitățile, interfețele și structura folderelor: [`docs/PLAN.md` §6–13](docs/PLAN.md#6-arhitectura).
@@ -182,7 +182,7 @@ Săgețile agentului sunt ținta din [`docs/PLAN.md` §13](docs/PLAN.md#13-agent
 | `TinFormat` + TIN on Europa | Formatul TIN pe țară (DE, IT, AT, ES, FR, US, RO); pentru statele UE, verificare la serviciul Comisiei Europene, care confirmă tot doar structura și sintaxa. Spunem „format valid”, niciodată „TIN valid” |
 | `AuditLog` | Fiecare pas e o intrare cu `Hash = SHA-256(hash-ul anterior + conținut)`; „Verifică” găsește exact intrarea modificată |
 | `PiiVault` | CNP, IBAN, card, e-mail și telefoane (românești și internaționale, cu `+` sau `00`) sunt mascate înainte de model; uneltele lucrează cu valorile reale; ce se salvează rămâne mascat |
-| Verificări pe răspuns (`Features/Checks`) | `pii-leak` (fără date personale scăpate); în `CrsChecks`: `evidence-quoted` (citatele sunt printre rezultatele uneltelor), `signals-never-alert`, `rule-cited` (fiecare indiciu are regula și pagina), `no-tin-valid-claim`. Pe `main`, agentul CRS are activă doar `pii-leak` |
+| Verificări pe răspuns (`Features/Checks`) | `pii-leak` (fără date personale scăpate); în `CrsChecks`: `evidence-quoted` (citatele sunt printre rezultatele uneltelor), `signals-never-alert`, `rule-cited` (fiecare indiciu are regula și pagina), `no-tin-valid-claim`. Pe `main`, agentul CRS are active `pii-leak` și `evidence-quoted` (#44); celelalte trei sunt oprite, decizia R4 |
 
 ### Modelele și fallback-ul
 
@@ -228,8 +228,8 @@ Metricile vin doar din rulări reale (`/metrics` și testele), prezentate separa
 ### Ultima rulare
 
 Rularea pe commit-ul `e0bc47c`, 28.10.2026, 22:08, **fără model** (nicio cheie, niciun apel AI): pagina `/metrics`, cu
-aplicația pornită local, și `IEvaluationService.RunAsync()` chemat direct dau aceleași cifre. Toate cifrele de mai jos
-vin din cod determinist, nu din AI.
+aplicația pornită local, și `IEvaluationService.RunAsync()` chemat direct dau aceleași cifre. Pe `eaea3f3` (după #44, la 22:14),
+`IEvaluationService` dă din nou aceleași cifre. Toate cifrele de mai jos vin din cod determinist, nu din AI.
 
 **1. Acoperirea specificației** (motorul `crs-rules/1.2`): regulile din ghid sunt implementate și testate, pe 20 de
 cazuri-etalon cu date de intrare și pe 50 de clienți sintetici.
@@ -298,8 +298,8 @@ IAM), niciodată din repo. În `appsettings.Local.json` (ignorat de git): `"AI":
 
 Lucrăm în paralel, pe module; fiecare PR intră doar cu CI verde (build cu 0 warnings, teste unitare și E2E).
 
-Starea de pe `main` la commit-ul `e0bc47c`, verificată în cod pe 28.10.2026, la 22:10: `dotnet build -warnaserror` fără
-warnings, testele unitare 1183 din 1183, E2E 23 din 23.
+Starea de pe `main` la commit-ul `eaea3f3`, verificată în cod pe 28.10.2026, la 22:15: `dotnet build -warnaserror` fără
+warnings, testele unitare 1236 din 1236, E2E 23 din 23.
 
 | Modul | Rol | Pe `main` | În lucru | Lipsește |
 | --- | --- | --- | --- | --- |
@@ -310,8 +310,8 @@ warnings, testele unitare 1183 din 1183, E2E 23 din 23.
 | `HiddenTextShield`, `EvidenceVerifier`, `TinFormat` + TIN on Europa, `AuditLog` | R3 | da (#23) | | |
 | Pagina `/privacy` (jurnal, TIN on Europa, Bedrock, retenție, temeiul legal) | R3 | da (#26) | | |
 | Provider Bedrock | R4 | da (#5) | | |
-| Runtime-ul agentului (aprobarea oprește rularea), verificările CRS pe răspuns, mascarea telefoanelor străine | R4 | da (#20, #35) | | verificările CRS nu sunt încă active pe agentul CRS |
-| `CrsSentinelAgent`: uneltele, system prompt-ul final, mock RO/EN, înregistrarea | R4 | doar scheletul, cu `getCase` | #44 (uneltele și mock-ul, Maria cap-coadă în RO și EN) | înregistrarea `Recordings/crs-sentinel.json` |
+| Runtime-ul agentului (aprobarea oprește rularea), verificările CRS pe răspuns, mascarea telefoanelor străine | R4 | da (#20, #35) | | |
+| `CrsSentinelAgent`: cele 14 unelte, system prompt-ul, mock RO/EN (Maria cap-coadă), verificările active | R4 | da (#44) | | înregistrarea `Recordings/crs-sentinel.json`; legarea agentului de pagina cazului |
 | Datele: 50 de clienți sintetici, PDF-urile cazurilor-etalon, cazurile-etalon transcrise, seed-ul | R5 | da (#8, #9, #11, #17, #21, #22, #25, #27, #31, #36, #39) | | |
 | `EvaluationService` (cele trei feluri de cifre) și pagina `/metrics` | R5 | da (#29, #38, #42) | | |
 | Landing-ul și subsolurile | R5 | da (#24, #32) | | |
