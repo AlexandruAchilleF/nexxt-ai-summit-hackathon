@@ -63,8 +63,7 @@ public sealed record CoverageRow(
 
 /// <summary>The deadline of an opened case, through IDeadlineCalculator.</summary>
 /// <param name="Actual">Null when the engine opened no case.</param>
-/// <param name="Matches">Null when the rule is not the calculator's (DL-EXPIRED-*: CaseService, GoldenWorkflowTests).</param>
-public sealed record DeadlineCheck(GoldenDeadline Expected, DeadlineResult? Actual, bool? Matches);
+public sealed record DeadlineCheck(GoldenDeadline Expected, DeadlineResult? Actual, bool Matches);
 
 /// <param name="Caught">An action was expected and the engine gave it.</param>
 /// <param name="Missed">An action was expected; the engine gave NoCase, Compliant or another decision.</param>

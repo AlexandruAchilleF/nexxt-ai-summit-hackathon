@@ -228,7 +228,6 @@ public sealed class EvaluationService(
 
     private DeadlineCheck Deadline(GoldenDeadline expected, RuleOutcome outcome, ClientSnapshot after, DateTime knownAt)
     {
-        if (expected.RuleId?.StartsWith("DL-EXPIRED", StringComparison.Ordinal) == true) return new(expected, null, null);
         // NEVERIFICAT: which account sets the deadline is not in the guide. Ours: the most recently opened one, which gives the
         // earliest deadline (a new account's 90 days never end after a preexisting one's). R2 to make it a shared function.
         var account = after.Accounts.MaxBy(a => a.OpenedOn);
