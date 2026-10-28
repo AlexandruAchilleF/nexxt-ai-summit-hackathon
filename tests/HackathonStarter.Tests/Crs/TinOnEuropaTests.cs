@@ -131,6 +131,33 @@ public class TinOnEuropaTests
         Assert.Equal(TinFormatStatus.Valid, check.Status);
     }
 
+    [Theory]
+    [InlineData("RO", "2910608400319")] // recorded as [CNP-1]
+    [InlineData("FR", "1023217608406")] // recorded as [CARD-1]
+    public async Task Masked_recording_is_replayed_for_the_same_tin(string country, string tin)
+    {
+        Assert.NotEqual(tin, PiiVault.ForStorage().Mask(tin));
+        var (host, validator) = await CreateAsync(Target(Down), record: true);
+        await using var _ = host;
+        host.Get<TargetRecordings>().Save(TinOnEuropaClient.Target, TinOnEuropaClient.Conversation(country, tin),
+            ValidAnswer.Replace(">DE<", $">{country}<").Replace("86095174223", tin));
+
+        var check = await validator.CheckAsync(country, tin);
+
+        Assert.Equal(TinCheckSource.TinOnEuropaReplay, check.Source);
+        Assert.Equal(TinFormatStatus.Valid, check.Status);
+    }
+
+    [Fact]
+    public void Only_the_envelope_is_sent_and_the_masked_key_holds_no_tin()
+    {
+        var conversation = TinOnEuropaClient.Conversation("RO", "2910608400319");
+
+        Assert.Equal(TinOnEuropaClient.BuildRequest("RO", "2910608400319"), conversation[^1].Content); // {{text}} = last user turn
+        var vault = PiiVault.ForStorage();
+        Assert.All(conversation, t => Assert.DoesNotContain("2910608400319", vault.Mask(t.Content)));
+    }
+
     [Fact]
     public async Task Recording_of_another_tin_is_never_replayed()
     {
