@@ -1,11 +1,190 @@
+using HackathonStarter.Features.Changes;
+using HackathonStarter.Features.Evaluation;
+using HackathonStarter.Features.Shield;
+using HackathonStarter.Features.Synthetic;
+using HackathonStarter.Services;
+using UglyToad.PdfPig;
+
 namespace HackathonStarter.Features.Clients;
 
 /// <summary>
-/// Demo clients (synthetic, Features/Synthetic). Owner: R5: Maria, Andrei and one client per golden case, plus the 50
-/// generated ones. Empty in phase 0; AppDbContext seeds whatever this returns into an empty table.
+/// Demo clients, all synthetic: the golden cases' clients exactly as on their cards (docs/GOLDEN-CASES.md), then ordinary
+/// RO residents up to <see cref="DemoClientCount"/>. AppDbContext seeds whatever this returns into an empty table. Owner: R5.
+/// The 50 clients of <see cref="SyntheticClients"/> stay in memory (metrics) and are not seeded.
 /// </summary>
 public static class ClientSeed
 {
-    /// <param name="now">The demo date (ISimClock) at startup: seed dates relative to it, so open cases stay open on any day.</param>
-    public static List<Client> Create(DateTime now) => [];
+    /// <summary>The most clients the demo database holds.</summary>
+    public const int DemoClientCount = 25;
+
+    /// <summary>Fixed, so the filler clients are the same on every start.</summary>
+    public const int FillerSeed = 2027;
+
+    /// <summary>Filler codes start at CL-2001: clear of the golden CL-00nn and of the synthetic CL-1001..CL-1050.</summary>
+    public const int FillerFirstNumber = 2001;
+
+    // Everyone on a golden card (GOLDEN-CASES.md, 2), transcribed or not: filler names stay clear of them, so the
+    // filler does not change when a card is transcribed and a search for "Maria" or "Pop" finds only the golden client.
+    private static readonly string[] GoldenPeople =
+    [
+        "Maria Popescu", "Cristina Dobre", "Bogdan Lazăr", "Radu Ionescu", "Alexandra Vlad", "Marius Stoica", "Andrei Pop",
+        "Sorin Matei", "Victor Neagu", "Doina Cazacu", "Petru Sârbu", "Lucian Toma", "Ioana Mureșan", "Irina Constantin",
+        "Gheorghe Marin", "Teodora Iliescu",
+    ];
+
+    private sealed record Street(string Name, string PostalCode);
+
+    // Real streets and postal codes, none of them a street of a golden card, even with another kind ("Str. Republicii",
+    // "Bd. Republicii"): SeedTests checks it. A city with none left here (Brașov) is moved to FallbackCity.
+    private static readonly Dictionary<string, Street[]> Streets = new()
+    {
+        ["București"] = [new("Calea Victoriei", "010063"), new("Str. Baba Novac", "031622"), new("Bd. Iuliu Maniu", "061103")],
+        ["Cluj-Napoca"] = [new("Calea Dorobanților", "400117")],
+        ["Iași"] = [new("Bd. Independenței", "700102")],
+        ["Timișoara"] = [new("Calea Șagului", "300516")],
+        ["Constanța"] = [new("Bd. Tomis", "900178"), new("Str. Mircea cel Bătrân", "900658")],
+        ["Craiova"] = [new("Str. Brestei", "200581")],
+        ["Oradea"] = [new("Calea Aradului", "410223"), new("Str. Nufărului", "410582")],
+    };
+
+    private const string FallbackCity = "București";
+
+    /// <summary>The streets the filler lives on.</summary>
+    public static IEnumerable<string> StreetNames => Streets.Values.SelectMany(s => s).Select(s => s.Name);
+
+    // SyntheticData draws from fixed name lists: this many draws in a row with no new name means none is left.
+    private const int MaxMisses = 10_000;
+
+    private static readonly DateOnly FirstOpening = new(2016, 1, 4), LastOpening = new(2025, 12, 15);
+
+    /// <param name="now">The demo date (ISimClock) at startup: the documents' UploadedAt. No other date depends on it.</param>
+    public static List<Client> Create(DateTime now)
+    {
+        var golden = Golden(now);
+        return [.. golden, .. Filler(Math.Max(0, DemoClientCount - golden.Count))];
+    }
+
+    /// <summary>
+    /// One client per code of the golden cases that have input (CL-0013 serves 8 and 13, CL-0015 serves 1 and 15), from
+    /// <see cref="GoldenClients.Create"/>, so a case transcribed later is seeded with no change here. Each gets the documents
+    /// its cards list (<see cref="GoldenCase.Documents"/>) that <see cref="SyntheticPdfs"/> generates; an answer's document
+    /// (<see cref="GoldenResponse.Document"/>) is not on file yet: it arrives during the demo. The shield scans each document
+    /// here, except those that are a case's change (DocumentUploaded): they stay NotScanned until ChangeService scans them.
+    /// </summary>
+    private static List<Client> Golden(DateTime now)
+    {
+        var codes = GoldenCases.All.Where(c => c.HasInput).Select(c => c.ClientCode).Distinct().Order(StringComparer.Ordinal);
+        var shield = new HiddenTextShield();
+        return [.. codes.Select(code =>
+        {
+            var client = GoldenClients.Create(code);
+            var cases = GoldenCases.All.Where(c => c.ClientCode == code).ToList();
+            var uploads = cases.Where(c => c.Change?.Kind == ChangeKind.DocumentUploaded).SelectMany(c => c.Documents)
+                .Select(d => d.FileName).ToHashSet();
+            var files = cases.SelectMany(c => c.Documents).DistinctBy(d => d.FileName).Where(d => SyntheticPdfs.FileNames.Contains(d.FileName));
+            client.Documents.AddRange(files.Select(d =>
+            {
+                var pdf = SyntheticPdfs.Get(d.FileName);
+                return Document(pdf, d.Kind, now, uploads.Contains(d.FileName) ? ShieldVerdict.NotScanned : shield.Scan(pdf.Bytes).Verdict);
+            }));
+            return client;
+        })];
+    }
+
+    /// <summary>
+    /// Ordinary RO residents with nothing to report (the "standard RO resident" of GOLDEN-CASES.md, 1): residence and mobile
+    /// in RO, citizenship [RO], a current account opened from 2016 on (new for CRS and FATCA), sometimes a savings account,
+    /// a Valid self-certification [RO, TIN = CNP] signed at the counter. The first <paramref name="count"/> of one fixed
+    /// sequence, so a longer list starts with the shorter one. Throws when SyntheticData has fewer names clear of the golden ones.
+    /// </summary>
+    public static List<Client> Filler(int count)
+    {
+        var data = new SyntheticData(FillerSeed);
+        var random = new Random(FillerSeed + 1);
+        var reserved = GoldenPeople.Concat(GoldenClients.Codes.Select(code => GoldenClients.Create(code).FullName))
+            .SelectMany(n => n.Split(' ')).Select(TextMatch.Normalize).ToHashSet();
+        var taken = new HashSet<string>();
+        var clients = new List<Client>(count);
+        var misses = 0;
+
+        while (clients.Count < count)
+        {
+            var person = data.Person();
+            if (Clashes(person.FirstName, reserved) || Clashes(person.LastName, reserved) || !taken.Add(person.FullName))
+            {
+                if (++misses == MaxMisses)
+                    throw new InvalidOperationException(
+                        $"Filler: {count} clients asked, but SyntheticData has only {clients.Count} full names clear of the golden people.");
+                continue;
+            }
+            misses = 0;
+
+            var (city, streets) = Streets.TryGetValue(person.City, out var known) ? (person.City, known) : (FallbackCity, Streets[FallbackCity]);
+            var adult = person.BirthDate.AddYears(18);
+            var opened = Day(random, adult > FirstOpening ? adult : FirstOpening, LastOpening);
+            var signedAt = opened.ToDateTime(new TimeOnly(7, 0), DateTimeKind.Utc).AddMinutes(random.Next(0, 480));
+            var street = streets[random.Next(streets.Length)];
+            var number = FillerFirstNumber + clients.Count;
+            var client = new Client
+            {
+                Id = number,
+                Code = $"CL-{number}",
+                FirstName = person.FirstName,
+                LastName = person.LastName,
+                BirthDate = person.BirthDate,
+                BirthCountry = "RO",
+                Cnp = person.Cnp,
+                Citizenships = ["RO"],
+                Addresses =
+                [
+                    new Address
+                    {
+                        Kind = AddressKind.Residence, Line = $"{street.Name} {random.Next(1, 120)}, ap. {random.Next(1, 80)}",
+                        City = $"{street.PostalCode} {city}", Country = "RO", ValidFrom = opened,
+                    },
+                ],
+                Phones = [new Phone { Number = data.PhoneE164("RO"), Country = "RO" }],
+                Accounts =
+                [
+                    new Account { Iban = data.Iban("RZBR"), Type = AccountType.Depository, Product = "Cont curent", OpenedOn = opened, Balance = Money(random, 300, 45_000), Currency = "RON" },
+                ],
+                SelfCertifications =
+                [
+                    new SelfCertification
+                    {
+                        SignedAt = signedAt, ReceivedAt = signedAt, Channel = "ghișeu",
+                        Residences = [new TaxResidence { Country = "RO", Tin = person.Cnp }],
+                    },
+                ],
+            };
+            if (random.Next(3) == 0 && opened < LastOpening)
+                client.Accounts.Add(new Account
+                {
+                    Iban = data.Iban("RZBR"), Type = AccountType.Depository, Product = "Cont de economii",
+                    OpenedOn = Day(random, opened.AddDays(1), LastOpening), Balance = Money(random, 1_000, 90_000), Currency = "RON",
+                });
+            clients.Add(client);
+        }
+        return clients;
+    }
+
+    private static ClientDocument Document(SyntheticPdf pdf, DocumentKind kind, DateTime now, ShieldVerdict verdict)
+    {
+        using var parsed = PdfDocument.Open(pdf.Bytes);
+        return new ClientDocument
+        {
+            Kind = kind, FileName = pdf.FileName, Content = pdf.Bytes, Pages = parsed.NumberOfPages, ShieldVerdict = verdict, UploadedAt = now,
+        };
+    }
+
+    /// <summary>Equal to a golden name, or one inside the other ("Ion" in "Ionescu", "Stan" in "Constantin").</summary>
+    private static bool Clashes(string name, HashSet<string> reserved)
+    {
+        var n = TextMatch.Normalize(name);
+        return reserved.Any(r => r.Contains(n, StringComparison.Ordinal) || n.Contains(r, StringComparison.Ordinal));
+    }
+
+    private static DateOnly Day(Random random, DateOnly from, DateOnly to) => from.AddDays(random.Next(0, to.DayNumber - from.DayNumber + 1));
+
+    private static decimal Money(Random random, int min, int max) => random.Next(min * 100, max * 100 + 1) / 100m;
 }
