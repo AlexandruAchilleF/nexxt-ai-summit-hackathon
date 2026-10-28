@@ -338,6 +338,8 @@ html.pwa-installable .pwa-install { display: inline-flex !important; }
 .crs-case-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; align-items: start; }
 .crs-case-main > :first-child { margin-top: 0; }
 .crs-case-side .agent-chat { height: min(680px, calc(100dvh - 120px)); min-height: 420px; }
+.crs-case-actions { margin-bottom: 16px; }
+.crs-question-box { margin-bottom: 0; }
 @container (min-width: 940px) {
   .crs-case-grid { grid-template-columns: minmax(0, 1fr) minmax(340px, 400px); }
   .crs-case-side { position: sticky; top: 72px; }

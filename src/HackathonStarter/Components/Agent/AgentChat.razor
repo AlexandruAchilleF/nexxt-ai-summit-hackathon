@@ -117,6 +117,7 @@
 @code {
     [Parameter, EditorRequired] public string AgentName { get; set; } = "";
     [Parameter] public bool AllowFiles { get; set; }
+    [Parameter] public bool AllowActionParameter { get; set; }
     [Parameter] public string Placeholder { get; set; } = T("Ask anything…");
     [Parameter] public string EmptyTitle { get; set; } = T("How can I help?");
     [Parameter] public string? EmptyDescription { get; set; }
@@ -127,6 +128,8 @@
     /// which only sees the last message, know what the page is about. Not shown in the bubbles.
     /// </summary>
     [Parameter] public string? Context { get; set; }
+    /// <summary>Current action ID when called with SendWithAction (e.g., "AnalyzeDossier", "VerifyResponse").</summary>
+    private string? _currentActionId;
 
     private class Turn
     {
@@ -177,6 +180,13 @@
         }
     }
 
+    /// <summary>Send a message with an optional action ID (used by CaseDetailPage action buttons).</summary>
+    public async Task SendWithAction(string text, string? actionId = null)
+    {
+        _currentActionId = actionId;
+        await Send(text);
+    }
+
     private async Task Send(string text)
     {
         text = text.Trim();
@@ -201,6 +211,7 @@
         Attach(active);
         // Put the conversation id in the URL only once the run is saved: a reload now restores it.
         if (newConversation) Nav.NavigateTo(Nav.GetUriWithQueryParameter("c", _conversationId), replace: true);
+        _currentActionId = null; // Clear after sending
         StateHasChanged();
         await ScrollToBottom();
     }

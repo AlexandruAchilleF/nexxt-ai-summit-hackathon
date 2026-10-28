@@ -84,10 +84,36 @@ else
             </div>
 
             <aside class="crs-case-side" aria-label="@T("CRS Sentinel agent")">
-                <AgentChat AgentName="crs-sentinel" Context="@($"Case: {c.Code}")"
-                           Placeholder="@T("Ask CRS Sentinel about this case…")"
-                           EmptyTitle="@T("Ask the agent to prepare this case")"
-                           EmptyDescription="@StarterPrompts" />
+                <div class="crs-case-actions">
+                    @if (c.Status == CaseStatus.Open && _canEdit)
+                    {
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Class="mb-3"
+                                   OnClick="AnalyzeDossierClick">
+                            @T("Analyze the dossier")
+                        </MudButton>
+                    }
+                    @if (c.Status == CaseStatus.ResponseReceived && _canEdit)
+                    {
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Class="mb-3"
+                                   OnClick="VerifyResponseClick">
+                            @T("Check the response")
+                        </MudButton>
+                    }
+                    @if (c.Status == CaseStatus.Closed && _canEdit)
+                    {
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Class="mb-3" Disabled="true">
+                            @T("Case closed")
+                        </MudButton>
+                    }
+                </div>
+
+                <MudExpansionPanel Text="@T("Ask about the case")" Dense="true" Class="crs-question-box">
+                    <AgentChat @ref="_agentChat" AgentName="crs-sentinel" Context="@($"Case: {c.Code}")"
+                               Placeholder="@T("Ask CRS Sentinel about this case…")"
+                               EmptyTitle="@T("Ask the agent")"
+                               AllowActionParameter="true"
+                               Height="400px" />
+                </MudExpansionPanel>
             </aside>
         </div>
     </div>
@@ -107,6 +133,7 @@ else
     private string? _error, _fingerprint, _deliveredDoc;
     private bool _loading = true, _canEdit, _delivering, _disposed;
     private readonly CancellationTokenSource _stop = new();
+    private AgentChat? _agentChat;
 
     private DateTime Now => _demoClock?.UtcNow ?? SimClock.UtcNow;
     private TimeSpan Offset => _demoClock?.Offset ?? SimClock.Offset;
@@ -211,6 +238,21 @@ else
     }
 
     private string? DocName(int? id) => id is { } v && _documents.TryGetValue(v, out var name) ? name : null;
+
+    private async Task AnalyzeDossierClick() => await RunAction(_agentChat, "AnalyzeDossier");
+    private async Task VerifyResponseClick() => await RunAction(_agentChat, "VerifyResponse");
+
+    private async Task RunAction(AgentChat? chat, string actionId)
+    {
+        if (chat is null) return;
+        var messageMap = new Dictionary<string, string>
+        {
+            { "AnalyzeDossier", T("Analizează dosarul") },
+            { "VerifyResponse", T("Verifică răspunsul") }
+        };
+        if (messageMap.TryGetValue(actionId, out var message))
+            await chat.SendWithAction(message, actionId);
+    }
 
     public void Dispose()
     {

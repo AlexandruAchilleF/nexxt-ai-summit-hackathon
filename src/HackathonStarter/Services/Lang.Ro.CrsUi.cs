@@ -15,8 +15,13 @@ public static partial class Lang
         ro["Apply a scenario to see the decision here: the indicia with rule and page, and the rules that do not apply, with the reason."] = "Aplică un scenariu și decizia apare aici: indiciile cu regula și pagina, plus regulile care nu se aplică, cu motivul.";
         ro["Apply change"] = "Aplică schimbarea";
         ro["Approved by {0} on {1}"] = "Aprobată de {0} pe {1}";
+        ro["Analyze the dossier"] = "Analizează dosarul";
+        ro["Ask about the case"] = "Întreabă despre caz";
+        ro["Ask the agent"] = "Întreabă agentul";
         ro["Ask CRS Sentinel about this case…"] = "Întreabă CRS Sentinel despre acest caz…";
         ro["Ask the agent to prepare this case"] = "Cere agentului să pregătească acest caz";
+        ro["Case closed"] = "Caz închis";
+        ro["Check the response"] = "Verifică răspunsul";
         ro["Audit log"] = "Jurnal";
         ro["Back to today's real date"] = "Înapoi la data reală de azi";
         ro["Bank policy"] = "Politica băncii";

@@ -5,8 +5,8 @@ namespace HackathonStarter.E2E;
 
 /// <summary>
 /// Maria's case end to end (docs/PLAN.md 6.3, docs/GOLDEN-CASES.md case 4), the way the demo video runs it: apply the
-/// change, open the case, the agent prepares it, a person approves, the demo date moves +85 days, the client answers,
-/// the agent proposes closing, a person approves, the case is Closed. Needs the real (or interim) CRS services, the demo
+/// change, open the case, run "Analizează dosarul" action, approve the request, demo date moves +85 days, client answers,
+/// run "Verifică răspunsul" action, approve the closing, case is Closed. Needs the real (or interim) CRS services, the demo
 /// scenarios and the agent's mock: run with --filter Flow=Maria once they are integrated.
 /// </summary>
 [Collection("app")]
@@ -15,16 +15,8 @@ public class MariaFlowTests(AppFixture app)
     private static readonly Regex CaseUrl = new(@"/cases/CRS-\d{4}-\d{4}(\?|$)");
     private static readonly LocatorAssertionsToBeVisibleOptions Slow = new() { Timeout = 60_000 };
 
-    private static ILocator ChatBox(IPage page) => page.GetByPlaceholder("Ask CRS Sentinel about this case…");
     private static ILocator Status(IPage page) => page.GetByTestId("case-status");
     private static ILocator Approve(IPage page) => page.GetByRole(AriaRole.Button, new() { Name = "Approve", Exact = true });
-
-    private static async Task AskAsync(IPage page, string question)
-    {
-        await ChatBox(page).FillAsync(question);
-        await page.WaitForTimeoutAsync(150);
-        await ChatBox(page).PressAsync("Enter");
-    }
 
     [Fact, Trait("Flow", "Maria")]
     public async Task Maria_case_runs_from_the_change_to_the_closing()
@@ -50,8 +42,8 @@ public class MariaFlowTests(AppFixture app)
             await Assertions.Expect(page.GetByTestId("deadline-rule")).ToContainTextAsync("DL-NEW-90");
             await Assertions.Expect(Status(page)).ToHaveTextAsync("Open");
 
-            // 3. Run 1: the agent prepares the case and stops at the request, which waits for a person.
-            await AskAsync(page, "Pregătește cazul");
+            // 3. Run 1: click "Analizează dosarul" (Analyze the dossier) action button
+            await page.GetByRole(AriaRole.Button, new() { Name = "Analyze the dossier" }).ClickAsync();
             await Assertions.Expect(page.GetByText("Approval needed")).ToBeVisibleAsync(Slow);
 
             // The viewer sees the same proposal read-only: no Approve, no Reject.
@@ -82,9 +74,19 @@ public class MariaFlowTests(AppFixture app)
             await page.GetByRole(AriaRole.Button, new() { Name = "Simulate the client's answer" }).ClickAsync();
             await Assertions.Expect(page.GetByTestId("delivered")).ToBeVisibleAsync();
 
-            // 6. Run 2: the agent registers the answer, re-evaluates and proposes closing; a person approves.
-            await AskAsync(page, "Clienta a răspuns: verifică și închide cazul");
+            // 6. Run 2: click "Verifică răspunsul" (Check the response) action button
+            await page.GetByRole(AriaRole.Button, new() { Name = "Check the response" }).ClickAsync();
             await Assertions.Expect(Approve(page)).ToBeVisibleAsync(Slow);
+
+            // 7. Verify deadline DL-NEW-90 is shown with page reference 29 / 35-36
+            await Assertions.Expect(page.GetByTestId("deadline-rule")).ToContainTextAsync("DL-NEW-90");
+            await Assertions.Expect(page.GetByTestId("due-date")).ToHaveTextAsync(new Regex(@"26 ianG 2027"));
+
+            // 8. All checks passing (case is Compliant, indicia covered by response)
+            await Assertions.Expect(page.GetByTestId("indicia")).ToContainTextAsync("CRS-IND-ADDR");
+            await Assertions.Expect(page.GetByTestId("indicia")).ToContainTextAsync("CRS-IND-PHONE");
+
+            // 9. Approve the closing (proposal with proof)
             await Approve(page).ClickAsync();
             await Assertions.Expect(Status(page)).ToHaveTextAsync("Closed", new() { Timeout = 15_000 });
             await Assertions.Expect(page.GetByTestId("proof")).ToBeVisibleAsync();
@@ -98,7 +100,7 @@ public class MariaFlowTests(AppFixture app)
     }
 
     [Fact, Trait("Flow", "Maria")]
-    public async Task A_viewer_cannot_apply_a_scenario_or_move_the_demo_date()
+    public async Task A_viewer_cannot_apply_a_scenario_move_the_demo_date_or_use_action_buttons()
     {
         var page = await app.NewPageAsync(user: "viewer");
         await app.GoAsync(page, "/changes/new");
@@ -108,6 +110,18 @@ public class MariaFlowTests(AppFixture app)
         await Assertions.Expect(page.GetByRole(AriaRole.Button, new() { Name = "Apply change" })).ToHaveCountAsync(0);
         foreach (var name in new[] { "+1 day", "+30 days", "+85 days", "Reset the demo date" })
             await Assertions.Expect(page.GetByRole(AriaRole.Button, new() { Name = name })).ToHaveCountAsync(0);
+
+        // Viewer cannot see action buttons on an open case
+        var maria = page.Locator("[data-scenario='maria']");
+        var admin = await app.NewPageAsync();
+        await app.GoAsync(admin, "/changes/new");
+        await admin.Locator("[data-scenario='maria']").GetByRole(AriaRole.Button, new() { Name = "Apply change" }).ClickAsync();
+        var result = admin.GetByTestId("change-result");
+        var caseUrl = new Uri(await result.Locator("a").First.GetAttributeAsync("href") ?? "").PathAndQuery;
+
+        await app.GoAsync(page, caseUrl);
+        await Assertions.Expect(page.GetByRole(AriaRole.Button, new() { Name = "Analyze the dossier" })).ToHaveCountAsync(0);
+        await Assertions.Expect(page.GetByRole(AriaRole.Button, new() { Name = "Check the response" })).ToHaveCountAsync(0);
     }
 
     [Fact, Trait("Flow", "Maria")]
