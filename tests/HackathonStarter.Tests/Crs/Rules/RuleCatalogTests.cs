@@ -55,6 +55,7 @@ public class RuleCatalogTests
     {
         Assert.Equal(RuleBasis.Interpretation, RuleCatalog.Get(RuleIds.Domestic).Basis);
         Assert.Equal(RuleBasis.Interpretation, RuleCatalog.Get(RuleIds.NewAccountIndicia).Basis);
+        Assert.Equal(RuleBasis.Interpretation, RuleCatalog.Get(RuleIds.DeadlinePreexistingYear).Basis);
         Assert.Equal(RuleBasis.Policy, RuleCatalog.Get(RuleIds.TinFormat).Basis);
         Assert.Equal(RuleBasis.Policy, RuleCatalog.Get(RuleIds.FatcaScopeAllAccounts).Basis);
         Assert.Equal(RuleBasis.Verified, RuleCatalog.Get(RuleIds.CrsStandingOrder).Basis);

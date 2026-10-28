@@ -218,10 +218,12 @@ public static class RuleCatalog
             "status for at most 90 days, until a new self-certification or an explanation."),
 
         new(RuleIds.DeadlinePreexistingYear, Regime.Crs, "Cont preexistent: sfârșitul anului sau 90 de zile",
-            "Ultima zi a anului calendaristic relevant sau 90 de zile de la notificare / descoperire, oricare dintre acestea " +
-            "este mai recentă.",
-            "29", Version, "Preexisting account: year end or 90 days", "CPF Anexa 2 pct. 1", RuleBasis.Verified,
-            "The last day of the relevant calendar year or 90 days after notice / discovery, whichever is later."),
+            "Ultima zi a anului calendaristic relevant sau 90 de zile de la notificare / descoperire, cea mai târzie. Ghidul " +
+            "spune „sau”; textul „oricare dintre acestea este mai recentă” e scris pentru testul adresei de rezidență, iar " +
+            "aplicarea lui generală e decizia echipei.",
+            "29", Version, "Preexisting account: year end or 90 days", "CPF Anexa 2 pct. 1; ghid p. 29", RuleBasis.Interpretation,
+            "The last day of the relevant calendar year or 90 days after notice / discovery, whichever is later. The guide says " +
+            "\"or\"; the \"whichever is later\" text is written for the residence address test, and applying it generally is the team's decision."),
 
         new(RuleIds.DeadlineExpiredNew, Regime.Crs, "Expirare, cont nou",
             "Fără autocertificare nouă: titularul e rezident și în jurisdicția inițială, și în cea nouă.",

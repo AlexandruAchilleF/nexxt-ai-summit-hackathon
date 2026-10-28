@@ -83,6 +83,7 @@ var forAgent = outcome.Summarize(en: Lang.IsEn);             // R4: unealta eval
 | `GEN-DOMESTIC` | Nicio regulă nu se aplică; analogie cu VII.A pct. 5 lit. c) | specialistul de domeniu |
 | `CRS-IND-CO` cu adrese vechi la dosar | „Nicio altă adresă” = nicio altă adresă **actuală** (Î6) | specialistul de domeniu |
 | `CRS-IND-PHONE` cu telefon RO vechi | Telefonul RO care nu mai e actual nu anulează indiciul (Maria) | specialistul de domeniu |
+| `DL-PRE-YEAR` (R2) | Cea mai târzie dintre 31.12 și 90 de zile: ghidul spune „sau”; Anexa 2 pct. 1 spune „mai recentă” pentru testul adresei de rezidență | decis de echipă (`docs/decizii-domeniu`) |
 | `SC-TIN-FORMAT` | Politică: formatul greșit duce la clarificare | banca |
 | `FATCA-SCOPE-ALL` | Politică: nu aplicăm pragurile de 50.000 USD | banca |
 | Valoarea mică FATCA | Sold curent, curs fix maxim (`AccountStatus`), nu soldul la 30.06.2014 / 31.12 | banca |
