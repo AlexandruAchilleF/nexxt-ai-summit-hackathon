@@ -251,6 +251,16 @@ public class SeedTests
     }
 
     [Fact]
+    public void Every_seeded_self_certification_uses_a_ChangeEvent_channel_name()
+    {
+        // Golden and filler alike: "branch" in code, as ChangeEvent.SourceChannel; "ghișeu" is only the Romanian text on screen.
+        var seed = ClientSeed.Create(Now);
+        Assert.Contains(seed, c => c.Code.StartsWith("CL-2", StringComparison.Ordinal));
+        Assert.All(seed.SelectMany(c => c.SelfCertifications.Select(s => (c.Code, s.Channel))),
+            x => Assert.True(x.Channel is "branch" or "online" or "call center", $"{x.Code}: channel \"{x.Channel}\""));
+    }
+
+    [Fact]
     public void Seed_is_deterministic_and_the_filler_is_one_fixed_sequence()
     {
         Assert.Equal(Json(ClientSeed.Create(Now)), Json(ClientSeed.Create(Now)));

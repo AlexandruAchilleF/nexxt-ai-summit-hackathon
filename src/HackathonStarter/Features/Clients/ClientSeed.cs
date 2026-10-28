@@ -152,7 +152,7 @@ public static class ClientSeed
                 [
                     new SelfCertification
                     {
-                        SignedAt = signedAt, ReceivedAt = signedAt, Channel = "ghișeu",
+                        SignedAt = signedAt, ReceivedAt = signedAt, Channel = "branch",
                         Residences = [new TaxResidence { Country = "RO", Tin = person.Cnp }],
                     },
                 ],
