@@ -1,5 +1,6 @@
 @page "/architecture"
 @using Microsoft.EntityFrameworkCore
+@using HackathonStarter.Features.Sentinel
 @inject IEnumerable<AgentDefinition> Agents
 @inject ChatClientProvider Ai
 @inject IConfiguration Config
@@ -65,8 +66,8 @@
     <MudItem xs="12" md="6">
         <MudPaper Outlined="true" Class="pa-5" Style="height:100%">
             <MudText Typo="Typo.subtitle1" Style="font-weight:600">@T("Agents")</MudText>
-            <MudText Typo="Typo.caption" Class="mud-text-secondary">@T("Registered in Program.cs")</MudText>
-            @foreach (var agent in Agents)
+            <MudText Typo="Typo.caption" Class="mud-text-secondary">@T("CRS Sentinel and its tools (the template's example agents are hidden)")</MudText>
+            @foreach (var agent in Shown)
             {
                 <div class="mt-3">
                     <div class="d-flex align-center gap-2">
@@ -103,6 +104,11 @@
     private ToolContext? _ctx;
     private Stats? _stats;
 
+    // The pitch shows the product agent; the template's example agents stay registered but off this page.
+    private IEnumerable<AgentDefinition> Shown => Agents.Any(a => a.Name == SentinelTools.AgentName)
+        ? Agents.Where(a => a.Name == SentinelTools.AgentName)
+        : Agents;
+
     protected override async Task OnInitializedAsync()
     {
         _ctx = new ToolContext(await CurrentUser.GetAsync(), [], Services);
@@ -115,7 +121,7 @@
             finished.Count == 0 ? 0 : finished.Average(r => (r.FinishedAt!.Value - r.CreatedAt).TotalSeconds),
             live.Count == 0 ? 0 : live.Average(r => r.InputTokens + r.OutputTokens),
             priced.Count == 0 ? null : Math.Round(priced.Average(r => r.EstimatedCost!.Value), 6));
-        var tools = Agents.OfType<ToolAgent>().SelectMany(a => a.Tools(_ctx)).Select(t => t.Name).Distinct().ToArray();
+        var tools = Shown.OfType<ToolAgent>().SelectMany(a => a.Tools(_ctx)).Select(t => t.Name).Distinct().ToArray();
         var db = Config["Database:Provider"] ?? "Sqlite";
         var model = Ai.IsConfigured ? $"{Ai.Options.Provider}: {Ai.Options.Model}" : T("none (replay / mock)");
         _layers =
