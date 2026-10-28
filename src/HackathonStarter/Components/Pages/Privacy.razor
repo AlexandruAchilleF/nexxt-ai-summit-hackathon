@@ -80,6 +80,29 @@
         </MudText>
     </MudPaper>
 
+    <MudPaper Outlined="true" Class="pa-5">
+        <MudText Typo="Typo.subtitle1" Style="font-weight:600">@Lang.Pick("Temeiul legal", "Legal basis")</MudText>
+        <MudSimpleTable Dense="true" Elevation="0" Class="mt-2">
+            <tbody>
+                <tr>
+                    <td>@Lang.Pick("Temei", "Basis")</td>
+                    <td>@Lang.Pick("Obligație legală (art. 6 alin. (1) lit. (c) GDPR): Codul de procedură fiscală (Legea 207/2015) și Acordul FATCA cer băncii să identifice rezidența fiscală a clienților.",
+                            "Legal obligation (Art. 6(1)(c) GDPR): the Romanian Fiscal Procedure Code (Law 207/2015) and the FATCA Agreement require the bank to identify its clients' tax residence.")</td>
+                </tr>
+                <tr>
+                    <td>@Lang.Pick("Decizii automate", "Automated decisions")</td>
+                    <td>@Lang.Pick("Art. 22 GDPR nu se aplică: codul aplică regulile din ghidul ANAF, iar un om aprobă cererea către client și închiderea cazului.",
+                            "Art. 22 GDPR does not apply: code applies the rules from the ANAF guide, and a person approves the request to the client and the closing of the case.")</td>
+                </tr>
+                <tr>
+                    <td>@Lang.Pick("Mascarea", "Masking")</td>
+                    <td>@Lang.Pick("Ține de minimizarea datelor (art. 5 alin. (1) lit. (c) GDPR) și de securitatea prelucrării (art. 32 GDPR).",
+                            "Serves data minimisation (Art. 5(1)(c) GDPR) and security of processing (Art. 32 GDPR).")</td>
+                </tr>
+            </tbody>
+        </MudSimpleTable>
+    </MudPaper>
+
     @if (_targets.Count > 0)
     {
         <MudPaper Outlined="true" Class="pa-5">
