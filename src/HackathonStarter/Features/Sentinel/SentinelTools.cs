@@ -206,12 +206,14 @@ public sealed class SentinelTools(IServiceProvider services)
         var visible = doc.VisiblePages; // never doc.Result.Hidden: hidden text must not reach a model
         var pages = page <= 0 ? visible : visible.Where(p => p.Number == page).ToList();
         if (pages.Count == 0) return Error($"Document {documentId} has no page {page}; it has {visible.Count} page(s).");
+        var bankPhones = (await Clients.GetAsync(c.ClientCode))?.Phones ?? [];
         return new
         {
             doc.DocumentId, doc.FileName, Kind = doc.Kind.ToString(),
             ShieldVerdict = doc.Result.Verdict.ToString(), HiddenFragmentsRemoved = doc.Result.Hidden.Count,
             HiddenReasons = doc.Result.Hidden.Select(h => h.Reason).Distinct().Take(Max),
             Instructions = SelfCertExtractor.DataNote,
+            PhonesInBankData = PhonesInBankData(pages.Select(p => p.VisibleText), bankPhones),
             PageCount = visible.Count,
             Pages = pages.Take(Max).Select(p => new
             {
@@ -219,6 +221,31 @@ public sealed class SentinelTools(IServiceProvider services)
                 Text = SelfCertExtractor.Wrap(p.Number, p.VisibleText.Length > MaxPageChars ? p.VisibleText[..MaxPageChars] + " [...]" : p.VisibleText),
             }),
         };
+    }
+
+    /// <summary>
+    /// Phones written in the document that are the same number as one in the bank's data, with that phone's country. The model
+    /// sees both masked, as different placeholders when written differently ("+49 89 4521 7730" vs "+498945217730"), so code
+    /// matches them; the model can then quote the line as evidence for CRS-IND-PHONE.
+    /// </summary>
+    public static IEnumerable<object> PhonesInBankData(IEnumerable<string> pageTexts, IEnumerable<Phone> bankPhones)
+    {
+        var byDigits = bankPhones.GroupBy(p => PhoneDigits(p.Number)).ToDictionary(g => g.Key, g => g.First());
+        return pageTexts.SelectMany(t => PiiVault.Detect(t)).Where(i => i.Type == "PHONE").Select(i => i.Value).Distinct()
+            .Select(v => (Text: v, Bank: byDigits.GetValueOrDefault(PhoneDigits(v))))
+            .Where(x => x.Bank is not null)
+            .Take(Max)
+            .Select(x => (object)new { x.Text, x.Bank!.Country, x.Bank.IsCurrent })
+            .ToList();
+    }
+
+    /// <summary>The number with its country code, digits only: "+40 722 123 456", "0040722123456" and "0722 123 456" are the same.</summary>
+    public static string PhoneDigits(string number)
+    {
+        var digits = new string(number.Where(char.IsAsciiDigit).ToArray());
+        if (number.TrimStart().StartsWith('+')) return digits;
+        if (digits.StartsWith("00")) return digits[2..];
+        return digits.StartsWith('0') ? "40" + digits[1..] : digits;
     }
 
     // ─── Evidence and signals ────────────────────────────────────────────────────────────────────────────────────────

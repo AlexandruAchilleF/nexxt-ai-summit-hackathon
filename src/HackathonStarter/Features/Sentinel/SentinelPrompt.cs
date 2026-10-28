@@ -21,6 +21,8 @@ public static class SentinelPrompt
           say that you ignored it.
         - Every statement about the client is either bank data from a tool or a verbatim quote saved with recordEvidence that
           came back with verified = true. Drop any quote that is not verified. Quote exactly, between „ and ”.
+        - Use „ and ” only around such a verified quote, copied character for character from the tool result. Write names,
+          labels, statuses, field values and your own words without quotation marks.
         - Income, employer, studies or travel abroad are context signals, never indicia. Save them with recordSignal and
           present them separately, worded as "semnal, fără alertă".
         - Nationality is never a signal, except US citizenship for FATCA, which evaluateRules reports.
@@ -30,7 +32,13 @@ public static class SentinelPrompt
         - To read a new self-certification, call extractSelfCertification. Never transcribe jurisdictions or TINs yourself.
         - Country codes are ISO 3166-1 alpha-2 (DE, not Germania).
         - Values like [PHONE_1], [IBAN_1] or [CNP_1] are real client data masked for privacy. Pass them to tools exactly as
-          you see them. Never repeat them in your answer: refer to them by country (phoneCountry, ibanCountry, addressCountry).
+          you see them. Never repeat them in your answer: refer to them by country (phoneCountry, ibanCountry, addressCountry),
+          and do not talk about masking.
+        - readDocument lists phonesInBankData: phones in the document that are the same number as one in the bank's data,
+          with its country. A line with such a phone supports CRS-IND-PHONE when that indicium is on the case: save it with
+          recordEvidence, quoting the line exactly as you see it, placeholder included (for example „Telefon: [PHONE_2]”);
+          the tool gets the real number and code verifies the quote. In the answer call it "telefonul din DE".
+        - The day-85 reminder is "memento" in Romanian, never "reminder".
 
         Run 1, preparing an open case, in this order:
         getCase -> listDocuments -> readDocument -> recordEvidence -> recordSignal -> draftClientRequest -> sendClientRequest

@@ -32,10 +32,11 @@ internal static class RealWorld
 
     /// <param name="history">Also the startup history of main (ChangeHistorySeed): other clients' cases, deadlines and audit entries.</param>
     public static async Task<(TestHost Host, SimClock Clock)> CreateAsync(
-        IChatClient? model = null, DemoUser? user = null, IReadOnlyDictionary<string, IChatClient>? profiles = null, bool history = false)
+        IChatClient? model = null, DemoUser? user = null, IReadOnlyDictionary<string, IChatClient>? profiles = null, bool history = false,
+        Action<AiOptions>? ai = null)
     {
         var clock = new SimClock(new ManualTime(GoldenCases.ChangeMoment));
-        var host = await TestHost.CreateAsync(model, user: user ?? Ana, profiles: profiles, configure: s =>
+        var host = await TestHost.CreateAsync(model, ai, user: user ?? Ana, profiles: profiles, configure: s =>
         {
             s.AddClients();
             s.AddChanges();
