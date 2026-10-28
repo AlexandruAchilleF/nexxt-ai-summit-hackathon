@@ -83,7 +83,7 @@ public interface ICrsRuleEngine
 
     /// <summary>
     /// The current state of a client whose change the bank has known since <paramref name="changeKnownAt"/>: re-evaluation
-    /// before closing a case (pass the trigger change's ReceivedAt). A self-certification signed that day or later is a new
+    /// before closing a case (pass the latest Case.Indicia AddedAt). A self-certification signed that day or later is a new
     /// one, so a "not a US person" form can cover a FATCA indicium where the agreement allows it (IGA Annex I, II.B.4 and
     /// III.B.2). Without the date, only a form declaring US status covers one. The default ignores the date.
     /// </summary>

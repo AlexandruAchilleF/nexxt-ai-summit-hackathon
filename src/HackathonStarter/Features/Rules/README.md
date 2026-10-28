@@ -37,7 +37,7 @@ Catalogul are cele 26 de ID-uri din PLAN 8.2, plus `GEN-NEW-ACCOUNT` și `FATCA-
 var engine = sp.GetRequiredService<ICrsRuleEngine>();                  // AddRules() + AddTin() în Program.cs
 var outcome = engine.Evaluate(before, after, ChangeKind.AddressChanged); // tot snapshot-ul after (Î3)
 var current = engine.EvaluateCurrent(client);                          // unealta agentului, metrici
-var closing = engine.EvaluateCurrent(client, trigger.ReceivedAt);      // reevaluare înainte de închiderea cazului
+var closing = engine.EvaluateCurrent(client, addedAt);                 // închiderea cazului: max(Case.Indicia.AddedAt)
 var form = engine.EvaluateSelfCertification(client, selfCert);          // cazurile 2, 3
 var forAgent = outcome.Summarize(en: Lang.IsEn);                       // R4: unealta evaluateRules
 ```
@@ -46,7 +46,7 @@ var forAgent = outcome.Summarize(en: Lang.IsEn);                       // R4: un
   `DL-PRE-YEAR` după `Preexisting.For`. La FATCA, acordul nu dă termen (`FATCA-SC`). Un hit cu `Basis = Interpretation`
   înseamnă că termenul se bazează pe interpretarea noastră: afișați asta. Înainte de închiderea pe explicație,
   `EvaluateCurrent` cu explicația candidată trebuie să dea `Compliant` (cazul 18). La închidere, apelați
-  `EvaluateCurrent(snapshot, trigger.ReceivedAt)`: doar așa motorul știe că autocertificarea e una nouă și o
+  `EvaluateCurrent(snapshot, item.Indicia.Max(i => i.AddedAt))`: doar așa motorul știe că autocertificarea e una nouă și o
   autocertificare „nu sunt persoană SUA” poate închide un caz FATCA (vezi mai jos). Fără data, doar o autocertificare care
   declară statut SUA acoperă un indiciu FATCA.
 - **R3:** motorul folosește `ITinFormat` din `AddTin()`. `Source = NotChecked` = „format neverificat”, niciodată „format
