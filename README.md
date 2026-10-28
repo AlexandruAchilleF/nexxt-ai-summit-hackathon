@@ -13,7 +13,7 @@ Raiffeisen Bank, challenge-ul *AI for Operational Efficiency*, NEXXT AI Hackatho
 
 | | |
 | --- | --- |
-| Aplicația | <https://hackathon-starter-k0ym.onrender.com/> |
+| Aplicația | <https://hackathon-starter-k0ym.onrender.com/> (cod de acces: `crs-nexxt-2026`; prima pornire durează până la un minut) |
 | Video (≤ 3 min) | de completat la predare |
 | Planul complet | [`docs/PLAN.md`](docs/PLAN.md) |
 | Cum funcționează, cap-coadă | [`docs/CUM-FUNCTIONEAZA.md`](docs/CUM-FUNCTIONEAZA.md) |
