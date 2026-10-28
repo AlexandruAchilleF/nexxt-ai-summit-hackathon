@@ -27,11 +27,14 @@ public sealed class FakeChatClient : IChatClient
     public FakeChatClient Json(object value) => Reply(JsonSerializer.Serialize(value, Web));
     public FakeChatClient Fail(string message) => Enqueue(_ => throw new HttpRequestException(message));
 
-    public FakeChatClient CallTool(string name, object args)
+    public FakeChatClient CallTool(string name, object args) => CallTools((name, args));
+
+    /// <summary>One turn asking for several tools at once (call ids call_1, call_2… across the script).</summary>
+    public FakeChatClient CallTools(params (string Name, object Args)[] calls)
     {
-        var id = $"call_{++_callIds}";
-        var dict = JsonSerializer.SerializeToElement(args, Web).EnumerateObject().ToDictionary(p => p.Name, p => (object?)p.Value.Clone());
-        return Enqueue(_ => new ChatResponse(new ChatMessage(ChatRole.Assistant, [new FunctionCallContent(id, name, dict)]))
+        var contents = calls.Select(c => (AIContent)new FunctionCallContent($"call_{++_callIds}", c.Name,
+            JsonSerializer.SerializeToElement(c.Args, Web).EnumerateObject().ToDictionary(p => p.Name, p => (object?)p.Value.Clone()))).ToList();
+        return Enqueue(_ => new ChatResponse(new ChatMessage(ChatRole.Assistant, contents))
         {
             Usage = new UsageDetails { InputTokenCount = 100, OutputTokenCount = 10 },
         });

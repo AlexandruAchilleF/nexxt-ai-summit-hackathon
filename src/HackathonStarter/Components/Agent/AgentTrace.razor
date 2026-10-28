@@ -72,22 +72,27 @@
                 break;
 
             case StepKind.Approval:
-                var css = step.State switch { ApprovalState.Approved => "app-approval approved", ApprovalState.Rejected => "app-approval rejected", _ => "app-approval" };
+                // Approved but the action threw (DecideAsync keeps the error on the card): never shown as done.
+                var failedAction = step is { State: ApprovalState.Approved, Error: not null };
+                var css = failedAction ? "app-approval failed"
+                    : step.State switch { ApprovalState.Approved => "app-approval approved", ApprovalState.Rejected => "app-approval rejected", _ => "app-approval" };
                 <div class="app-step" @key="step.Id">
                     <span class="app-step-node warn"><MudIcon Icon="@Icons.Material.Rounded.PanTool" /></span>
                     <div class="@css">
                         <div class="d-flex align-center gap-3">
                             <span class="app-approval-icon">
-                                <MudIcon Icon="@(step.State switch { ApprovalState.Approved => Icons.Material.Rounded.CheckCircle, ApprovalState.Rejected => Icons.Material.Rounded.Block, _ => Icons.Material.Rounded.PanTool })" />
+                                <MudIcon Icon="@(failedAction ? Icons.Material.Rounded.ErrorOutline : step.State switch { ApprovalState.Approved => Icons.Material.Rounded.CheckCircle, ApprovalState.Rejected => Icons.Material.Rounded.Block, _ => Icons.Material.Rounded.PanTool })" />
                             </span>
                             <div style="min-width:0">
                                 <MudText Typo="Typo.subtitle1">
-                                    @(step.State switch { ApprovalState.Pending => T("Approval needed"), ApprovalState.Approved => T("Approved by {0}", step.DecidedBy), _ => T("Rejected by {0}", step.DecidedBy) })
+                                    @(failedAction ? T("Approved by {0}, but the action failed", step.DecidedBy)
+                                        : step.State switch { ApprovalState.Pending => T("Approval needed"), ApprovalState.Approved => T("Approved by {0}", step.DecidedBy), _ => T("Rejected by {0}", step.DecidedBy) })
                                 </MudText>
                                 <MudText Typo="Typo.body2" Class="mud-text-secondary">@step.Summary</MudText>
                             </div>
                         </div>
-                        @if (step.State == ApprovalState.Pending && OnDecide.HasDelegate)
+                        @* Not while the run still executes: it saves itself at the end, over the decision (DecideAsync refuses too). *@
+                        @if (step.State == ApprovalState.Pending && OnDecide.HasDelegate && Run.Status != RunStatus.Running)
                         {
                             <div class="d-flex gap-2 mt-3">
                                 <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Rounded.Check"
@@ -195,6 +200,7 @@
 
     private async Task Decide(AgentStep step, bool approved)
     {
+        if (_deciding) return; // a second click that arrived before the buttons were disabled
         _deciding = true;
         try { await OnDecide.InvokeAsync((step, approved)); }
         finally { _deciding = false; }

@@ -107,6 +107,26 @@ public class AgentRunnerTests
     }
 
     [Fact]
+    public async Task An_approved_action_that_fails_is_not_shown_as_done()
+    {
+        var model = new FakeChatClient().CallTool("updateItem", new { id = 999, title = "Ghost", status = "Archived" }).Reply("proposed");
+        await using var host = await TestHost.CreateAsync(model);
+        var run = await host.RunAsync("assistant", "Archive the 'Ghost' item");
+        var approval = run.Steps.Single(s => s.Kind == StepKind.Approval);
+
+        var decided = await host.Get<AgentRunner>().DecideAsync(host.Agent("assistant"), run.Id, approval.Id, approved: true);
+
+        Assert.Equal(RunStatus.Error, decided.Status);
+        Assert.Equal("Item 999 not found", decided.Error);
+        Assert.Equal("Item 999 not found", decided.Steps.Single(s => s.Kind == StepKind.ToolResult).Error);
+        var card = decided.Steps.Single(s => s.Kind == StepKind.Approval);
+        Assert.Equal((ApprovalState.Approved, "Item 999 not found"), (card.State!.Value, card.Error));
+        Assert.Equal("Approved by Ana Admin, but the action failed: Item 999 not found.", decided.Steps.Last(s => s.Kind == StepKind.Text).Text);
+        Assert.DoesNotContain(decided.Steps, s => s.Text.Contains("Done:"));
+        Assert.Equal(RunStatus.Error, (await host.Get<RunStore>().GetAsync(run.Id))!.Status);
+    }
+
+    [Fact]
     public async Task A_live_proposal_gets_one_last_turn_without_tools_then_the_run_ends()
     {
         var model = new FakeChatClient()
@@ -143,6 +163,26 @@ public class AgentRunnerTests
         Assert.Equal(2, model.Calls.Count);
         // The model ended its last turn without text: the run still tells the user what happens next.
         Assert.Equal("The proposed action needs human approval before it runs.", run.Steps.Last(s => s.Kind == StepKind.Text).Text);
+    }
+
+    [Fact]
+    public async Task Tool_calls_after_a_proposal_in_the_same_batch_do_not_run()
+    {
+        var agent = new NotesAgent();
+        var model = new FakeChatClient().CallTools(("publish", new { }), ("addNote", new { }), ("publish", new { })).Reply("proposed");
+        await using var host = await TestHost.CreateAsync(model, extraAgents: agent);
+
+        var run = await host.RunAsync("notes-agent", "Publish, then note it");
+
+        Assert.Equal(0, agent.Notes);
+        Assert.Equal(RunStatus.AwaitingApproval, run.Status);
+        Assert.Single(run.Steps, s => s.Kind == StepKind.Approval);
+        Assert.DoesNotContain(run.Steps, s => s.Kind is StepKind.ToolCall or StepKind.ToolResult);
+        // Every call of the batch gets a result (providers require one), saying why it did not run.
+        var results = model.Calls[1].Single(m => m.Role == ChatRole.Tool).Contents.OfType<FunctionResultContent>().ToList();
+        Assert.Equal(["call_1", "call_2", "call_3"], results.Select(r => r.CallId));
+        Assert.Contains("awaiting_human_approval", results[0].Result?.ToString());
+        Assert.All(results.Skip(1), r => Assert.Contains("not_executed", r.Result?.ToString()));
     }
 
     [Fact]
@@ -183,6 +223,54 @@ public class AgentRunnerTests
     }
 
     [Fact]
+    public async Task A_model_failing_after_a_proposal_keeps_the_proposal_and_runs_no_tool_twice()
+    {
+        var agent = new NotesAgent();
+        var model = new FakeChatClient().CallTool("addNote", new { }).CallTool("publish", new { }).Fail("model overloaded");
+        await using var host = await TestHost.CreateAsync(model, extraAgents: agent);
+
+        var run = await host.RunAsync("notes-agent", "Note it, then publish");
+
+        Assert.Equal(1, agent.Notes); // the fallback mock would add the note a second time
+        Assert.Equal(RunStatus.AwaitingApproval, run.Status);
+        Assert.Equal(RunSource.Live, run.Source);
+        Assert.Null(run.FallbackReason);
+        Assert.Single(run.Steps, s => s is { Kind: StepKind.ToolResult, Tool: "addNote" });
+        Assert.Single(run.Steps, s => s is { Kind: StepKind.Approval, Tool: "publish", State: ApprovalState.Pending });
+        Assert.Equal("The proposed action needs human approval before it runs.", run.Steps.Last(s => s.Kind == StepKind.Text).Text);
+    }
+
+    [Fact]
+    public async Task A_model_failing_after_tools_ran_fails_the_run_instead_of_running_them_again()
+    {
+        var agent = new NotesAgent();
+        var model = new FakeChatClient().CallTool("addNote", new { }).Fail("model overloaded");
+        await using var host = await TestHost.CreateAsync(model, extraAgents: agent);
+
+        var run = await host.RunAsync("notes-agent", "Note it, then publish");
+
+        Assert.Equal(1, agent.Notes);
+        Assert.Equal(RunStatus.Error, run.Status);
+        Assert.Equal("The live model failed after tools had run (model overloaded). The steps above were kept and not run again.", run.Error);
+        Assert.Equal(RunSource.Live, run.Source);
+        Assert.Single(run.Steps, s => s is { Kind: StepKind.ToolResult, Tool: "addNote" });
+        Assert.DoesNotContain(run.Steps, s => s.Kind == StepKind.Approval);
+    }
+
+    [Fact]
+    public async Task A_live_run_timing_out_after_a_tool_started_says_so_instead_of_falling_back()
+    {
+        var model = new FakeChatClient().CallTool("slow", new { });
+        await using var host = await TestHost.CreateAsync(model, ai => ai.TimeoutSeconds = 1, extraAgents: new SlowAgent());
+
+        var run = await host.RunAsync("slow-agent", "go");
+
+        Assert.Equal(RunStatus.Error, run.Status);
+        Assert.Contains("(no answer within 1s)", run.Error);
+        Assert.DoesNotContain(run.Steps, s => s.Text == "mock");
+    }
+
+    [Fact]
     public async Task Checks_get_the_successful_tool_results_of_the_run()
     {
         var model = new FakeChatClient().CallTool("lookupClient", new { id = 7 }).CallTool("broken", new { }).Reply("Ana has 1200.50 EUR.");
@@ -209,6 +297,78 @@ public class AgentRunnerTests
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             admin.Get<AgentRunner>().DecideAsync(admin.Agent("assistant"), run.Id, approvalId, approved: true));
+    }
+
+    [Fact]
+    public async Task An_approval_of_a_run_still_running_is_refused_and_nothing_runs()
+    {
+        await using var host = await TestHost.CreateAsync(client: null);
+        var target = (await host.Get<ItemService>().ListAsync(new ItemFilter("Old prototype"))).Single();
+        var run = await host.RunAsync("assistant", "Archive the 'Old prototype' item");
+        var approval = run.Steps.Single(s => s.Kind == StepKind.Approval);
+        run.Status = RunStatus.Running; // as saved while the run still executes
+        await host.Get<RunStore>().SaveAsync(run);
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            host.Get<AgentRunner>().DecideAsync(host.Agent("assistant"), run.Id, approval.Id, approved: true));
+
+        Assert.Equal(AgentRunner.StillRunning, error.Message);
+        Assert.Equal(ItemStatus.Draft, (await host.Get<ItemService>().GetAsync(target.Id))!.Status);
+        var saved = (await host.Get<RunStore>().GetAsync(run.Id))!;
+        Assert.Equal(ApprovalState.Pending, saved.Steps.Single(s => s.Kind == StepKind.Approval).State);
+        Assert.DoesNotContain(saved.Steps, s => s is { Kind: StepKind.ToolCall, Tool: "updateItem" });
+    }
+
+    [Fact]
+    public async Task A_proposal_shown_while_the_model_still_writes_can_be_decided_only_once_the_run_ends()
+    {
+        var model = new FakeChatClient();
+        await using var host = await TestHost.CreateAsync(model);
+        var target = (await host.Get<ItemService>().ListAsync(new ItemFilter("Old prototype"))).Single();
+        var writing = new TaskCompletionSource();
+        using var release = new ManualResetEventSlim();
+        model.CallTool("updateItem", new { id = target.Id, title = "Old prototype", status = "Archived" })
+            .ReplyWith(_ =>
+            {
+                writing.TrySetResult(); // the approval card is on screen, the model writes its last turn
+                release.Wait(TimeSpan.FromSeconds(10));
+                return "proposed";
+            });
+        var service = (AgentRunService)host.Root.GetService(typeof(AgentRunService))!;
+
+        var active = await service.StartAsync("assistant", [new ChatTurn("user", "Archive the 'Old prototype' item")], [], SiteConfig.Users[0], "conv-3");
+        await writing.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        var approval = active.Run.Snapshot().Single(s => s.Kind == StepKind.Approval);
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            host.Get<AgentRunner>().DecideAsync(host.Agent("assistant"), active.Run.Id, approval.Id, approved: true));
+        Assert.Equal(AgentRunner.StillRunning, error.Message);
+        Assert.Equal(ItemStatus.Draft, (await host.Get<ItemService>().GetAsync(target.Id))!.Status);
+
+        release.Set();
+        var run = await active.Completion.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Equal(RunStatus.AwaitingApproval, run.Status);
+        var decided = await host.Get<AgentRunner>().DecideAsync(host.Agent("assistant"), run.Id, approval.Id, approved: true);
+        Assert.Equal(RunStatus.Completed, decided.Status);
+        Assert.Equal(ItemStatus.Archived, (await host.Get<ItemService>().GetAsync(target.Id))!.Status);
+    }
+
+    [Fact]
+    public async Task Approving_twice_at_once_runs_the_action_once()
+    {
+        var agent = new NotesAgent();
+        var model = new FakeChatClient().CallTool("publish", new { }).Reply("proposed");
+        await using var host = await TestHost.CreateAsync(model, extraAgents: agent);
+        var run = await host.RunAsync("notes-agent", "Publish the notes");
+        var approval = run.Steps.Single(s => s.Kind == StepKind.Approval);
+        var runner = host.Get<AgentRunner>();
+
+        // A double click (or a second tab): the second decision arrives while the first still runs the action.
+        var decisions = Enumerable.Range(0, 2).Select(_ => Task.Run(() => runner.DecideAsync(agent, run.Id, approval.Id, approved: true))).ToList();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => Task.WhenAll(decisions));
+
+        Assert.Equal(1, agent.Published);
+        Assert.Equal(1, decisions.Count(d => d.IsCompletedSuccessfully));
     }
 
     [Fact]
@@ -390,6 +550,33 @@ public class AgentRunnerTests
         public override string Title => "Echo tool results";
         public override string Description => "Returns the tool-results fact.";
         public override CheckResult Evaluate(CheckSubject subject) => Pass(subject.Fact("tool-results") ?? "missing");
+    }
+
+    /// <summary>A tool that changes data without approval (counted) and one that needs approval; its mock calls both.</summary>
+    private sealed class NotesAgent : ToolAgent
+    {
+        public int Notes;
+        public int Published;
+        public override string Name => "notes-agent";
+        public override string Label => "Notes";
+        public override string Description => "Adds a note, then proposes to publish it.";
+        public override string SystemPrompt(ToolContext ctx) => "Test agent.";
+        public override IEnumerable<AgentTool> Tools(ToolContext ctx) =>
+        [
+            AgentTool.Create("addNote", "Adds a note.", () => ++Notes),
+            AgentTool.Create("publish", "Publishes the notes.", async () =>
+            {
+                Interlocked.Increment(ref Published);
+                await Task.Delay(100);
+                return "published";
+            }, needsApproval: true),
+        ];
+        public override async Task MockAsync(MockContext mock)
+        {
+            await mock.CallAsync("addNote", new { });
+            await mock.CallAsync("publish", new { });
+            await mock.SayAsync("mock");
+        }
     }
 
     private sealed class SlowAgent : ToolAgent

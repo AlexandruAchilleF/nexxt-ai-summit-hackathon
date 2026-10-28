@@ -81,9 +81,26 @@ public class AgentRunner(
                 }
                 catch (Exception ex) when (!ct.IsCancellationRequested && !Options.AgentMode.Equals("Live", StringComparison.OrdinalIgnoreCase))
                 {
-                    logger.LogWarning("Agent {Agent} live run failed ({Message}), falling back", agent.Name, ex.Message);
-                    vault = null;
-                    await FallbackAsync(agent, input, ctx, w, ex.Message, ct);
+                    // A fallback starts over: once tools ran or an action was proposed, it would run them a second time.
+                    var acted = run.Snapshot().Where(s => s.Kind is StepKind.ToolCall or StepKind.Approval).ToList();
+                    if (acted.Count == 0)
+                    {
+                        logger.LogWarning("Agent {Agent} live run failed ({Message}), falling back", agent.Name, ex.Message);
+                        vault = null;
+                        await FallbackAsync(agent, input, ctx, w, ex.Message, ct);
+                    }
+                    else if (acted.Any(s => s is { Kind: StepKind.Approval, State: ApprovalState.Pending }))
+                    {
+                        // It failed in the turn after the proposal, which only tells the user about it: the proposal stands.
+                        logger.LogWarning("Agent {Agent} live run failed after a proposal ({Message}), keeping it", agent.Name, ex.Message);
+                        await w.TypeAsync(ProposedAnswer, ct: ct);
+                    }
+                    else
+                    {
+                        // Tools ran and nothing is proposed: the run fails and keeps its steps.
+                        var reason = timeout.IsCancellationRequested ? $"no answer within {Options.TimeoutSeconds}s" : ex.Message;
+                        throw new InvalidOperationException($"The live model failed after tools had run ({reason}). The steps above were kept and not run again.", ex);
+                    }
                 }
             }
             run.Status = run.Snapshot().Any(s => s is { Kind: StepKind.Approval, State: ApprovalState.Pending })
@@ -202,6 +219,12 @@ public class AgentRunner(
             var results = new List<AIContent>();
             foreach (var call in calls)
             {
+                if (proposed)
+                {
+                    // The rest of a batch never runs once an action awaits approval; each call still gets its result.
+                    results.Add(new FunctionResultContent(call.CallId, NotExecuted));
+                    continue;
+                }
                 var args = Unmask(ToJsonArgs(call.Arguments ?? new Dictionary<string, object?>()), vault);
                 var result = await InvokeToolAsync(tools, call.Name, args, call.CallId, ctx, w, ct);
                 proposed |= result == AwaitingApproval;
@@ -268,6 +291,10 @@ public class AgentRunner(
     private const string AwaitingApproval =
         """{"status":"awaiting_human_approval","message":"This action needs human approval and has NOT been executed. Tell the user what you propose and that they can approve it below. Do not call more tools."}""";
 
+    /// <summary>What the model gets back for the calls of a batch that come after a proposal.</summary>
+    private const string NotExecuted =
+        """{"status":"not_executed","message":"This call was NOT executed because an earlier action in the same batch is awaiting human approval. Do not call more tools."}""";
+
     /// <summary>Shown when the model ends its last turn after a proposal without any text.</summary>
     private const string ProposedAnswer = "The proposed action needs human approval before it runs.";
 
@@ -300,13 +327,14 @@ public class AgentRunner(
         }
         catch (Exception ex) when (!ct.IsCancellationRequested)
         {
-            var error = ex is TimeoutException
-                ? $"Tool timed out after {Options.ToolTimeoutSeconds}s"
-                : ex.InnerException?.Message ?? ex.Message;
+            var error = ToolError(ex);
             await w.AddAsync(new AgentStep { Kind = StepKind.ToolResult, Id = callId, Tool = name, Error = error });
             return JsonSerializer.Serialize(new { error });
         }
     }
+
+    private string ToolError(Exception ex) =>
+        ex is TimeoutException ? $"Tool timed out after {Options.ToolTimeoutSeconds}s" : ex.InnerException?.Message ?? ex.Message;
 
     private async Task<string> ExecuteAsync(AgentTool tool, Dictionary<string, JsonElement> args, ToolContext ctx, CancellationToken ct)
     {
@@ -316,11 +344,26 @@ public class AgentRunner(
         return result is JsonElement je ? je.GetRawText() : JsonSerializer.Serialize(result, RunStore.Json);
     }
 
+    /// <summary>Why <see cref="DecideAsync"/> refuses a run that is still executing (shown translated).</summary>
+    public const string StillRunning = "The agent is still running: approve or reject once it has finished.";
+
+    /// <summary>One decision at a time: a double click or a second tab must not run an approved action twice.</summary>
+    private static readonly SemaphoreSlim Deciding = new(1, 1);
+
     /// <summary>Human-in-the-loop decision. On approval the tool runs now (no model call) and the run is updated.</summary>
     public async Task<AgentRun> DecideAsync(AgentDefinition agent, string runId, string approvalId, bool approved)
     {
         var user = await currentUser.Require(Roles.Admin, Roles.Member);
+        await Deciding.WaitAsync();
+        try { return await DecideOnceAsync(agent, runId, approvalId, approved, user); }
+        finally { Deciding.Release(); }
+    }
+
+    private async Task<AgentRun> DecideOnceAsync(AgentDefinition agent, string runId, string approvalId, bool approved, DemoUser user)
+    {
         var run = await store.GetAsync(runId) ?? throw new KeyNotFoundException("Run not found");
+        // The run saves itself once more when it finishes, which would undo a decision taken now.
+        if (run.Status == RunStatus.Running) throw new InvalidOperationException(StillRunning);
         var step = run.Steps.FirstOrDefault(s => s.Id == approvalId && s.Kind == StepKind.Approval)
                    ?? throw new KeyNotFoundException("Approval not found");
         if (step.State != ApprovalState.Pending) throw new InvalidOperationException($"Already {step.State}");
@@ -346,7 +389,12 @@ public class AgentRunner(
             }
             catch (Exception ex)
             {
-                run.Steps.Add(new AgentStep { Kind = StepKind.ToolResult, Id = id, Tool = step.Tool, Error = ex.InnerException?.Message ?? ex.Message });
+                var error = ToolError(ex);
+                run.Steps.Add(new AgentStep { Kind = StepKind.ToolResult, Id = id, Tool = step.Tool, Error = error });
+                run.Steps.Add(new AgentStep { Kind = StepKind.Text, Text = $"Approved by {user.Name}, but the action failed: {error.TrimEnd('.')}." });
+                // No model call follows to recover from it: the run failed, like any run that cannot finish.
+                step.Error = error;
+                run.Error = error;
             }
         }
         else
@@ -355,8 +403,9 @@ public class AgentRunner(
             run.Steps.Add(new AgentStep { Kind = StepKind.Text, Text = $"Rejected by {user.Name}. No changes were made." });
         }
 
-        run.Status = run.Steps.Any(s => s is { Kind: StepKind.Approval, State: ApprovalState.Pending })
-            ? RunStatus.AwaitingApproval : RunStatus.Completed;
+        run.Status = run.Error is not null ? RunStatus.Error
+            : run.Steps.Any(s => s is { Kind: StepKind.Approval, State: ApprovalState.Pending }) ? RunStatus.AwaitingApproval
+            : RunStatus.Completed;
         await store.SaveAsync(run);
         return run;
     }

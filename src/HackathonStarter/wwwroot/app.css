@@ -272,6 +272,7 @@ a.app-list-row:active, .dense-row:active { background: var(--app-fill-strong); }
 .app-approval-icon { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0; background: var(--mud-palette-surface); color: var(--mud-palette-warning); }
 .app-approval.approved .app-approval-icon { color: var(--mud-palette-success); animation: app-pop var(--app-base) var(--app-bounce); }
 .app-approval.rejected .app-approval-icon { color: var(--mud-palette-text-secondary); }
+.app-approval.failed { background: var(--app-danger-tint); } .app-approval.failed .app-approval-icon { color: var(--mud-palette-error); }
 @keyframes app-pop { from { transform: scale(.5); } }
 .app-verdict-row { display: grid; grid-template-columns: 28px 90px 1fr 44px; align-items: center; gap: 10px; margin-top: 10px; font-size: 14px; }
 .app-verdict-bar { height: 10px; border-radius: 5px; background: var(--app-fill); overflow: hidden; }
