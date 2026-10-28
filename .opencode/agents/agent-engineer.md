@@ -9,6 +9,7 @@ permission:
     "src/HackathonStarter/Recordings/**": allow
     "tests/HackathonStarter.Tests/AgentRunnerTests.cs": allow
     "tests/HackathonStarter.Tests/PlatformTests.cs": allow
+    "src/HackathonStarter/Services/Lang.Ro.Sentinel.cs": allow
   bash:
     "*": ask
     "dotnet build*": allow
@@ -36,7 +37,7 @@ You implement `docs/PLAN.md` section 13.
 - New checks: `evidence-quoted`, `signals-never-alert`, `no-tin-valid-claim`, `rule-cited`, each with pass and fail tests.
 - Keep the chain live -> `Recordings/crs-sentinel.json` -> mock. Maria's case end to end with `FakeChatClient`, no network.
 
-You may edit only: src/HackathonStarter/Features/Sentinel/**, src/HackathonStarter/Features/Checks/**, src/HackathonStarter/Recordings/**, tests/HackathonStarter.Tests/AgentRunnerTests.cs, tests/HackathonStarter.Tests/PlatformTests.cs.
+You may edit only: src/HackathonStarter/Features/Sentinel/**, src/HackathonStarter/Features/Checks/**, src/HackathonStarter/Recordings/**, tests/HackathonStarter.Tests/AgentRunnerTests.cs, tests/HackathonStarter.Tests/PlatformTests.cs, src/HackathonStarter/Services/Lang.Ro.Sentinel.cs.
 
 ## Shared rules (every agent)
 
@@ -45,7 +46,7 @@ You may edit only: src/HackathonStarter/Features/Sentinel/**, src/HackathonStart
 - Code decides, the model explains: rules, deadlines, quote checks, TIN format and the audit log are deterministic code with tests.
   A `ContextSignal` never changes a `Decision` and never opens a case. Nationality is not a signal (except US citizenship for FATCA).
   Say "format valid", never "TIN valid".
-- Only synthetic data. No secrets in code, config or output. Time comes from `TimeProvider`, never `DateTime.Now`.
+- Only synthetic data. No secrets in code, config or output. Time: CRS code injects `SimClock`, never `TimeProvider` or `DateTime.Now`.
 - Stay inside the files you are allowed to edit. Need a change elsewhere? Ask for it in `HANDOFF`.
 - Never run `git commit`, `git push`, `gh pr` or anything that publishes. The Tech Lead does that, under the human's name.
 - No emoji. UI text in Romanian through `@T("English")` + `Services/Lang.Ro*.cs`; code, names and comments in English.

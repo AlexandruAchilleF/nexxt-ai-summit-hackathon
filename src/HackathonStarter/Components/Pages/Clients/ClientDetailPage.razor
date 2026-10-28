@@ -1,0 +1,11 @@
+@page "/clients/{Code}"
+
+<PageTitle>@T("Client {0}", Code) · @SiteConfig.Name</PageTitle>
+
+<PageHeader Title="@T("Client {0}", Code)" Description="@T("Addresses, phones, accounts, standing orders, powers of attorney and self-certifications.")" />
+
+<EmptyState Icon="@Icons.Material.Rounded.HowToReg" Title="@T("Coming in the next phase")" Description="@T("The backend for this page is being built.")" />
+
+@code {
+    [Parameter] public string Code { get; set; } = "";
+}

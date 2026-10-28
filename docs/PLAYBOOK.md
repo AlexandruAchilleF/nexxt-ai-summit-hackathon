@@ -169,7 +169,7 @@ Rolurile se împart la kickoff. Ore efective, în paralel.
 | --- | --- | --- | --- |
 | Entități `Client`, `ClientChange`, `CrsCase`, `Evidence` + seed: Maria, Andrei, clientul din Cluj și cazurile de test | `tools/NewFeature`, `SyntheticData` (IBAN pe orice țară: `IbanWithCheckDigits`) | dev .NET 1 | 1 |
 | `CrsRules`: filtrul, indiciile CRS a–f și FATCA, verdict cu ID și pagină. **Teste întâi** (cazurile din secțiunea 5) | ca `FinanceCalculator` | dev .NET 1 + domeniu | 2.5 |
-| `CrsDeadlines`: termen pe tip de cont, memento, expirare și consecința; data simulată = un `TimeProvider` setabil (cel din `Program.cs`) | `TimeProvider` | dev .NET 1 | 1 |
+| `CrsDeadlines`: termen pe tip de cont, memento, expirare și consecința; data simulată = `SimClock` (doar pentru codul CRS; `TimeProvider`-ul global rămâne real, vezi PLAN 9.1) | `TimeProvider` | dev .NET 1 | 1 |
 | `HiddenTextShield`: cu PdfPig, litere albe pe fundal alb, font sub 2 pt sau în afara paginii → eliminate + semnal | `DocumentText` (PdfPig) | securitate | 1.5 |
 | `TinCheck`: format OCDE + TIN on Europa prin `TargetClient` (dacă serviciul nu e JSON, extindem `TargetClient`, nu facem un `HttpClient` separat) | `Features/Targets` | dev .NET 2 | 1.5 |
 | `CrsAgent : ToolAgent` cu uneltele din secțiunea 4, aprobări, mock RO/EN (`TextMatch`) | `ToolAgent`, `AgentTool` | dev .NET 2 | 3 |
@@ -256,7 +256,7 @@ există deja); nu înlocuiește nimic, adaugă bucla de după semnal. Obligația
 | Citirea PDF-urilor, literă cu literă | PdfPig (`DocumentText`) | `HiddenTextShield` |
 | Mascarea datelor personale, retenție, `/privacy` | `PiiVault`, `RunRedaction`, `RetentionService` | textele pentru CRS pe `/privacy` |
 | Servicii externe cu timeout și replay | `TargetClient` | ținta `tin-europa` |
-| Data simulată | `TimeProvider` înregistrat în `Program.cs` | un `TimeProvider` setabil + bara din UI |
+| Data simulată | `TimeProvider` înregistrat în `Program.cs` | `SimClock` separat (codul CRS) + bara din UI |
 | Date sintetice valide (CNP, IBAN pe orice țară) | `SyntheticData` | clienții și documentele CRS |
 | Demo care nu pică | live → înregistrare → mock | înregistrările pentru video |
 | Modele | Anthropic, OpenAI-compatibil (Featherless, Ollama), Azure OpenAI | Bedrock, opțional |

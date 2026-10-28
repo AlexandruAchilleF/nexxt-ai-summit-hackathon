@@ -125,8 +125,9 @@ Ce nu detectăm și spunem deschis: text acoperit de o formă desenată peste el
 
 ## 8. Data simulată și jurnalul
 
-- **Data simulată** (`SimClock`): în bara de sus, „Azi: … (+85 zile)”, cu butoane +1 / +30 / +85 / resetare. Tot sistemul citește
-  timpul de aici, deci în 3 minute de video arătăm 90 de zile.
+- **Data simulată** (`SimClock`): în bara de sus, „Azi: … (+85 zile)”, cu butoane +1 / +30 / +85 / resetare. Tot codul CRS (cazuri,
+  termene, jurnal) citește timpul de aici, deci în 3 minute de video arătăm 90 de zile. Restul aplicației (login, chei,
+  ștergerea rulărilor) rămâne pe ceasul real, ca să nu expire nimic la „+85 zile”.
 - **Jurnalul** (`AuditLog`): fiecare pas (modificare, regulă, dovadă, aprobare, memento, închidere) e o intrare cu
   `Hash = SHA-256(hash-ul anterior + conținut)`. Dacă cineva modifică o intrare, „Verifică” arată exact unde s-a rupt lanțul.
 

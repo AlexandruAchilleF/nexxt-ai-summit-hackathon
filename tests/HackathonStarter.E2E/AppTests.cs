@@ -154,8 +154,10 @@ public class AppTests(AppFixture app)
 
         var nav = page.Locator(".mobile-nav");
         await Assertions.Expect(nav).ToBeVisibleAsync();
-        await nav.GetByText("Assistant").ClickAsync();
-        await Assertions.Expect(page).ToHaveURLAsync(new System.Text.RegularExpressions.Regex("/assistant$"));
+        await nav.GetByText("Cases", new() { Exact = true }).ClickAsync();
+        await Assertions.Expect(page).ToHaveURLAsync(new System.Text.RegularExpressions.Regex("/cases$"));
+
+        await app.GoAsync(page, "/assistant"); // the Assistant left the bottom bar; it stays reachable by URL
         await page.WaitForTimeoutAsync(500);
         await AskAsync(page, "Give me an overview of our items");
         await Assertions.Expect(page.GetByText(new System.Text.RegularExpressions.Regex("You have \\d+ items"))).ToBeVisibleAsync();

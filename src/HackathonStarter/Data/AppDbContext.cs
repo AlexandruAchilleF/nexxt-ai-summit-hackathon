@@ -1,4 +1,8 @@
 using HackathonStarter.Agents;
+using HackathonStarter.Features.Audit;
+using HackathonStarter.Features.Cases;
+using HackathonStarter.Features.Changes;
+using HackathonStarter.Features.Clients;
 using HackathonStarter.Features.Exports;
 using HackathonStarter.Features.Items;
 using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
@@ -18,10 +22,42 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<RunExport> RunExports => Set<RunExport>();
     /// <summary>Encryption keys (cookies, sealed approvals), kept as long as the data they protect.</summary>
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
+
+    // CRS Sentinel. Each module configures its entities in its own folder (IEntityTypeConfiguration<T>).
+    public DbSet<Client> Clients => Set<Client>();
+    public DbSet<Address> Addresses => Set<Address>();
+    public DbSet<Phone> Phones => Set<Phone>();
+    public DbSet<Account> Accounts => Set<Account>();
+    public DbSet<StandingOrder> StandingOrders => Set<StandingOrder>();
+    public DbSet<PowerOfAttorney> PowersOfAttorney => Set<PowerOfAttorney>();
+    public DbSet<SelfCertification> SelfCertifications => Set<SelfCertification>();
+    public DbSet<ClientDocument> ClientDocuments => Set<ClientDocument>();
+    public DbSet<ChangeEvent> ChangeEvents => Set<ChangeEvent>();
+    public DbSet<RuleEvaluation> RuleEvaluations => Set<RuleEvaluation>();
+    public DbSet<Case> Cases => Set<Case>();
+    public DbSet<Indicium> Indicia => Set<Indicium>();
+    public DbSet<Evidence> Evidence => Set<Evidence>();
+    public DbSet<ContextSignal> ContextSignals => Set<ContextSignal>();
+    public DbSet<ClientRequest> ClientRequests => Set<ClientRequest>();
+    public DbSet<ClientResponse> ClientResponses => Set<ClientResponse>();
+    public DbSet<ConfirmationProof> ConfirmationProofs => Set<ConfirmationProof>();
+    public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
     // @gen:dbsets (the feature generator inserts new tables above this line)
+
+    /// <summary>
+    /// Every DateTime is UTC in the database and comes back with Kind = Utc (SQLite returns Unspecified; Npgsql refuses to
+    /// write Unspecified into timestamptz). The audit hash and the deadlines rely on it.
+    /// </summary>
+    protected override void ConfigureConventions(ModelConfigurationBuilder conventions)
+    {
+        conventions.Properties<DateTime>().HaveConversion<UtcDateTimeConverter>();
+        conventions.Properties<DateTime?>().HaveConversion<UtcNullableDateTimeConverter>();
+    }
 
     protected override void OnModelCreating(ModelBuilder model)
     {
+        model.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+
         model.Entity<Item>(e =>
         {
             e.Property(i => i.Status).HasConversion<string>();
@@ -80,6 +116,25 @@ public static class DatabaseSetup
             db.Items.AddRange(ItemSeed.Create());
             await db.SaveChangesAsync();
         }
+        if (!await db.Clients.AnyAsync())
+        {
+            db.Clients.AddRange(ClientSeed.Create(app.Services.GetRequiredService<Features.Deadlines.SimClock>().UtcNow));
+            await db.SaveChangesAsync();
+        }
         // @gen:seed (the feature generator inserts new seeds above this line)
     }
 }
+
+public sealed class UtcDateTimeConverter() : Microsoft.EntityFrameworkCore.Storage.ValueConversion.ValueConverter<DateTime, DateTime>(
+    v => ToUtc(v), v => DateTime.SpecifyKind(v, DateTimeKind.Utc))
+{
+    internal static DateTime ToUtc(DateTime v) => v.Kind switch
+    {
+        DateTimeKind.Utc => v,
+        DateTimeKind.Local => v.ToUniversalTime(),
+        _ => DateTime.SpecifyKind(v, DateTimeKind.Utc),
+    };
+}
+
+public sealed class UtcNullableDateTimeConverter() : Microsoft.EntityFrameworkCore.Storage.ValueConversion.ValueConverter<DateTime?, DateTime?>(
+    v => v.HasValue ? UtcDateTimeConverter.ToUtc(v.Value) : v, v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v);

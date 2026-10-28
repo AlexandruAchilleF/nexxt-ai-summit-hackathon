@@ -1,5 +1,7 @@
 using System.Globalization;
+using System.IO.Enumeration;
 using System.Text;
+using System.Text.RegularExpressions;
 using HackathonStarter.Agents;
 using HackathonStarter.Config;
 using HackathonStarter.Features.Exports;
@@ -17,7 +19,7 @@ public class LangTests
         var src = Path.Combine(RepoRoot(), "src", "HackathonStarter");
         var files = Directory.EnumerateFiles(src, "*.razor", SearchOption.AllDirectories)
             .Concat(Directory.EnumerateFiles(src, "*.cs", SearchOption.AllDirectories))
-            .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}") && !f.EndsWith("Lang.Ro.cs") && !f.EndsWith("Lang.cs")); // Lang.cs: examples in comments
+            .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}") && !IsRoDictionary(f) && !f.EndsWith("Lang.cs")); // Lang.cs: examples in comments
 
         var missing = files
             .SelectMany(f => Keys(File.ReadAllText(f)).Select(k => (File: Path.GetFileName(f), Key: k)))
@@ -26,7 +28,31 @@ public class LangTests
             .Distinct()
             .ToList();
 
-        Assert.True(missing.Count == 0, "Add these to Services/Lang.Ro.cs:\n" + string.Join("\n", missing));
+        Assert.True(missing.Count == 0, "Add these to Services/Lang.Ro*.cs (the file of your module):\n" + string.Join("\n", missing));
+    }
+
+    [Fact]
+    public void Romanian_keys_are_not_defined_twice()
+    {
+        // ["key"] = ... inside BuildRo() (Lang.Ro.cs) and ro["key"] = ...; in Lang.Ro.<Module>.cs. A key may contain \".
+        var entry = new Regex(@"^\s*(?:ro)?\[""((?:[^""\\]|\\.)*)""\]\s*=", RegexOptions.Multiline);
+        var services = Path.Combine(RepoRoot(), "src", "HackathonStarter", "Services");
+        var keys = Directory.EnumerateFiles(services, "*.cs")
+            .Where(IsRoDictionary)
+            .SelectMany(f => entry.Matches(File.ReadAllText(f))
+                .Select(m => (File: Path.GetFileName(f), Key: Regex.Replace(m.Groups[1].Value, @"\\(.)", "$1"))))
+            .ToList();
+
+        var twice = keys
+            .GroupBy(x => x.Key)
+            .Where(g => g.Count() > 1)
+            .Select(g => $"{g.Key}: {string.Join(", ", g.Select(x => x.File))}")
+            .ToList();
+        Assert.True(twice.Count == 0, "Defined more than once (the last one wins), keep one:\n" + string.Join("\n", twice));
+
+        // Guards the parser: a key written in another form would make this test pass without checking it.
+        var unread = Lang.Translations.Keys.Except(keys.Select(x => x.Key)).ToList();
+        Assert.True(unread.Count == 0, "Write these as [\"key\"] = or ro[\"key\"] = in Services/Lang.Ro*.cs:\n" + string.Join("\n", unread));
     }
 
     [Fact]
@@ -93,6 +119,9 @@ public class LangTests
             }
         }
     }
+
+    /// <summary>Lang.Ro.cs and the module files Lang.Ro.&lt;Module&gt;.cs.</summary>
+    private static bool IsRoDictionary(string path) => FileSystemName.MatchesSimpleExpression("Lang.Ro*.cs", Path.GetFileName(path));
 
     private static string RepoRoot()
     {

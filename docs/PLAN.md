@@ -93,13 +93,13 @@ rules, and produces an outcome or flags an exception.* **Date:** sintetice.
 | **Jurisdicție raportabilă** | Un stat față de care România raportează CRS (DE, IT, AT, ES…). România însăși **nu** e raportabilă pentru un rezident RO. NEVERIFICAT lista în ghid / anexă. |
 | **Indiciu** (indicium) | Un fapt din datele băncii care arată posibilă rezidență într-o jurisdicție raportabilă (lista e **închisă**, în lege). Doar indiciile pot porni o acțiune. |
 | **Semnal contextual** | Ceva găsit de AI în documente care **nu** e indiciu legal (ex. salariu de la o firmă germană). Se afișează, cu dovadă, dar **nu pornește niciodată** o alertă. |
-| **Schimbare de circumstanțe** | O modificare care face autocertificarea posibil invalidă (ghid, p. 35). Pornește termenul. |
-| **Termen** | De regulă **90 de zile** pentru o autocertificare nouă sau o explicație rezonabilă (ghid, p. 29–30, 35–36). NEVERIFICAT: din ce zi curge, zile calendaristice, diferențe pe tip de cont. |
-| **Explicație rezonabilă** | Clientul explică de ce indiciul nu înseamnă rezidență (ex. student, diplomat, funcționar UE). Ghidul dă exemplele. |
-| **Consecința la expirare** | Clientul e tratat ca rezident în jurisdicția inițială **și** în cea nouă (ghid, p. 35–36). |
+| **Schimbare de circumstanțe** | Orice modificare care adaugă informații relevante despre client sau contrazice situația lui, inclusiv la conturile asociate (ghid, p. 30). Face autocertificarea posibil incorectă sau nesigură (p. 29, p. 35). Termenul pornește de când banca află, nu de la data schimbării. |
+| **Termen** | **90 de zile calendaristice** (ghid, p. 29, p. 35–36). Cont nou: de la data la care banca „cunoaște sau are motive să cunoască” schimbarea (p. 35–36). Cont preexistent: „de la notificarea sau descoperirea” schimbării, sau „până în ultima zi a anului calendaristic” (p. 29). Nu curge de la data schimbării. NEVERIFICAT: dacă ziua 0 se numără, ce variantă se aplică la preexistent, termenul FATCA (p. 38 nu dă unul). Detalii în 9.2. |
+| **Explicație rezonabilă** | Clientul arată, cu documente dacă e cazul, că declarația inițială rămâne valabilă (ghid, p. 35, lit. b). La schimbarea de circumstanțe, ghidul o admite doar la contul CRS nou; la preexistent (p. 29) și la FATCA (p. 38) cere declarație nouă. Exemplele de la p. 37 nu sunt o listă închisă („Exemple ... includ”): student, profesor sau stagiar (cu viza corespunzătoare „dacă este cazul”), diplomat, funcționar UE. Ele sunt date pentru testul de rezonabilitate; folosirea lor la o schimbare de circumstanțe e inferența noastră (NEVERIFICAT). |
+| **Consecința la expirare** | CRS, cont nou: rezident în jurisdicția declarată inițial **și** în cea în care ar putea fi rezident după schimbare (ghid, p. 36). CRS, cont preexistent: căutare în evidența electronică, rezident cel puțin în statul nou (p. 29–30, Exemplul 2). FATCA: banca „va trata contul drept cont raportabil din Statele Unite” (p. 38). |
 | **Cont de depozit** (depository account) | Cont curent, de economii, depozit. **Ordinul permanent dintr-un cont de depozit nu e indiciu CRS** (ghid, p. 29). Capcana noastră principală. |
 | **Cont de custodie** (custodial account) | Cont de instrumente financiare. Aici ordinul permanent către străinătate **este** indiciu. |
-| **Cont preexistent / nou** | Deschis înainte / după data de start CRS (NEVERIFICAT data pentru RO). Pot avea proceduri și termene diferite. |
+| **Cont preexistent / nou** | CRS: preexistent = administrat la 31 decembrie 2015; nou = deschis la 1 ianuarie 2016 sau după (ghid, p. 20; pentru conturile care devin conturi financiare abia prin noile reglementări, datele sunt 31 decembrie 2025 și 1 ianuarie 2026). FATCA: preexistent = menținut la 30 iunie 2014 (p. 20); definiția FATCA a contului nou nu e pe p. 20 (NEVERIFICAT). Procedurile diferă: preexistent p. 29–30, nou p. 35–36. |
 | **TIN** | Cod fiscal străin. Verificăm **formatul** (nu existența): spunem „format valid”, niciodată „TIN valid”. |
 | **c/o, hold mail** | Adresă „în grija” cuiva / „post restant”. Indiciu dacă e **singura** adresă și e într-o jurisdicție raportabilă. |
 
@@ -166,7 +166,7 @@ Construim pe template-ul echipei (deja în repo: build cu 0 warnings, 124 de tes
 | Mascarea datelor personale | `PiiVault` (CNP, IBAN, card, email, telefon), `RunRedaction` | `Services/`, `Agents/` |
 | Extragere tipizată din text | `StructuredAi.GenerateAsync<T>(prompt, mock)` | `Services/Ai.cs` |
 | Date sintetice valide | `SyntheticData` (CNP, IBAN, CUI, telefon) | `Features/Synthetic` |
-| Ceas injectabil | `TimeProvider` (singleton în `Program.cs`) | îl înlocuim cu `SimClock` |
+| Ceas injectabil | `TimeProvider` (singleton în `Program.cs`) | rămâne ceasul sistemului; codul CRS folosește `SimClock` (9.1) |
 | Exporturi aprobate | `IRunExporter`, `/exports` | `Features/Exports` |
 | API HTTP + docs | `/api/...`, `/api-docs` (Scalar) | `Api/` |
 | RO/EN | `@T("...")` + `Lang.Ro.cs`, `Lang.Pick(ro, en)` | `Services/Lang*.cs` |
@@ -263,7 +263,7 @@ sequenceDiagram
 
   Sys->>RE: ChangeEvent: adresă nouă München (DE)
   RE-->>CS: Indicii: CRS-IND-ADDR (DE); telefon DE fără telefon RO → CRS-IND-PHONE
-  CS->>CS: Deschide CRS-2026-0001, DueAt = OpenedAt + 90 zile (după tipul contului)
+  CS->>CS: Deschide CRS-2026-0001, DueAt = ReceivedAt + 90 zile calendaristice
   CS->>AU: case.opened + rule.applied ×2
   CS->>AG: „Pregătește cazul”
   AG->>SH: readDocument(fluturaș.pdf)
@@ -359,7 +359,7 @@ public enum AccountType { Depository, Custodial, Insurance, Other }   // Deposit
 public class Account
 {
     int Id; int ClientId; string Iban; AccountType Type; string Product /* „Cont curent” */;
-    DateOnly OpenedOn; bool IsPreexisting /* NEVERIFICAT: data de start CRS pentru RO */; decimal Balance; string Currency;
+    DateOnly OpenedOn; bool IsPreexisting /* CRS: deținut la 31.12.2015 (ghid p. 20) */; decimal Balance; string Currency;
     List<StandingOrder> StandingOrders;
 }
 
@@ -501,7 +501,7 @@ contul curent nu contează. Explicațiile sunt template-uri în cod, în RO și 
 | `SC-TIN-FORMAT` | CRS | TIN în format greșit pentru țara declarată → `Clarification` | 36–37 (rezonabilitate); formatul din fișele OCDE |
 | `SC-TIN-MISSING` | CRS | TIN lipsă: acceptat doar cu motiv valid (A/B/C). Fără TIN, deși fișa OCDE spune că țara emite TIN tuturor: declarație nesigură | 53, 37 |
 | `SC-CONSISTENT` | CRS | Autocertificarea acoperă toate jurisdicțiile din indicii → `Compliant`, raportabil pentru ele | 33–34, 36–37 |
-| `DL-CHANGE-90` | CRS | Termen pentru autocertificare nouă / explicație rezonabilă: 90 de zile (pe tip de cont) | 29–30, 35–36 |
+| `DL-CHANGE-90` | CRS | Termen pentru autocertificare nouă / explicație rezonabilă: 90 de zile calendaristice; diferă preexistent / nou, nu tipul contului | 29, 35–36 |
 | `DL-EXPIRED` | CRS | La expirare: tratat ca rezident în toate jurisdicțiile indicate | 35–36 |
 | `RESP-EXPLANATION` | CRS | Explicații rezonabile acceptate: student, profesor sau stagiar, diplomat, funcționar UE | 37 |
 
@@ -526,27 +526,56 @@ venitul din străinătate nu e indiciu; un telefon străin (non-SUA) alături de
 
 ### 9.1 Data simulată
 
-`SimClock : TimeProvider` înlocuiește `TimeProvider.System` în `Program.cs`. Are un decalaj (`Offset`) față de
-ora reală, setabil din UI (doar admin) și prin API: „+85 zile”, „resetează”. Toate serviciile folosesc
-`TimeProvider.GetUtcNow()`, **niciodată** `DateTime.Now`. Un test verifică asta (grep în cod).
+`SimClock : TimeProvider` (în `Features/Deadlines`) = ora reală + un decalaj (`Offset`), setabil din UI (doar admin) și prin
+API: „+85 zile”, „resetează”. **Codul CRS injectează `SimClock`**, nu `TimeProvider`. `TimeProvider`-ul global rămâne ceasul
+sistemului, intenționat: cookie-urile de autentificare, cheile Data Protection și ștergerea rulărilor (`RetentionService`, 30
+de zile) nu au voie să sară 85 de zile înainte. Niciodată `DateTime.Now` / `UtcNow` în codul CRS; `ClockTests` verifică
+asta (niciun constructor CRS nu primește `TimeProvider`, nicio sursă CRS nu conține `DateTime.Now`).
 
 ### 9.2 Calculul termenului
 
 ```csharp
+public record DeadlineInput(DateTime KnownAt, Regime Regime, bool IsPreexisting);
+public record DeadlineResult(DateTime DueAt, DateTime RemindAt, string RuleId, string GuidePage, string Explanation, bool DesignChoice);
 public interface IDeadlineCalculator
 {
-    DeadlineResult Compute(Case @case, AccountSnapshot primaryAccount, DateTime changeKnownAt);
+    DeadlineResult Compute(DeadlineInput input);
 }
-public record DeadlineResult(DateTime DueAt, DateTime RemindAt, string RuleId, string GuidePage, string Explanation);
 ```
 
-- Implicit: `DueAt = changeKnownAt + 90 zile`, `RemindAt = DueAt − 5 zile` (memento la ziua 85).
-- **Verificat:** la schimbarea de situație, 90 de zile pentru declarație nouă sau explicație; altfel rezident în jurisdicția inițială
-  **și** în cea nouă (p. 35–36). La conturile preexistente ghidul spune „până la sfârșitul anului sau 90 de zile” (p. 29); care dintre
-  ele se aplică (data mai târzie?) e NEVERIFICAT și îl confirmă colegul din domeniu.
-- **NEVERIFICAT (R2, în Faza 0):** ziua de start (data primirii schimbării sau data la care banca
-  „află”), zile calendaristice sau lucrătoare, diferențe preexistent / nou și pe tip de cont, ce se întâmplă
-  la mai multe schimbări pe același caz. Până atunci, testele au `// TODO(ghid p.?)` vizibil.
+**Ce spune ghidul** (citatele sunt sub tabel):
+
+| Regim | Ce trebuie obținut | Termen și start | La expirare | Pagina |
+| --- | --- | --- | --- | --- |
+| CRS, cont nou | O declarație valabilă **sau** o explicație rezonabilă și documente aferente (dacă este cazul) | 90 de zile calendaristice de la data la care declarația își pierde valabilitatea, adică data la care banca „cunoaște sau are motive să cunoască” schimbarea | Rezident în jurisdicția declarată inițial **și** în cea în care ar putea fi rezident după schimbare | 35–36 |
+| CRS, cont preexistent | O declarație **și** un document justificativ nou | Până în ultima zi a anului calendaristic (sau a altei perioade de raportare) **sau** 90 de zile calendaristice de la notificare sau descoperire | Căutare în evidența electronică; rezident cel puțin în statul nou | 29; Exemplul 2 la p. 29 și p. 30 |
+| FATCA, cont nou | O declarație nouă valabilă (fără variantă cu explicație) | Ghidul nu dă termen (NEVERIFICAT) | Cont raportabil din Statele Unite | 38 |
+
+- Cont nou CRS (p. 35–36): declarația „își pierde valabilitatea la data la care instituția financiară raportoare care deține
+  declarația cunoaște sau are motive să cunoască că circumstanțele s-au schimbat”. Termenul este de „90 de zile calendaristice de la
+  data la care declarația pe propria răspundere își pierde valabilitatea ca urmare a modificării circumstanțelor”. În acest interval
+  banca „poate să decidă” să păstreze statutul anterior (p. 36): e o opțiune, nu o obligație.
+- Cont preexistent CRS (p. 29), integral: „Declarația pe propria răspundere și documentul justificativ se vor obține până în ultima
+  zi a anului calendaristic în cauză sau a altei perioade de raportare adecvate, sau în 90 de zile calendaristice de la notificarea
+  sau descoperirea unei modificări a circumstanțelor. Dacă IFR nu poate să obțină documentele menționate în termenul prevăzut,
+  trebuie să aplice procedura de căutare în registrele electronice.” Care variantă se aplică (eventual data mai târzie) e
+  NEVERIFICAT; o confirmă colegul din domeniu.
+- FATCA (p. 38): „Dacă IFR nu poate obține o nouă declarație valabilă, atunci va trata contul drept cont raportabil din Statele
+  Unite.” Paragraful nu are termen.
+
+**Ce face codul** (convenții de design, nu text din ghid):
+
+- `DueAt = KnownAt + 90 zile calendaristice`. `KnownAt` este data la care banca e notificată, descoperă sau află de
+  schimbare, nu data schimbării. Formula numără ziua în care banca află drept ziua 0; dacă ghidul face la fel e NEVERIFICAT.
+- `DesignChoice = true` când o parte din rezultat e alegerea noastră, nu textul ghidului (ziua memento, termenul FATCA).
+- La FATCA folosim tot 90 de zile, ca alegere de design; o spunem așa în UI și în README.
+- `RemindAt = DueAt − 5 zile` (memento la ziua 85) și escaladarea către departamentul fiscal sunt alegerea noastră. Ghidul spune
+  doar „Se recomandă ca Instituțiile Financiare Raportoare să contacteze clienții pentru a clarifica aceste situații” (p. 30,
+  despre indiciile posibil false).
+- Pe paginile 29 și 35–36 termenul nu diferă după tipul de cont (depozit / custodie); diferența este între preexistent și nou.
+- **Încă NEVERIFICAT (R2, cu colegul din domeniu):** dacă ziua 0 se numără; varianta aplicabilă la preexistent; termenul FATCA
+  (cont nou și preexistent); ce se întâmplă la mai multe schimbări pe același caz. Testele pentru aceste puncte au
+  `// TODO(ghid p.?)` vizibil.
 
 ### 9.3 State machine-ul cazului
 
@@ -901,7 +930,7 @@ Conținut:
    `ICrsRuleEngine`, `IDeadlineCalculator`, `IHiddenTextShield`, `IEvidenceVerifier`, `ITinValidator`,
    `IAuditLog`, `ICaseService`, `IChangeService`, `IClientService` (+ `ClientSnapshot`), `IEvaluationService`.
 3. **Înregistrarea:** `AddClients()`, `AddRules()`, `AddDeadlines()`, `AddCases()`, `AddShield()`, `AddTin()`,
-   `AddAudit()`, `AddSentinel()`, `AddEvaluation()`; `SimClock` în locul `TimeProvider.System`.
+   `AddAudit()`, `AddSentinel()`, `AddEvaluation()`; `SimClock` înregistrat de `AddDeadlines()`, separat de `TimeProvider` (9.1).
 4. **Agentul schelet** `CrsSentinelAgent` (nume, unelte declarate cu stub-uri, mock minim).
 5. **`SiteConfig`:** nume „CRS Sentinel”, nav-ul final (pagini goale cu `EmptyState`), ascunse Assistant / Arena
    / Scenarios / Items / Calculators, utilizatorii demo, landing minimal (R5 îl scrie pe urmă).
@@ -1077,7 +1106,7 @@ Reguli ale Tech Lead-ului:
 - [ ] 0 warnings; testele vechi și noi verzi.
 - [ ] Paginile nu folosesc `DbContext`; serviciile verifică rolurile (`CurrentUser.Require`).
 - [ ] `IDbContextFactory`, un context per operație.
-- [ ] Banii în `decimal`; datele prin `TimeProvider` (nu `DateTime.Now`).
+- [ ] Banii în `decimal`; în codul CRS timpul prin `SimClock` (nu `TimeProvider`, nu `DateTime.Now`).
 - [ ] Text UI prin `@T` + română în `Lang.Ro*.cs`.
 - [ ] Fiecare regulă are ID, titlu RO/EN, pagina din ghid; explicația pentru `Cleared`.
 - [ ] Semnalele contextuale nu schimbă decizia și nu deschid cazuri.
@@ -1108,7 +1137,7 @@ Reguli ale Tech Lead-ului:
 | Raiffeisen are deja automatizarea | Prima întrebare către mentor: „Ce se întâmplă azi, pentru CRS, când un client își schimbă adresa sau telefonul într-o altă țară? Cine verifică și în cât timp?” |
 | Juriul nu știe ce e CRS | Explicația de 20 de secunde la începutul video-ului |
 | Regulile sunt complicate | Domeniu limitat explicit; fiecare regulă cu pagina din ghid |
-| Termenul diferă pe tip de cont | R2 îl implementează exact după ghid, cu pagina afișată; până atunci 90 de zile cu `TODO` vizibil |
+| Termenul diferă între conturi preexistente și noi, iar FATCA nu are termen în ghid | R2 îl implementează după §9.2, cu pagina afișată; ce lipsește din ghid e marcat NEVERIFICAT sau „alegere de design” |
 | Arată ca un simplu validator | Bucla cu mai mulți pași și termenul vizibile în UI, cu data simulată |
 | Discriminare | Naționalitatea nu e semnal (excepție: cetățenia SUA la FATCA); test dedicat |
 | Bedrock nu e gata / pică | Mock + înregistrări; aplicația merge fără model |
