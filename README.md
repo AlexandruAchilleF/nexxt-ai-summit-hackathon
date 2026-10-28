@@ -214,8 +214,8 @@ clienți sintetici (același seed → aceleași date), etichetați după scenari
 
 Metricile vin doar din rulări reale (`/metrics` și testele), prezentate separat:
 
-1. **Acoperirea specificației:** cazurile trec sau nu. Motorul e determinist, deci spunem „regulile din ghid sunt
-   implementate și testate”, nu „acuratețe 100%”.
+1. **Acoperirea specificației:** cazurile trec sau nu. Motorul e determinist, deci, când toate cazurile trec,
+   spunem „regulile din ghid sunt implementate și testate”, nu „acuratețe 100%”.
 2. **Unde există incertitudine:** extragerea din PDF câmp cu câmp, procentul de citate verificate și respinse, scutul pe
    PDF-uri variate, semnalele care ar fi schimbat decizia (0 prin construcție, verificat la fiecare rulare).
 3. **Eficiența operațională:** timpul pe caz cu agentul, doar când se poate măsura dintr-o rulare. Azi `EvaluationService`
@@ -224,8 +224,8 @@ Metricile vin doar din rulări reale (`/metrics` și testele), prezentate separa
 
 ### Prima rulare
 
-Rularea `IEvaluationService.RunAsync()` pe commit-ul `bbe131e`, 28.10.2026, 21:27, **fără model** (nicio cheie, niciun
-apel AI). Pagina `/metrics` e încă goală pe `main`, așa că serviciul a fost chemat direct. Toate cifrele de mai jos vin din
+Rularea `IEvaluationService.RunAsync()` pe commit-ul `bbe131e` (plus doar README), 28.10.2026, 21:27, **fără model** (nicio cheie, niciun
+apel AI). Pagina `/metrics` e încă goală pe `main` (pagina e în PR #38), așa că serviciul a fost chemat direct. Toate cifrele de mai jos vin din
 cod determinist, nu din AI.
 
 **1. Acoperirea specificației** (motorul `crs-rules/1.0`)
@@ -238,7 +238,7 @@ cod determinist, nu din AI.
 Trei cazuri-etalon nu se potrivesc încă cu specificația, deci **nu** spunem încă „regulile din ghid sunt implementate și
 testate”:
 
-- la 2, motorul dă `NoCase` în loc de `Clarification`, pentru că lipsește `SC-TIN-FORMAT` (IT);
+- la 2, motorul dă `NoCase` în loc de `Clarification` și lipsește `SC-TIN-FORMAT` (IT);
 - la 7, decizia (`FatcaAlert`) e corectă, dar lipsește verificarea respinsă `FATCA-IND-POB`;
 - la 12, decizia și termenul (`DL-PRE-YEAR`) sunt corecte, dar lipsește `CRS-IND-MAIL` (IT).
 
@@ -246,7 +246,7 @@ testate”:
 
 | Ce | Rezultat |
 | --- | --- |
-| Scutul, pe 12 PDF-uri generate | 5 texte ascunse (alb 1, microscopic 2, în afara paginii 1, invizibil 1): 5 detectate, 0 ratate; 8 documente curate, 0 alarme false |
+| Scutul, pe 12 PDF-uri generate | 4 cu text ascuns (5 texte: alb 1, microscopic 2, în afara paginii 1, invizibil 1): toate 5 detectate, 0 ratate; 8 curate, 0 alarme false |
 | Citatele, pe banca de test a `EvidenceVerifier` (citate fixe, nu ale modelului) | 10 din 10 citate adevărate verificate; 4 din 4 citate doar din textul ascuns respinse; 38 din 38 de citate inventate respinse |
 | Extragerea autocertificării de către AI | nemăsurată: nu există încă o rulare live |
 | Semnalele care ar fi schimbat decizia | 0, prin construcție (motorul nu primește semnale), verificat la rulare |
@@ -308,15 +308,15 @@ warnings, testele unitare 1051 din 1051, E2E 21 trecute și 1 sărit (testul să
 | --- | --- | --- | --- | --- |
 | Documentația: planul, regulile verificate, paginile ghidului, cazurile-etalon, sursele, scenariul video, textul `/privacy` | toți | da (#1–#4, #6, #7, #10, #12, #14, #15, #19, #30, #33) | | |
 | Contractele și entitățile (Faza 0), `SimClock` | integrator | da (#13, #18) | | |
-| `CrsRuleEngine`, `RuleCatalog`, `GoldenEngineTests` | R1 | da (#16) | | |
+| `CrsRuleEngine`, `RuleCatalog`, `GoldenEngineTests` | R1 | da (#16) | #37 (cazurile-etalon 7 și 12) | |
 | `ChangeService`, `CaseService` (stările cazului), `DeadlineCalculator`, `DeadlineWatcher`, `SimClockControl` | R2 | da (#28) | | butoanele datei simulate în bara de sus |
 | `HiddenTextShield`, `EvidenceVerifier`, `TinFormat` + TIN on Europa, `AuditLog` | R3 | da (#23) | | |
 | Pagina `/privacy` (jurnal, TIN on Europa, Bedrock, retenție, temeiul legal) | R3 | da (#26) | | |
 | Provider Bedrock | R4 | da (#5) | | |
-| Runtime-ul agentului (aprobarea oprește rularea), verificările CRS pe răspuns, mascarea telefoanelor străine | R4 | da (#20) | | verificările CRS nu sunt încă active pe agentul CRS |
+| Runtime-ul agentului (aprobarea oprește rularea), verificările CRS pe răspuns, mascarea telefoanelor străine | R4 | da (#20) | #35 (mascarea în extrasele verificărilor, `pii-leak`) | verificările CRS nu sunt încă active pe agentul CRS |
 | `CrsSentinelAgent`: uneltele, system prompt-ul final, mock RO/EN, înregistrarea | R4 | doar scheletul, cu `getCase` | | uneltele de la §3 pașii 4, 5, 7, 8 |
-| Datele: 50 de clienți sintetici, PDF-urile cazurilor-etalon, cazurile-etalon transcrise, seed-ul | R5 | da (#8, #9, #11, #17, #21, #22, #25, #27, #31) | | seed-ul nu trece prin `ChangeService`, deci jurnalul e gol la pornire |
-| `EvaluationService` (cele trei feluri de cifre) | R5 | da (#29) | | |
+| Datele: 50 de clienți sintetici, PDF-urile cazurilor-etalon, cazurile-etalon transcrise, seed-ul | R5 | da (#8, #9, #11, #17, #21, #22, #25, #27, #31) | #36 (termenul la 17a, regula de expirare la 17a și 17b); #39 (istoricul seed-ului prin `ChangeService`) | seed-ul nu trece încă prin `ChangeService`, deci jurnalul e gol la pornire |
+| `EvaluationService` (cele trei feluri de cifre) | R5 | da (#29) | #38 (pagina `/metrics`) | |
 | Landing-ul și subsolurile | R5 | da (#24, #32) | | |
 
 **Paginile CRS, așa cum sunt acum pe `main`:**
