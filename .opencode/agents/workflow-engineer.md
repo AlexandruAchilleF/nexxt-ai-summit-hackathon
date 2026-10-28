@@ -33,10 +33,14 @@ You implement `docs/PLAN.md` section 9.
   cookies, data protection keys and run retention do not jump 85 days. Moving the clock goes through a scoped control that
   requires the admin role and writes a `clock.changed` audit entry.
 - `DeadlineCalculator`: 90 days after the bank knows of the change (guide p. 35-36); reminder 5 days before. Preexisting accounts:
-  the later of 31 December and 90 days (p. 29 says "or"; the law says "whichever is later": Fiscal Procedure Code, Annex 2
-  point 1, and OECD CRS Commentary on Section III, para 13). Keep it behind one policy method with a test.
-- On expiry: new account (`DL-EXPIRED-NEW`): resident in the original AND the new jurisdiction (p. 35-36); preexisting
-  (`DL-EXPIRED-PRE`): at least the new jurisdiction (p. 29). FATCA has no deadline in the guide (p. 38): `DueAt` is null.
+  the later of 31 December and 90 days (p. 29 says "or"). The law says "whichever is later" only for accounts documented by
+  the residence address test (Fiscal Procedure Code, Annex 2 point 1), as does OECD CRS Commentary on Section III, para 13.
+  For indicia found by the electronic record search, which is how every case here starts, the law says only "or" (Annex 1,
+  Section III, subsection B, point 16): there the later-of reading is our interpretation, aligned with Commentary para 16.
+  `Explanation` and `ExplanationRo` say "our interpretation" and cite point 16. Keep it behind one policy method with a test.
+- On expiry: new account (`DL-EXPIRED-NEW`), resident in the original AND the new jurisdiction (p. 35-36); preexisting account
+  (`DL-EXPIRED-PRE`), resident at least in the new jurisdiction (p. 29, example 2). FATCA has no deadline in the guide (p. 38):
+  `DueAt` is null.
 - `DeadlineCalculator` already implements DL-NEW-90, DL-PRE-YEAR and FATCA-SC with tests (`Crs/DeadlineCalculatorTests.cs`).
 - Case transitions only through explicit `CaseService` methods, each with a role check and an audit entry; an invalid transition
   throws. `DeadlineWatcher.TickAsync(now)` is testable without real time.
