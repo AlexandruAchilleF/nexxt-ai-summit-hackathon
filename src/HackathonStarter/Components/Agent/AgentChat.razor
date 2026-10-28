@@ -8,6 +8,7 @@
 @inject IEnumerable<AgentDefinition> Agents
 @inject ISnackbar Snackbar
 @inject IJSRuntime JS
+@inject HackathonStarter.Features.Shield.IHiddenTextShield Shield
 
 @*
     Drop-in chat for any registered agent: streaming answers, live tool calls, approvals,
@@ -283,7 +284,9 @@
                         continue;
                     }
                     await using var stream = file.OpenReadStream(DocumentText.MaxBytes);
-                    _files.Add(await DocumentText.ExtractAsync(stream, file.Name));
+                    var (attached, hidden) = await HackathonStarter.Features.Sentinel.ShieldedAttachment.ReadAsync(Shield, stream, file.Name);
+                    _files.Add(attached);
+                    if (hidden > 0) Snackbar.Add(T("{0}: hidden text removed before the model reads it ({1} fragments).", file.Name, hidden), Severity.Warning);
                 }
                 catch (Exception ex)
                 {
