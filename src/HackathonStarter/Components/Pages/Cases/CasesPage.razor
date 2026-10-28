@@ -59,7 +59,7 @@ else
             {
                 <a class="app-list-row crs-queue-row" href="@($"/cases/{c.Code}")" style="@($"--i:{i++}")">
                     <span class="crs-queue-main">
-                        <span class="d-flex align-center gap-2">
+                        <span class="d-flex flex-wrap align-center gap-2">
                             <span class="crs-code">@c.Code</span>
                             <Pill>@CrsUi.Label(c.Regime)</Pill>
                         </span>

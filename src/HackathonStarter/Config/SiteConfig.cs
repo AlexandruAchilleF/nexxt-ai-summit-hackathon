@@ -163,7 +163,6 @@ public static class SiteConfig
         // Assistant, Arena, Scenarios, Items and Calculators stay reachable by URL (E2E tests and the Docker CI check use them).
         // @gen:nav (the feature generator inserts new pages above this line)
         new("Agent runs", "/runs", Icons.Material.Rounded.History, "Agents"),
-        new("Exports", "/exports", Icons.Material.Rounded.FileDownload, "Agents"),
         new("Architecture", "/architecture", Icons.Material.Rounded.AccountTree, "Agents"),
         new("Settings", "/settings", Icons.Material.Rounded.Settings, "Account"),
     ];
@@ -172,7 +171,7 @@ public static class SiteConfig
     /// Bottom navigation on phones (max 4–5 hrefs from <see cref="Nav"/>; the menu button still shows everything).
     /// Empty = no bottom bar.
     /// </summary>
-    public static readonly string[] MobileNav = ["/dashboard", "/cases", "/changes/new", "/settings"];
+    public static readonly string[] MobileNav = ["/dashboard", "/cases", "/changes/new", "/clients"];
 
     /// <summary>
     /// Installable app (PWA): "Install" in Chrome/Edge (desktop + Android), "Add to Home Screen" on iPhone.
