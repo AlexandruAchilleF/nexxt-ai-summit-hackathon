@@ -290,7 +290,7 @@
                 }
                 catch (Exception ex)
                 {
-                    Snackbar.Add($"{file.Name}: {ex.Message}", Severity.Error);
+                    Snackbar.Add($"{file.Name}: {T(ex.Message)}", Severity.Error);
                 }
             }
         }

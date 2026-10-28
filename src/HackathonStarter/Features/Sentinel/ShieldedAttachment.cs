@@ -24,20 +24,25 @@ public static partial class ShieldedAttachment
         var bytes = buffer.ToArray();
         var ext = Path.GetExtension(fileName).ToLowerInvariant();
 
-        // By content, not by name: a PDF renamed to .txt would otherwise be read raw, hidden text included.
-        if (ext == ".pdf" || bytes.AsSpan().StartsWith("%PDF"u8)) return Pdf(shield, bytes, fileName);
+        // By content, not by name: a PDF renamed to .txt would otherwise be read raw, hidden text included. PDF readers
+        // accept the header anywhere in the first 1024 bytes, so look there too.
+        if (ext == ".pdf" || bytes.AsSpan(0, Math.Min(bytes.Length, 1024)).IndexOf("%PDF-"u8) >= 0) return Pdf(shield, bytes, fileName);
         if (ext is ".html" or ".htm" or ".xml")
-            throw new NotSupportedException("HTML and XML are not accepted in the chat: they can hide text from a reader. Attach a PDF or a text file.");
+            throw new NotSupportedException(MarkupRefused);
 
         var file = await DocumentText.ExtractAsync(new MemoryStream(bytes), fileName, ct);
         if (file.Image is not null) return (file, 0);
 
+        // A comment (closed or not) or a tag can hide text from a reader once rendered: refuse rather than guess what shows.
+        if (Markup().IsMatch(file.Text)) throw new NotSupportedException(MarkupRefused);
         var hidden = 0;
-        var text = HtmlComment().Replace(file.Text, _ => { hidden++; return ""; });
-        text = Invisible().Replace(text, _ => { hidden++; return ""; }).Trim();
+        var text = Invisible().Replace(file.Text, _ => { hidden++; return ""; }).Trim();
         if (text.Length == 0) throw new InvalidOperationException("No visible text found in the file.");
         return (file with { Text = text }, hidden);
     }
+
+    private const string MarkupRefused =
+        "Files with HTML or XML markup are not accepted in the chat: markup can hide text from a reader. Attach a PDF or plain text.";
 
     private static (AgentFile File, int Hidden) Pdf(IHiddenTextShield shield, byte[] bytes, string fileName)
     {
@@ -49,11 +54,12 @@ public static partial class ShieldedAttachment
         return (new AgentFile(Guid.NewGuid().ToString("N")[..12], fileName, text, scan.Pages.Count), scan.Hidden.Count);
     }
 
-    // Not shown when Markdown is rendered.
-    [GeneratedRegex(@"<!--.*?-->", RegexOptions.Singleline)]
-    private static partial Regex HtmlComment();
+    // An HTML comment, or an opening or closing tag with its name right after "<" ("Sold < 5000" is no tag).
+    [GeneratedRegex(@"<!--|</?[A-Za-z][A-Za-z0-9-]*(?:\s[^<>]*)?/?>")]
+    private static partial Regex Markup();
 
-    // Zero-width, joiner, direction and soft-hyphen characters: invisible, but read by a model.
-    [GeneratedRegex(@"[\u00AD\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\uFEFF]")]
+    // Format characters (zero-width, joiners, direction marks, soft hyphen, BOM), variation selectors and the Unicode tag
+    // block (U+E0000-E007F, written as surrogate pairs): invisible, but read by a model.
+    [GeneratedRegex(@"\p{Cf}|[\uFE00-\uFE0F]|\uDB40[\uDC00-\uDC7F\uDD00-\uDDEF]")]
     private static partial Regex Invisible();
 }

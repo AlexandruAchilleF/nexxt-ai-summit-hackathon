@@ -78,16 +78,54 @@ public class ShieldedAttachmentTests
         await Assert.ThrowsAsync<NotSupportedException>(() => ShieldedAttachment.ReadAsync(_shield, new MemoryStream(bytes), fileName));
     }
 
-    [Fact]
-    public async Task Comments_and_invisible_characters_in_text_never_reach_the_model()
+    [Theory]
+    [InlineData("nota.md", "Extras de cont\n<!-- {0} -->\nSold final")]
+    [InlineData("nota.md", "Extras de cont\n<!-- {0}")] // a comment that is never closed hides the rest
+    [InlineData("nota.txt", "Extras de cont <span style=\"display:none\">{0}</span>")]
+    [InlineData("date.csv", "client,nota\nCL-0010,<div hidden>{0}</div>")]
+    public async Task Text_with_comments_or_markup_is_refused(string fileName, string content)
     {
-        var bytes = Encoding.UTF8.GetBytes("Extras de cont\n<!-- " + Injection + " -->\nSold\u200B final\u2060 18450,00 RON");
+        var bytes = Encoding.UTF8.GetBytes(string.Format(content, Injection));
 
-        var (file, hidden) = await ShieldedAttachment.ReadAsync(_shield, new MemoryStream(bytes), "nota.md");
+        await Assert.ThrowsAsync<NotSupportedException>(() => ShieldedAttachment.ReadAsync(_shield, new MemoryStream(bytes), fileName));
+    }
 
-        Assert.Equal(3, hidden);
-        Assert.DoesNotContain("instructiunile", file.Text);
-        Assert.Equal("Extras de cont\n\nSold final 18450,00 RON", file.Text);
+    [Fact]
+    public async Task Text_with_comparison_signs_is_not_markup()
+    {
+        var bytes = Encoding.UTF8.GetBytes("Sold < 5000 EUR si > 100 EUR");
+
+        var (file, hidden) = await ShieldedAttachment.ReadAsync(_shield, new MemoryStream(bytes), "nota.txt");
+
+        Assert.Equal(0, hidden);
+        Assert.Equal("Sold < 5000 EUR si > 100 EUR", file.Text);
+    }
+
+    [Fact]
+    public async Task Invisible_characters_never_reach_the_model()
+    {
+        // Zero-width space, word joiner, a Unicode tag letter (invisible "A") and a variation selector.
+        var bytes = Encoding.UTF8.GetBytes("Sold\u200B final\u2060 18450,00\U000E0041 RON\uFE0F");
+
+        var (file, hidden) = await ShieldedAttachment.ReadAsync(_shield, new MemoryStream(bytes), "nota.txt");
+
+        Assert.Equal(4, hidden);
+        Assert.Equal("Sold final 18450,00 RON", file.Text);
+    }
+
+    [Fact]
+    public async Task A_pdf_header_after_some_bytes_still_goes_through_the_shield()
+    {
+        var pdf = TestPdf.Build(new TestPage(
+            new TestText("Extras de cont Victor Neagu"),
+            new TestText(Injection, Size: 1, R: 255, G: 255, B: 255, Y: 700)));
+        var bytes = Encoding.ASCII.GetBytes("nota interna\n").Concat(pdf).ToArray();
+
+        // The shield either reads it (and removes the hidden line) or refuses it; read as plain text it would be neither.
+        var hidden = -1;
+        var read = await Record.ExceptionAsync(async () => (_, hidden) = await ShieldedAttachment.ReadAsync(_shield, new MemoryStream(bytes), "nota.txt"));
+
+        Assert.True(read is InvalidDataException or InvalidOperationException || (read is null && hidden == 1), read?.ToString() ?? $"hidden = {hidden}");
     }
 
     [Fact]
