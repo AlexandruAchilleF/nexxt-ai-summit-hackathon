@@ -1,0 +1,83 @@
+@page "/"
+@layout LandingLayout
+@inject NavigationManager Nav
+
+<PageTitle>@SiteConfig.Name</PageTitle>
+
+@* Landing page. All copy lives in SiteConfig.Landing; set Enabled = false to skip it. Styles: wwwroot/landing.css *@
+<div class="lp">
+    <LandingHeader />
+
+    <main>
+        <section class="lp-wrap lp-hero">
+            @if (L.Announcement is { } a)
+            {
+                <a class="lp-announce" href="@a.Href"><span>@a.Badge</span>@a.Label<MudIcon Icon="@Icons.Material.Rounded.ChevronRight" Size="Size.Small" /></a>
+            }
+            <h1>@L.Headline</h1>
+            <p class="lp-hero-sub">@L.Subheadline</p>
+            <div class="lp-hero-actions">
+                <a class="lp-btn lp-btn-light" href="@L.CtaHref">@L.CtaLabel</a>
+            </div>
+        </section>
+
+        <div class="lp-wrap"><AppPreview /></div>
+
+        <section id="product" class="lp-wrap lp-statement">
+            <p><span>@L.Statement.Lead</span> @L.Statement.Rest</p>
+        </section>
+
+        @foreach (var s in L.Sections)
+        {
+            <section class="lp-section">
+                <div class="lp-wrap">
+                    <div class="lp-section-head">
+                        <h2>@s.Title</h2>
+                        <p>@s.Description</p>
+                    </div>
+                    <div class="lp-features">
+                        @foreach (var f in s.Features)
+                        {
+                            <div class="lp-feature">
+                                <span class="lp-feature-icon"><MudIcon Icon="@f.Icon" /></span>
+                                <h3>@f.Title</h3>
+                                <p>@f.Description</p>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </section>
+        }
+
+        <section id="how" class="lp-section">
+            <div class="lp-wrap">
+                <h2 class="lp-big">@T("How it works")</h2>
+                <ol class="lp-steps" style="--n:@L.Steps.Length">
+                    @foreach (var step in L.Steps)
+                    {
+                        <li><h3>@step.Title</h3><p>@step.Description</p></li>
+                    }
+                </ol>
+            </div>
+        </section>
+
+        <section class="lp-closing">
+            <h2><span>@L.Closing.Lead</span><br />@L.Closing.Rest</h2>
+            <div class="lp-closing-actions">
+                <a class="lp-btn lp-btn-light" href="@L.CtaHref">@L.CtaLabel</a>
+                <a class="lp-btn lp-btn-dark" href="/contact">@T("Contact us")</a>
+            </div>
+        </section>
+    </main>
+
+    <LandingFooter />
+</div>
+
+@code {
+    private static Landing L => SiteConfig.Landing;
+
+    protected override void OnInitialized()
+    {
+        if (!L.Enabled) Nav.NavigateTo(SiteConfig.Nav[0].Href, replace: true);
+    }
+}

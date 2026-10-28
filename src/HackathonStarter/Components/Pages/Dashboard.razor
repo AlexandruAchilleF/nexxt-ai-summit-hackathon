@@ -1,0 +1,114 @@
+@page "/dashboard"
+@using HackathonStarter.Features.Items
+@inject ItemService Items
+@inject CurrentUser CurrentUser
+
+<PageTitle>@T("Dashboard") · @SiteConfig.Name</PageTitle>
+
+<PageHeader Title="@T("Welcome back, {0}", _user?.Name.Split(' ')[0])" Description="@SiteConfig.Description">
+    <Actions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.AutoAwesome" Href="/assistant">@T("Assistant")</MudButton>
+    </Actions>
+</PageHeader>
+
+@if (_error is not null)
+{
+    <ErrorState Message="@_error" OnRetry="Load" />
+}
+else if (_stats is null)
+{
+    <MudGrid Spacing="3">
+        @for (var i = 0; i < 4; i++)
+        {
+            <MudItem xs="6" md="3"><MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="132px" Style="border-radius:20px" /></MudItem>
+        }
+        <MudItem xs="12" md="8"><MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="320px" Style="border-radius:20px" /></MudItem>
+        <MudItem xs="12" md="4"><MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="320px" Style="border-radius:20px" /></MudItem>
+    </MudGrid>
+}
+else
+{
+    <MudGrid Spacing="3">
+        <MudItem xs="6" md="3"><StatCard Label="@T("Total items")" Value="@Format.Number(_stats.Total)" Icon="@Icons.Material.Rounded.Checklist" Href="/items"
+                                         Hint="@T("{0} created this week", _stats.PerDay.TakeLast(7).Sum(d => d.Count))" Series="_spark" /></MudItem>
+        <MudItem xs="6" md="3"><StatCard Label="@T("Active items")" Value="@Format.Number(_stats.ByStatus[ItemStatus.Active])" Icon="@Icons.Material.Rounded.TrendingUp" Delay="70" /></MudItem>
+        <MudItem xs="6" md="3"><StatCard Label="@T("High priority")" Value="@Format.Number(_stats.ByPriority[ItemPriority.High])" Icon="@Icons.Material.Rounded.LocalFireDepartment" Delay="140" /></MudItem>
+        <MudItem xs="6" md="3"><StatCard Label="@T("Total value")" Value="@Format.Money(_stats.TotalValue, compact: true)" Icon="@Icons.Material.Rounded.Payments" Delay="210" /></MudItem>
+
+        <MudItem xs="12" md="8">
+            <MudPaper Outlined="true" Class="pa-4 app-enter" Style="height:100%;animation-delay:280ms">
+                <div class="app-card-title">@T("Created per day")</div>
+                <div class="app-card-sub">@T("Last 14 days")</div>
+                <div class="stat-value mb-3">@Format.Number(_stats.PerDay.Sum(d => d.Count))</div>
+                <AreaChart Points="_perDay" AriaLabel="@T("Created per day")" />
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <MudPaper Outlined="true" Class="pa-4 app-enter" Style="height:100%;animation-delay:340ms">
+                <div class="app-card-title">@T("By status")</div>
+                <div class="app-card-sub mb-6">@T("All items")</div>
+                <ActivityRings Segments="_byStatus" Unit="@T("Items").ToLower()" />
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12">
+            <div class="d-flex align-center justify-space-between mt-4 mb-2">
+                <div class="app-card-title">@T("Recent items")</div>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" Href="/items">@T("See all")</MudButton>
+            </div>
+            <div class="app-list app-enter" style="animation-delay:400ms">
+                @foreach (var item in _stats.Recent)
+                {
+                    <a class="app-list-row has-icon" href="@($"/items/{item.Id}")">
+                        <span class="app-list-icon"><MudIcon Icon="@Icons.Material.Rounded.Description" /></span>
+                        <span class="app-list-main">
+                            <span class="app-list-title d-block">@item.Title</span>
+                            <span class="app-list-meta">@Format.Relative(item.CreatedAt)</span>
+                        </span>
+                        <ItemStatusChip Status="item.Status" />
+                        <MudIcon Icon="@Icons.Material.Rounded.ChevronRight" Class="app-chevron" />
+                    </a>
+                }
+            </div>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private DemoUser? _user;
+    private ItemStats? _stats;
+    private string? _error;
+    private IReadOnlyList<(string Label, double Value)> _perDay = [];
+    private IReadOnlyList<double> _spark = [];
+    private IReadOnlyList<(string Label, double Value, string Color)> _byStatus = [];
+
+    // Red and orange stay reserved for failures and risk; the other states are greys, like their pills.
+    private static string StatusColor(ItemStatus status) => status switch
+    {
+        ItemStatus.Active => "var(--app-accent)",
+        ItemStatus.Draft => "var(--mud-palette-text-secondary)",
+        _ => "color-mix(in srgb, var(--mud-palette-text-secondary) 40%, transparent)",
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        _user = await CurrentUser.GetAsync();
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        try
+        {
+            _error = null;
+            _stats = await Items.StatsAsync();
+            _perDay = _stats.PerDay.Select(d => (d.Day.ToString("d MMM", Format.Culture), (double)d.Count)).ToList();
+            _spark = _stats.PerDay.Select(d => (double)d.Count).ToList();
+            _byStatus = _stats.ByStatus.OrderByDescending(s => s.Value).Select(s => (T(s.Key.ToString()), (double)s.Value, StatusColor(s.Key))).ToList();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+}

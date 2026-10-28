@@ -1,0 +1,7 @@
+@page "/scenarios"
+
+<PageTitle>@T("Scenarios") · @SiteConfig.Name</PageTitle>
+
+<PageHeader Title="@T("Scenarios")" Description="@T("A simulated customer talks to a target system for several turns. Deterministic checks run on every answer and stop the conversation at the first failure (Features/Scenarios).")" />
+<AgentChat AgentName="customer-probe" Placeholder="@T("Describe the customer's goal…")" EmptyTitle="@T("What should the customer try?")"
+           EmptyDescription="@T("The goal becomes the first message; the customer keeps pushing for up to 4 turns.")" />

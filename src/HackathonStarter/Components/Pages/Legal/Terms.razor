@@ -1,0 +1,8 @@
+@page "/terms"
+@layout PublicLayout
+@using HackathonStarter.Features.Legal
+
+<PageTitle>@T("Terms and conditions") · @SiteConfig.Name</PageTitle>
+
+<PageHeader Title="@T("Terms and conditions")" />
+<Markdown Class="legal" Text="@LegalTexts.Terms(SiteConfig.Legal)" />

@@ -1,0 +1,10 @@
+@using Markdig
+@* Renders model output as Markdown. Raw HTML is disabled, so it's safe to show untrusted text. *@
+<div class="markdown @Class">@((MarkupString)Markdig.Markdown.ToHtml(Text ?? "", Pipeline))</div>
+
+@code {
+    private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().DisableHtml().Build();
+
+    [Parameter] public string? Text { get; set; }
+    [Parameter] public string? Class { get; set; }
+}

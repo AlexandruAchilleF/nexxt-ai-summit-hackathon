@@ -1,0 +1,47 @@
+@* Static picture of the app for the landing page: real nav labels, sample content from SiteConfig.Landing.Preview. *@
+<div class="lp-preview" aria-hidden="true">
+    <aside class="lp-preview-side">
+        <div class="lp-preview-brand"><span class="brand-logo-mark">@if (SiteConfig.Logo.StartsWith('/')) { <img src="@SiteConfig.Logo" alt="" /> } else { @SiteConfig.Logo }</span>@SiteConfig.Name</div>
+        @foreach (var item in SiteConfig.Nav.Take(7))
+        {
+            <div class="lp-preview-link@(item == SiteConfig.Nav[0] ? " active" : "")"><MudIcon Icon="@item.Icon" Size="Size.Small" />@T(item.Label)</div>
+        }
+    </aside>
+
+    <section class="lp-preview-main">
+        <div class="lp-preview-bar">
+            <span class="lp-mono">@P.ItemId</span>
+            <span>@P.ItemTitle</span>
+            <MudIcon Icon="@Icons.Material.Filled.Star" Size="Size.Small" Style="color:#F2C94C" />
+            <span class="lp-dim">···</span>
+            <span class="lp-dim ml-auto">1 / 12</span>
+        </div>
+        <div class="lp-preview-body">
+            <h3>@P.ItemTitle</h3>
+            <p class="lp-dim">@P.ItemDescription</p>
+            <h4>@T("Activity")</h4>
+            <ul class="lp-preview-activity">
+                @foreach (var (line, i) in P.Activity.Select((l, i) => (l, i)))
+                {
+                    <li><span class="lp-dot"></span>@line<span class="lp-dim"> · @T("{0} min ago", P.Activity.Length - i)</span></li>
+                }
+            </ul>
+        </div>
+    </section>
+
+    <section class="lp-preview-agent">
+        <div class="lp-preview-agent-head"><span class="brand-logo-mark">@if (SiteConfig.Logo.StartsWith('/')) { <img src="@SiteConfig.Logo" alt="" /> } else { @SiteConfig.Logo }</span>@T("Agent")<span class="lp-dim ml-auto">— ⤢ ✕</span></div>
+        <div class="lp-preview-prompt">@P.Prompt</div>
+        <div class="lp-dim lp-small">@T("Worked for {0} sec", 4) ▸</div>
+        <p>@P.Reply</p>
+        <div class="lp-preview-result">
+            <div><strong>@P.ResultTitle</strong> <span class="lp-dim">@P.ResultDetail</span></div>
+            <span class="lp-preview-approve">@T("Approve")</span>
+        </div>
+        <div class="lp-preview-reply lp-dim">@T("Reply…")</div>
+    </section>
+</div>
+
+@code {
+    private static LandingPreview P => SiteConfig.Landing.Preview;
+}

@@ -1,0 +1,7 @@
+@page "/assistant"
+
+<PageTitle>@T("Assistant") · @SiteConfig.Name</PageTitle>
+
+<PageHeader Title="@T("Assistant")" Description="@T("Answers questions about items, calculates loans and savings, reads attached PDFs and proposes changes for your approval.")" />
+<AgentChat AgentName="assistant" AllowFiles="true" Placeholder="@T("Ask about items, a loan, or attach a document…")"
+           EmptyDescription="@T("I use tools to look up real data and do the math, and I ask for your approval before changing anything.")" />

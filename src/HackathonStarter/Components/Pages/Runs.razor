@@ -1,0 +1,88 @@
+@page "/runs"
+@inject RunStore Store
+
+<PageTitle>@T("Agent runs") · @SiteConfig.Name</PageTitle>
+
+<PageHeader Title="@T("Agent runs")" Description="@T("Every run with its steps: what the agent did, with which data, who approved it, and which checks it passed.")" />
+
+@if (_error is not null)
+{
+    <ErrorState Message="@_error" OnRetry="Load" />
+}
+else if (_runs is null)
+{
+    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="240px" />
+}
+else if (_runs.Count == 0)
+{
+    <EmptyState Icon="@Icons.Material.Outlined.SmartToy" Title="@T("No agent runs yet")" Description="@T("Talk to the Assistant or start a scenario: every run shows up here.")" />
+}
+else
+{
+    <MudTextField T="string" @bind-Value="_search" Placeholder="@T("Filter by request or agent…")" Immediate="true" DebounceInterval="200"
+                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Outlined.Search" Variant="Variant.Outlined" Margin="Margin.Dense"
+                  Class="mb-3" Style="max-width:360px" />
+    @if (!Filtered.Any())
+    {
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">@T("No run matches") “@_search”.</MudText>
+    }
+    else
+    {
+        <div class="dense-list">
+            @foreach (var run in Filtered)
+            {
+                var failedCheck = run.Steps.Any(s => s.Kind == StepKind.Check && s.Checks?.Any(c => c.Outcome == CheckOutcome.Fail) == true);
+                <a class="dense-row" href="@($"/runs/{run.Id}")">
+                    <MudTooltip Text="@T(run.Status.ToString())">
+                        <MudIcon Icon="@StatusIcon(run.Status)" Color="@StatusColor(run.Status)" Size="Size.Small" />
+                    </MudTooltip>
+                    <span class="dense-row-main">@run.Input</span>
+                    @if (failedCheck)
+                    {
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Error" Icon="@Icons.Material.Outlined.Rule">@T("check failed")</MudChip>
+                    }
+                    <span class="dense-row-meta hide-xs">@run.Agent</span>
+                    <span class="hide-xs"><SourceBadge Source="run.Source" /></span>
+                    <span class="dense-row-meta mono hide-xs">@(run.Id[..6])</span>
+                    <span class="dense-row-meta">@Format.Relative(run.CreatedAt)</span>
+                </a>
+            }
+        </div>
+    }
+}
+
+@code {
+    private List<AgentRun>? _runs;
+    private string? _error;
+    private string _search = "";
+
+    private IEnumerable<AgentRun> Filtered => string.IsNullOrWhiteSpace(_search)
+        ? _runs ?? []
+        : (_runs ?? []).Where(r => TextMatch.ContainsAny(r.Input + " " + r.Agent, _search.Trim()));
+
+    protected override Task OnInitializedAsync() => Load();
+
+    private async Task Load()
+    {
+        _error = null;
+        try { _runs = await Store.ListAsync(); }
+        catch (Exception ex) { _error = ex.Message; }
+    }
+
+    private static string StatusIcon(RunStatus status) => status switch
+    {
+        RunStatus.Completed => Icons.Material.Outlined.CheckCircle,
+        RunStatus.AwaitingApproval => Icons.Material.Outlined.PendingActions,
+        RunStatus.Error => Icons.Material.Outlined.ErrorOutline,
+        RunStatus.Cancelled => Icons.Material.Outlined.Block,
+        _ => Icons.Material.Outlined.Autorenew,
+    };
+
+    private static Color StatusColor(RunStatus status) => status switch
+    {
+        RunStatus.Completed => Color.Success,
+        RunStatus.AwaitingApproval => Color.Primary,
+        RunStatus.Error => Color.Error,
+        _ => Color.Default,
+    };
+}

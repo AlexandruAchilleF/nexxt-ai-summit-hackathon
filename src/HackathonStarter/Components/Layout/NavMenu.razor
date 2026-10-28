@@ -1,0 +1,30 @@
+@* Navigation from SiteConfig.Nav, grouped; group labels fold their links away. *@
+<MudNavMenu Class="app-nav" Rounded="true" Margin="Margin.Dense">
+    @foreach (var group in SiteConfig.Nav.GroupBy(n => n.Group ?? ""))
+    {
+        var open = !_closed.Contains(group.Key);
+        @if (group.Key != "")
+        {
+            <button type="button" class="nav-group-label" aria-expanded="@(open ? "true" : "false")" @onclick="() => Toggle(group.Key)">
+                @T(group.Key)
+                <MudIcon Icon="@Icons.Material.Rounded.ExpandMore" Size="Size.Small" />
+            </button>
+        }
+        @if (open)
+        {
+            @foreach (var item in group)
+            {
+                <MudNavLink Href="@item.Href" Icon="@item.Icon" Match="NavLinkMatch.Prefix">@T(item.Label)</MudNavLink>
+            }
+        }
+    }
+</MudNavMenu>
+
+@code {
+    private readonly HashSet<string> _closed = [];
+
+    private void Toggle(string group)
+    {
+        if (!_closed.Remove(group)) _closed.Add(group);
+    }
+}

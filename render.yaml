@@ -1,0 +1,53 @@
+# Render Blueprint: https://render.com/docs/blueprint-spec
+# Dashboard → New → Blueprint → pick this repo. Every push to main redeploys once CI is green.
+services:
+  - type: web
+    name: hackathon-starter
+    runtime: docker
+    plan: free
+    # Frankfurt: closest Render region to Bucharest. Blazor Server does a round trip per click; it can't be changed later.
+    region: frankfurt
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    # Deploy a push to main only after its GitHub checks (CI: build, tests, Docker image) pass: a broken commit never goes live.
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: PORT
+        value: "8080"
+      # AI (optional). Leave empty → agents use recorded runs / mocks.
+      # Values are entered in the Render dashboard when you create the Blueprint (never commit keys).
+      - key: AI__Provider
+        sync: false
+      - key: AI__Model
+        sync: false
+      - key: AI__ApiKey
+        sync: false
+      - key: AI__Endpoint
+        sync: false
+      # Model profiles (optional): the scenario driver and a judge on their own models. Unset = main model.
+      - key: AI__Profiles__driver__Provider
+        sync: false
+      - key: AI__Profiles__driver__Model
+        sync: false
+      - key: AI__Profiles__driver__Endpoint
+        sync: false
+      - key: AI__Profiles__driver__ApiKey
+        sync: false
+      # External target (optional): e.g. the open-source model on your own server, reachable from the internet.
+      - key: Targets__target__Kind
+        sync: false
+      - key: Targets__target__Endpoint
+        sync: false
+      - key: Targets__target__Model
+        sync: false
+      - key: Targets__target__ApiKey
+        sync: false
+      # Protection for the public URL (optional, recommended once a real AI key is set):
+      # Security__AccessCode → visitors type it once (share it with the jury); Security__ApiKey → X-Api-Key for /api.
+      - key: Security__AccessCode
+        sync: false
+      - key: Security__ApiKey
+        sync: false
+      # Only if a separate frontend (Lovable, React…) calls /api from the browser: its URL(s), comma-separated.
+      - key: Security__AllowedOrigins
+        sync: false

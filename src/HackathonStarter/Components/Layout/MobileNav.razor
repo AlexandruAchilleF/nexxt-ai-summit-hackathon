@@ -1,0 +1,35 @@
+@implements IDisposable
+@inject NavigationManager Nav
+
+@* Bottom navigation on phones only (hidden from md up). Items: SiteConfig.MobileNav. *@
+@if (_items.Length > 0)
+{
+    <nav class="mobile-nav d-flex d-md-none" aria-label="@T("Main")">
+        @foreach (var item in _items)
+        {
+            <a href="@item.Href" class="@(IsActive(item) ? "mobile-nav-item active" : "mobile-nav-item")">
+                <MudIcon Icon="@item.Icon" Size="Size.Small" />
+                <span>@T(item.Label)</span>
+            </a>
+        }
+    </nav>
+}
+
+@code {
+    private readonly NavItem[] _items = SiteConfig.MobileNav
+        .Select(href => SiteConfig.Nav.FirstOrDefault(n => n.Href == href))
+        .OfType<NavItem>()
+        .ToArray();
+
+    private bool IsActive(NavItem item)
+    {
+        var path = "/" + Nav.ToBaseRelativePath(Nav.Uri).Split('?')[0];
+        return path == item.Href || path.StartsWith(item.Href + "/");
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e) => InvokeAsync(StateHasChanged);
+
+    protected override void OnInitialized() => Nav.LocationChanged += OnLocationChanged;
+
+    public void Dispose() => Nav.LocationChanged -= OnLocationChanged;
+}

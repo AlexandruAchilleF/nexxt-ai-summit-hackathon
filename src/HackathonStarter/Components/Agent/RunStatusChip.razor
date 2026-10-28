@@ -1,0 +1,12 @@
+@switch (Status)
+{
+    case RunStatus.Running: <Pill Tone="accent" Live="true">@T("Running")</Pill> break;
+    case RunStatus.AwaitingApproval: <Pill Tone="warning" Icon="@Icons.Material.Rounded.PanTool">@T("AwaitingApproval")</Pill> break;
+    case RunStatus.Completed: <Pill Tone="success" Icon="@Icons.Material.Rounded.CheckCircle">@T("Completed")</Pill> break;
+    case RunStatus.Error: <Pill Tone="danger" Icon="@Icons.Material.Rounded.Error">@T("Error")</Pill> break;
+    default: <Pill Icon="@Icons.Material.Rounded.Block">@T(Status.ToString())</Pill> break;
+}
+
+@code {
+    [Parameter] public RunStatus Status { get; set; }
+}

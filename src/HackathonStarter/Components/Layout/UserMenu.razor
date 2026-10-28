@@ -1,0 +1,43 @@
+@inject CurrentUser CurrentUser
+@inject NavigationManager Nav
+
+@* Demo users instead of login: one click switches user (real cookie auth with roles). *@
+<MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" Class="ml-1">
+    <ActivatorContent>
+        <MudChip T="string" Variant="Variant.Text" Class="px-1">
+            <MudAvatar Size="Size.Small" Style="@($"background:{_user?.Color};color:white;font-size:12px")">@_user?.Initials</MudAvatar>
+            <span class="ml-2 d-none d-sm-inline">@_user?.Name</span>
+        </MudChip>
+    </ActivatorContent>
+    <ChildContent>
+        <MudText Typo="Typo.caption" Class="px-4 pt-2 mud-text-secondary">@T("Switch demo user")</MudText>
+        @foreach (var u in SiteConfig.Users)
+        {
+            <MudMenuItem OnClick="() => Switch(u)">
+                <div class="d-flex align-center gap-3">
+                    <MudAvatar Size="Size.Small" Style="@($"background:{u.Color};color:white;font-size:12px")">@u.Initials</MudAvatar>
+                    <div>
+                        <MudText Typo="Typo.body2">@u.Name</MudText>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">@T(u.Role)</MudText>
+                    </div>
+                    @if (u.Id == _user?.Id)
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" Class="ml-auto" />
+                    }
+                </div>
+            </MudMenuItem>
+        }
+    </ChildContent>
+</MudMenu>
+
+@code {
+    private DemoUser? _user;
+
+    protected override async Task OnInitializedAsync() => _user = await CurrentUser.GetAsync();
+
+    private void Switch(DemoUser user)
+    {
+        var returnUrl = "/" + Nav.ToBaseRelativePath(Nav.Uri);
+        Nav.NavigateTo($"/switch-user/{user.Id}?returnUrl={Uri.EscapeDataString(returnUrl)}", forceLoad: true);
+    }
+}

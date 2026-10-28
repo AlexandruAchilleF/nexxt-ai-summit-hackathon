@@ -1,0 +1,302 @@
+@using Microsoft.AspNetCore.Components.Forms
+@implements IDisposable
+@inject AgentRunner Runner
+@inject AgentRunService RunService
+@inject RunStore Store
+@inject CurrentUser CurrentUser
+@inject NavigationManager Nav
+@inject IEnumerable<AgentDefinition> Agents
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+
+@*
+    Drop-in chat for any registered agent: streaming answers, live tool calls, approvals,
+    file attachments (on a phone, images can come straight from the camera) and suggestion chips.
+    <AgentChat AgentName="assistant" AllowFiles="true" />
+*@
+<MudPaper Outlined="true" Class="agent-chat d-flex flex-column" Style="@(Height is null ? null : $"height:{Height}")">
+    <div class="chat-head d-flex align-center gap-2 px-4 py-2">
+        <SourceBadge Source="@_turns.LastOrDefault(t => t.Run is not null)?.Run?.Source" />
+        <MudSpacer />
+        <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Rounded.AddComment" Disabled="@(_turns.Count == 0)" OnClick="Reset">@T("New chat")</MudButton>
+    </div>
+
+    <div class="chat-scroll pa-4 d-flex flex-column gap-4" @ref="_scroll">
+        @if (_turns.Count == 0)
+        {
+            <div class="d-flex flex-column align-center justify-center gap-3 py-10" style="text-align:center;flex:1">
+                <span class="chat-empty-glyph app-state-float"><MudIcon Icon="@Icons.Material.Rounded.AutoAwesome" Size="Size.Large" /></span>
+                <div class="app-state-title">@EmptyTitle</div>
+                @if (!string.IsNullOrEmpty(EmptyDescription))
+                {
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary" Style="max-width:480px">@EmptyDescription</MudText>
+                }
+                <div class="d-flex flex-wrap justify-center gap-2" style="max-width:640px">
+                    @foreach (var s in _agent?.Suggestions ?? [])
+                    {
+                        <MudButton Variant="Variant.Outlined" Size="Size.Small" Class="chat-suggestion" OnClick="() => Send(s)">@s</MudButton>
+                    }
+                </div>
+            </div>
+        }
+
+        @foreach (var turn in _turns)
+        {
+            if (turn.Run is null)
+            {
+                <div class="chat-bubble-me">
+                    @turn.Content
+                    @if (turn.FileNames.Count > 0)
+                    {
+                        <div class="chat-files d-flex align-center gap-1"><MudIcon Icon="@Icons.Material.Rounded.AttachFile" Style="font-size:14px" />@string.Join(", ", turn.FileNames)</div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div>
+                    @if (turn.Run.FallbackReason is not null)
+                    {
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary d-block mb-1">@T("Live model not used ({0}): showing a {1} run.", Short(turn.Run.FallbackReason), T(turn.Run.Source.ToString()).ToLower())</MudText>
+                    }
+                    @if (turn.Run.ReplayOf is not null)
+                    {
+                        <MudAlert Severity="Severity.Info" Dense="true" Variant="Variant.Text" Class="mb-2">@T("Replaying a recorded answer to a similar question:") “@turn.Run.ReplayOf”</MudAlert>
+                    }
+                    <AgentTrace Run="turn.Run" Chat="true" Running="@(turn.Run.Status == RunStatus.Running)" OnDecide="args => Decide(turn, args)" />
+                    @if (turn.Run.Status == RunStatus.Error)
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Error" Class="mt-2">⚠️ @T(turn.Run.Error ?? "")</MudText>
+                    }
+                    else if (turn.Run.Status == RunStatus.Cancelled)
+                    {
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary mt-1 d-block">@T("Stopped.")</MudText>
+                    }
+                </div>
+            }
+        }
+    </div>
+
+    <div class="chat-composer">
+        @if (_files.Count > 0)
+        {
+            <div class="d-flex flex-wrap gap-1 mb-2">
+                @foreach (var f in _files)
+                {
+                    <MudChip T="string" Size="Size.Small" Icon="@(f.IsImage ? Icons.Material.Rounded.Image : Icons.Material.Rounded.Description)"
+                             OnClose="() => _files.Remove(f)">@f.Name@(f.IsImage ? "" : $" · {f.Pages} p")</MudChip>
+                }
+            </div>
+        }
+        <div class="chat-composer-box">
+            @if (AllowFiles)
+            {
+                <MudFileUpload T="IReadOnlyList<IBrowserFile>" FilesChanged="Upload" Accept=".pdf,.txt,.md,.csv,.json,image/*" MaximumFileCount="5">
+                    <CustomContent>
+                        <MudIconButton Icon="@(_uploading ? Icons.Material.Rounded.HourglassTop : Icons.Material.Rounded.Add)" Class="chat-send" Disabled="_uploading"
+                                       OnClick="@context.OpenFilePickerAsync" aria-label="@T("Attach file")" />
+                    </CustomContent>
+                </MudFileUpload>
+            }
+            <MudTextField T="string" @bind-Value="_input" Placeholder="@Placeholder" Variant="Variant.Outlined" Margin="Margin.Dense"
+                          Sizing="InputSizing.Auto" MaxLines="6" Immediate="true" OnKeyDown="OnKeyDown" @ref="_box" Class="mt-0" Style="flex:1" />
+            @if (_busy)
+            {
+                <MudIconButton Icon="@Icons.Material.Rounded.Stop" Variant="Variant.Filled" Class="chat-send" OnClick="Stop" aria-label="@T("Stop")" />
+            }
+            else
+            {
+                <MudIconButton Icon="@Icons.Material.Rounded.ArrowUpward" Variant="Variant.Filled" Color="Color.Primary" Class="chat-send"
+                               Disabled="@string.IsNullOrWhiteSpace(_input)" OnClick="() => Send(_input)" aria-label="@T("Send")" />
+            }
+        </div>
+    </div>
+</MudPaper>
+
+@code {
+    [Parameter, EditorRequired] public string AgentName { get; set; } = "";
+    [Parameter] public bool AllowFiles { get; set; }
+    [Parameter] public string Placeholder { get; set; } = T("Ask anything…");
+    [Parameter] public string EmptyTitle { get; set; } = T("How can I help?");
+    [Parameter] public string? EmptyDescription { get; set; }
+    /// <summary>CSS height; by default fills the screen (desktop and phone, see .agent-chat in app.css).</summary>
+    [Parameter] public string? Height { get; set; }
+
+    private class Turn
+    {
+        public string Content { get; init; } = "";
+        public List<string> FileNames { get; init; } = [];
+        public AgentRun? Run { get; set; }
+    }
+
+    private AgentDefinition? _agent;
+    private readonly List<Turn> _turns = [];
+    private readonly List<AgentFile> _files = [];
+    private string _input = "";
+    private bool _busy, _uploading, _disposed;
+    private ActiveRun? _active;
+    private string? _conversationId;
+    private ElementReference _scroll;
+    private MudTextField<string>? _box;
+    private DateTime _lastRender;
+
+    protected override void OnParametersSet() =>
+        _agent = Agents.FirstOrDefault(a => a.Name == AgentName) ?? throw new InvalidOperationException($"Agent '{AgentName}' is not registered");
+
+    /// <summary>Restores the conversation from ?c=… (after a reload or a dropped connection).</summary>
+    protected override async Task OnInitializedAsync()
+    {
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(new Uri(Nav.Uri).Query);
+        if (!query.TryGetValue("c", out var c) || string.IsNullOrEmpty(c)) return;
+        _conversationId = c.ToString();
+
+        foreach (var run in (await Store.ListByConversationAsync(_conversationId)).Where(r => r.Agent == AgentName))
+        {
+            _turns.Add(new Turn { Content = run.Input });
+            var live = run.Status == RunStatus.Running ? RunService.Get(run.Id) : null;
+            // Finished between the two reads: the final version is already saved.
+            var shown = run.Status == RunStatus.Running && live is null ? await Store.GetAsync(run.Id) ?? run : run;
+            _turns.Add(new Turn { Run = live?.Run ?? shown });
+            if (live is not null) Attach(live);
+        }
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e is { Key: "Enter", ShiftKey: false } && !_busy && !string.IsNullOrWhiteSpace(_input))
+        {
+            await Task.Yield(); // let the bound value update first
+            await Send(_input);
+        }
+    }
+
+    private async Task Send(string text)
+    {
+        text = text.Trim();
+        if (text.Length == 0 || _busy || _agent is null) return;
+
+        var newConversation = _conversationId is null;
+        _conversationId ??= Guid.NewGuid().ToString("N")[..12];
+
+        var history = _turns
+            .Select(t => t.Run is null
+                ? new ChatTurn("user", t.Content)
+                : new ChatTurn("assistant", string.Join("\n\n", t.Run.Snapshot().Where(s => s.Kind == StepKind.Text).Select(s => s.Agent is null ? s.Text : $"{s.Agent}: {s.Text}"))))
+            .Append(new ChatTurn("user", text))
+            .ToList();
+
+        _turns.Add(new Turn { Content = text, FileNames = _files.Select(f => f.Name).ToList() });
+        _input = "";
+        if (_box is not null) await _box.ClearAsync(); // a focused field otherwise keeps showing the sent text
+        var user = await CurrentUser.GetAsync();
+        var active = await RunService.StartAsync(_agent.Name, history, _files.ToList(), user, _conversationId);
+        _turns.Add(new Turn { Run = active.Run });
+        Attach(active);
+        // Put the conversation id in the URL only once the run is saved: a reload now restores it.
+        if (newConversation) Nav.NavigateTo(Nav.GetUriWithQueryParameter("c", _conversationId), replace: true);
+        StateHasChanged();
+        await ScrollToBottom();
+    }
+
+    /// <summary>Follows a background run: re-renders while it streams, until it finishes.</summary>
+    private void Attach(ActiveRun active)
+    {
+        _active = active;
+        _busy = true;
+        active.Updated += OnRunUpdated;
+        _ = active.Completion.ContinueWith(async _ =>
+        {
+            active.Updated -= OnRunUpdated;
+            if (_disposed) return;
+            await InvokeAsync(() =>
+            {
+                _busy = false;
+                _active = null;
+                StateHasChanged();
+            });
+            await ScrollToBottom();
+        }, TaskScheduler.Default);
+    }
+
+    private async Task OnRunUpdated(AgentRun run)
+    {
+        if (_disposed) return;
+        // Re-render at most every 40ms while streaming.
+        if (DateTime.UtcNow - _lastRender < TimeSpan.FromMilliseconds(40) && run.Status == RunStatus.Running) return;
+        _lastRender = DateTime.UtcNow;
+        await InvokeAsync(StateHasChanged);
+        await ScrollToBottom();
+    }
+
+    private static string Short(string reason) => reason.Length > 80 ? reason[..80] + "…" : reason;
+
+    private async Task Decide(Turn turn, (AgentStep Step, bool Approved) args)
+    {
+        if (turn.Run is null || _agent is null) return;
+        try
+        {
+            turn.Run = await Runner.DecideAsync(_agent, turn.Run.Id, args.Step.Id, args.Approved);
+            Snackbar.Add(args.Approved ? T("Approved and executed") : T("Rejected"), args.Approved ? Severity.Success : Severity.Info);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task Upload(IReadOnlyList<IBrowserFile>? files)
+    {
+        if (files is null) return;
+        _uploading = true;
+        try
+        {
+            foreach (var file in files)
+            {
+                try
+                {
+                    if (file.ContentType.StartsWith("image/") || DocumentText.IsImage(file.Name))
+                    {
+                        // Phone photos are 3-10 MB: resize in the browser first (models want ~1-2 MP anyway).
+                        var resized = await file.RequestImageFileAsync("image/jpeg", 1600, 1600);
+                        await using var image = resized.OpenReadStream(DocumentText.MaxBytes);
+                        using var bytes = new MemoryStream();
+                        await image.CopyToAsync(bytes);
+                        var name = Path.ChangeExtension(file.Name, ".jpg");
+                        _files.Add(DocumentText.FromImage(bytes.ToArray(), name, "image/jpeg"));
+                        continue;
+                    }
+                    await using var stream = file.OpenReadStream(DocumentText.MaxBytes);
+                    _files.Add(await DocumentText.ExtractAsync(stream, file.Name));
+                }
+                catch (Exception ex)
+                {
+                    Snackbar.Add($"{file.Name}: {ex.Message}", Severity.Error);
+                }
+            }
+        }
+        finally { _uploading = false; }
+    }
+
+    private void Stop() => _active?.Cancel();
+
+    private void Reset()
+    {
+        _active?.Cancel();
+        _turns.Clear();
+        _files.Clear();
+        _conversationId = null;
+        Nav.NavigateTo(Nav.GetUriWithQueryParameter("c", (string?)null), replace: true);
+    }
+
+    private async Task ScrollToBottom()
+    {
+        try { await JS.InvokeVoidAsync("scrollToBottom", _scroll); } catch { /* prerendering / disconnected */ }
+    }
+
+    // Leaving the page doesn't stop the agent: the run finishes in the background and is saved.
+    public void Dispose()
+    {
+        _disposed = true;
+        if (_active is not null) _active.Updated -= OnRunUpdated;
+    }
+}

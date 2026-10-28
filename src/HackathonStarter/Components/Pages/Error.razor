@@ -1,0 +1,20 @@
+@page "/Error"
+@layout EmptyLayout
+@using System.Diagnostics
+
+<PageTitle>@T("Error")</PageTitle>
+
+<div class="d-flex flex-column align-center justify-center gap-3" style="min-height:100vh;text-align:center">
+    <MudText Typo="Typo.h4" Style="font-weight:600">@T("Something went wrong")</MudText>
+    <MudText Class="mud-text-secondary">@T("An unexpected error occurred. Try again.")</MudText>
+    @if (RequestId is not null)
+    {
+        <MudText Typo="Typo.caption" Class="mono mud-text-secondary">@T("Request ID"): @RequestId</MudText>
+    }
+    <MudButton Href="/" Variant="Variant.Filled" Color="Color.Primary">@T("Go home")</MudButton>
+</div>
+
+@code {
+    [CascadingParameter] private HttpContext? HttpContext { get; set; }
+    private string? RequestId => Activity.Current?.Id ?? HttpContext?.TraceIdentifier;
+}

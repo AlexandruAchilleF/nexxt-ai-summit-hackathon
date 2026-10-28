@@ -1,0 +1,41 @@
+# Build + tests on every push and pull request. A red check = don't merge, don't demo.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: dotnet build -warnaserror
+      - name: Unit tests (agent runtime with a fake model, finance, PII, search)
+        run: dotnet test tests/HackathonStarter.Tests --no-build
+      - name: Install Playwright Chromium
+        run: pwsh tests/HackathonStarter.E2E/bin/Debug/net10.0/playwright.ps1 install --with-deps chromium
+      - name: End-to-end tests (real app + browser, no AI key)
+        run: dotnet test tests/HackathonStarter.E2E --no-build
+
+  docker:
+    # The production image (what Render runs): Production environment, published output. The E2E tests run in
+    # Development, so they can't catch a missing static file such as _framework/blazor.web.js.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the production image
+        run: docker build -t app .
+      - name: Start it and check the pages and the Blazor script
+        run: |
+          docker run -d --name app -p 8080:8080 app
+          for i in $(seq 1 30); do curl -fsS http://localhost:8080/health && break; sleep 2; done
+          curl -fsS -o /dev/null -w "page %{http_code}\n" http://localhost:8080/calculators
+          curl -fsS -o /dev/null -w "blazor.web.js %{http_code}\n" http://localhost:8080/_framework/blazor.web.js
+      - name: Container logs
+        if: always()
+        run: docker logs app || true

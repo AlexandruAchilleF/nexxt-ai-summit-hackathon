@@ -1,0 +1,55 @@
+@* One series as a smooth area that draws in; hover a day for its value. Replaces MudChart lines on overview pages. *@
+@if (Points.Count > 1)
+{
+    <svg class="app-chart" viewBox="0 0 @W @H" role="img" aria-label="@AriaLabel">
+        @foreach (var f in new[] { 0.0, 0.5, 1.0 })
+        {
+            <line class="grid" x1="0" x2="@W" y1="@N(Y(f * _max))" y2="@N(Y(f * _max))" />
+        }
+        <path class="area" d="@($"{_path} L{W} {H} L0 {H}Z")" />
+        <path class="line" d="@_path" pathLength="1" />
+        @for (var i = 0; i < Points.Count; i++)
+        {
+            var (label, value) = Points[i];
+            double x = X(i), w = W / (double)(Points.Count - 1);
+            <g class="col">
+                <title>@($"{label}: {value:0.##}")</title>
+                <rect class="hit" x="@N(x - w / 2)" y="0" width="@N(w)" height="@H" />
+                <line class="guide" x1="@N(x)" x2="@N(x)" y1="0" y2="@H" />
+                <circle class="dot" cx="@N(x)" cy="@N(Y(value))" r="5" />
+            </g>
+        }
+    </svg>
+    @* Axis labels in HTML so they keep their size when the chart scales down on a phone. *@
+    <div class="app-chart-axis">
+        <span>@Points[0].Label</span><span>@Points[(Points.Count - 1) / 2].Label</span><span>@Points[^1].Label</span>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<(string Label, double Value)> Points { get; set; } = [];
+    [Parameter] public string? AriaLabel { get; set; }
+
+    private const int W = 600, H = 160;
+    private double _max = 1;
+    private string _path = "";
+
+    protected override void OnParametersSet()
+    {
+        if (Points.Count < 2) return;
+        // Headroom, and a floor so a sparse series (0s and 1s) stays a gentle line instead of a cliff.
+        _max = Math.Max(4, Points.Max(p => p.Value) * 1.25);
+        // Monotone-looking curve: horizontal control points halfway between neighbours.
+        var path = $"M{N(X(0))} {N(Y(Points[0].Value))}";
+        for (var i = 1; i < Points.Count; i++)
+        {
+            double x0 = X(i - 1), y0 = Y(Points[i - 1].Value), x1 = X(i), y1 = Y(Points[i].Value), m = (x0 + x1) / 2;
+            path += $" C{N(m)} {N(y0)} {N(m)} {N(y1)} {N(x1)} {N(y1)}";
+        }
+        _path = path;
+    }
+
+    private double X(int i) => i * (double)W / (Points.Count - 1);
+    private double Y(double v) => H - v / _max * (H - 8);
+    private static string N(double v) => v.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+}

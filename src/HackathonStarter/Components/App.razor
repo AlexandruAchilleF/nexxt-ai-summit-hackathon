@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="@Lang.Current">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <base href="/" />
+    <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+    @if (SiteConfig.Pwa.Enabled)
+    {
+        @* Installable app: see Services/Pwa.cs *@
+        <link rel="manifest" href="manifest.webmanifest" />
+        <meta name="theme-color" content="@SiteConfig.PrimaryColor" />
+        <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-title" content="@SiteConfig.Pwa.ShortName" />
+    }
+    <ResourcePreloader />
+    <link rel="stylesheet" href="@Assets["_content/MudBlazor/MudBlazor.min.css"]" />
+    <link rel="preload" href="fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="@Assets["app.css"]" />
+    <link rel="stylesheet" href="@Assets["landing.css"]" />
+    <link rel="stylesheet" href="@Assets["HackathonStarter.styles.css"]" />
+    <ImportMap />
+    <HeadOutlet @rendermode="InteractiveServer" />
+</head>
+
+<body>
+    @* Whole app is interactive (Blazor Server): components can call services directly, no API layer needed. *@
+    <Routes @rendermode="InteractiveServer" />
+    <ReconnectModal />
+    <script src="@Assets["_framework/blazor.web.js"]"></script>
+    <script src="@Assets["_content/MudBlazor/MudBlazor.min.js"]"></script>
+    @if (SiteConfig.Pwa.Enabled)
+    {
+        <script src="@Assets["pwa.js"]"></script>
+    }
+    <script>window.scrollToBottom = el => { if (el) el.scrollTop = el.scrollHeight; };</script>
+</body>
+
+</html>

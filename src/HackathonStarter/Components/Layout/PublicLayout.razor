@@ -1,0 +1,13 @@
+@inherits LayoutComponentBase
+
+@* Public pages outside the app (privacy, contact, legal): the landing page's header and footer, always dark. *@
+<MudThemeProvider Theme="AppTheme.Theme" IsDarkMode="true" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<div class="lp">
+    <LandingHeader />
+    <main class="lp-wrap lp-page">@Body</main>
+    <LandingFooter />
+</div>

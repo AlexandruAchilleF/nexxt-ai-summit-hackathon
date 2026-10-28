@@ -1,0 +1,18 @@
+<a href="/" class="brand-logo@(Compact ? " brand-logo-compact" : "")">
+    <span class="brand-logo-mark">
+        @if (SiteConfig.Logo.StartsWith('/'))
+        {
+            <img src="@SiteConfig.Logo" alt="" width="16" height="16" />
+        }
+        else
+        {
+            @SiteConfig.Logo
+        }
+    </span>
+    <span class="brand-logo-name">@SiteConfig.Name</span>
+</a>
+
+@code {
+    /// <summary>Smaller mark and name, for the sidebar.</summary>
+    [Parameter] public bool Compact { get; set; }
+}

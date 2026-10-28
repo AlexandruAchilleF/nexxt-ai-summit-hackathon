@@ -1,0 +1,141 @@
+@page "/settings"
+@inject CurrentUser CurrentUser
+@inject ChatClientProvider Ai
+@inject IConfiguration Config
+@inject NavigationManager Nav
+@inject HackathonStarter.Data.DemoData DemoData
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+@inject Microsoft.Extensions.Options.IOptions<SecurityOptions> Security
+@inject ConnectionCheck Connections
+
+<PageTitle>@T("Settings") · @SiteConfig.Name</PageTitle>
+
+<PageHeader Title="@T("Settings")" Description="@T("Demo user and what is connected right now. Everything works without configuration.")" />
+
+<MudGrid Spacing="3">
+    <MudItem xs="12" md="6">
+        <MudPaper Outlined="true" Class="pa-5">
+            <MudText Typo="Typo.subtitle1" Style="font-weight:600">@T("Demo user")</MudText>
+            <MudText Typo="Typo.caption" Class="mud-text-secondary">@T("Roles control what each user can do.")</MudText>
+            <MudList T="string" Class="mt-2">
+                @foreach (var u in SiteConfig.Users)
+                {
+                    <MudListItem OnClick="@(() => Nav.NavigateTo($"/switch-user/{u.Id}?returnUrl=/settings", forceLoad: true))">
+                        <div class="d-flex align-center gap-3">
+                            <MudAvatar Size="Size.Small" Style="@($"background:{u.Color};color:white;font-size:12px")">@u.Initials</MudAvatar>
+                            <div style="flex:1">
+                                <MudText Typo="Typo.body2">@u.Name</MudText>
+                                <MudText Typo="Typo.caption" Class="mud-text-secondary">@u.Email</MudText>
+                            </div>
+                            <MudChip T="string" Size="Size.Small">@T(u.Role)</MudChip>
+                            @if (u.Id == _user?.Id)
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />
+                            }
+                        </div>
+                    </MudListItem>
+                }
+            </MudList>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" md="6">
+        <MudPaper Outlined="true" Class="pa-5">
+            <MudText Typo="Typo.subtitle1" Style="font-weight:600">@T("System")</MudText>
+            <MudText Typo="Typo.caption" Class="mud-text-secondary">@T("From appsettings.json / appsettings.Local.json / environment variables.")</MudText>
+            <MudSimpleTable Dense="true" Class="mt-2" Elevation="0">
+                <tbody>
+                    <tr><td>@T("Database")</td><td class="mono">@(Config["Database:Provider"] ?? "Sqlite")</td></tr>
+                    <tr><td>@T("AI provider")</td><td class="mono">@(Ai.IsConfigured ? $"{Ai.Options.Provider} · {Ai.Options.Model}" : T("not configured (replay / mock)"))</td></tr>
+                    @foreach (var name in Ai.Options.Profiles.Keys)
+                    {
+                        <tr><td>@T("Model profile") “@name”</td><td class="mono">@(Ai.ClientFor(name) is { } client && client != Ai.Client ? $"{Ai.OptionsFor(name).Provider} · {Ai.OptionsFor(name).Model}" : T("not usable → main model"))</td></tr>
+                    }
+                    <tr><td>@T("Agent mode")</td><td class="mono">@Ai.Options.AgentMode</td></tr>
+                    <tr><td>@T("Tool mode")</td><td class="mono">@Ai.Options.ToolMode</td></tr>
+                    <tr><td>@T("Recording")</td><td class="mono">@T(Ai.Options.Record ? "on (Development only)" : "off")</td></tr>
+                    <tr><td>@T("Personal data masking")</td><td class="mono">@T(Ai.Options.MaskPii ? "on" : "off") (@T("model")) · @T("always (run history)")</td></tr>
+                    <tr><td>@T("Access code")</td><td class="mono">@T(string.IsNullOrEmpty(Security.Value.AccessCode) ? "off (public)" : "on")</td></tr>
+                    <tr><td>@T("AI rate limit")</td><td class="mono">@T("{0}/min per user · {1}/day", Security.Value.AgentRunsPerMinute, Security.Value.DailyLiveRunBudget)</td></tr>
+                </tbody>
+            </MudSimpleTable>
+            <MudButton Href="/api-docs" Target="_blank" Variant="Variant.Text" StartIcon="@Icons.Material.Outlined.Api" Class="mt-2">@T("HTTP API docs")</MudButton>
+        </MudPaper>
+    </MudItem>
+    @if (_user?.Role is Roles.Admin or Roles.Member)
+    {
+        <MudItem xs="12">
+            <MudPaper Outlined="true" Class="pa-5">
+                <div class="d-flex flex-wrap align-center gap-4">
+                    <div style="flex:1;min-width:240px">
+                        <MudText Typo="Typo.subtitle1" Style="font-weight:600">@T("Connections")</MudText>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">@T("Sends a one-line request to the main model, every model profile and every target. Run it on the venue's network before going on stage.")</MudText>
+                    </div>
+                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.NetworkCheck" Disabled="_checking" OnClick="CheckConnections">
+                        @T(_checking ? "Checking…" : "Test connections")
+                    </MudButton>
+                </div>
+                @if (_connections is { Count: 0 })
+                {
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary mt-3">@T("Nothing to test: no model and no target is configured, so agents use recorded runs and mocks.")</MudText>
+                }
+                else if (_connections is not null)
+                {
+                    <div class="d-flex flex-column gap-1 mt-3">
+                        @foreach (var c in _connections)
+                        {
+                            <div class="d-flex align-start gap-2">
+                                <MudIcon Icon="@(c.Ok ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Cancel)" Color="@(c.Ok ? Color.Success : Color.Error)" Size="Size.Small" Style="margin-top:2px;flex-shrink:0" />
+                                <div style="min-width:0">
+                                    <MudText Typo="Typo.body2" Style="font-weight:600">@c.Name <span class="mud-text-secondary mono" style="font-weight:400;font-size:12px">@c.Milliseconds ms</span></MudText>
+                                    <MudText Typo="Typo.caption" Class="mud-text-secondary d-block" Style="word-break:break-word">@c.Detail</MudText>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </MudPaper>
+        </MudItem>
+    }
+    @if (_user?.Role == Roles.Admin)
+    {
+        <MudItem xs="12">
+            <MudPaper Outlined="true" Class="pa-5 d-flex flex-wrap align-center gap-4">
+                <div style="flex:1;min-width:240px">
+                    <MudText Typo="Typo.subtitle1" Style="font-weight:600">@T("Reset demo data")</MudText>
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">@T("Deletes all agent runs and restores the seed data. Do it right before the demo.")</MudText>
+                </div>
+                <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Outlined.RestartAlt" Disabled="_resetting" OnClick="Reset">@T("Reset")</MudButton>
+            </MudPaper>
+        </MudItem>
+    }
+</MudGrid>
+
+@code {
+    private DemoUser? _user;
+    private bool _resetting;
+    private bool _checking;
+    private List<ConnectionCheck.Result>? _connections;
+
+    private async Task CheckConnections()
+    {
+        _checking = true;
+        try { _connections = await Connections.RunAsync(); }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        finally { _checking = false; }
+    }
+    protected override async Task OnInitializedAsync() => _user = await CurrentUser.GetAsync();
+
+    private async Task Reset()
+    {
+        if (!await Dialogs.ConfirmAsync(T("Reset demo data?"), T("All agent runs and changes to the data will be lost."), T("Reset"), destructive: true)) return;
+        _resetting = true;
+        try
+        {
+            await DemoData.ResetAsync();
+            Snackbar.Add(T("Demo data reset"), Severity.Success);
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        finally { _resetting = false; }
+    }
+}

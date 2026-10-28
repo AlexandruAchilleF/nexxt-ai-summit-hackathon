@@ -1,0 +1,92 @@
+@page "/runs/{Id}"
+@inject RunStore Store
+@inject AgentRunner Runner
+@inject IEnumerable<AgentDefinition> Agents
+@inject ISnackbar Snackbar
+
+<PageTitle>@T("Agent run") · @SiteConfig.Name</PageTitle>
+
+<MudButton Href="/runs" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Class="mb-4" Size="Size.Small">@T("All runs")</MudButton>
+
+@if (_loading)
+{
+    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="240px" />
+}
+else if (_run is null)
+{
+    <EmptyState Title="@T("Run not found")" />
+}
+else
+{
+    <PageHeader Title="@_run.Input" Description="@($"{_run.Agent} · {SiteConfig.Users.FirstOrDefault(u => u.Id == _run.UserId)?.Name} · {Format.DateTime(_run.CreatedAt)}")">
+        <Actions>
+            <SourceBadge Source="_run.Source" />
+            <RunStatusChip Status="_run.Status" />
+        </Actions>
+    </PageHeader>
+    <div class="d-flex flex-wrap gap-2 mb-3">
+        @if (_run.Model is not null)
+        {
+            <MudChip T="string" Size="Size.Small" Icon="@Icons.Material.Outlined.Memory">@_run.Model</MudChip>
+        }
+        @if (_run.InputTokens + _run.OutputTokens > 0)
+        {
+            <MudChip T="string" Size="Size.Small" Icon="@Icons.Material.Outlined.DataUsage">@T("{0} in · {1} out tokens", Format.Number(_run.InputTokens), Format.Number(_run.OutputTokens))</MudChip>
+        }
+        @if (_run.EstimatedCost is { } cost)
+        {
+            <MudChip T="string" Size="Size.Small" Icon="@Icons.Material.Outlined.Paid">~$@cost.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture)</MudChip>
+        }
+        @if (_run.MaskedCount > 0)
+        {
+            <MudChip T="string" Size="Size.Small" Icon="@Icons.Material.Outlined.Lock">@T("{0} personal data item(s) masked", _run.MaskedCount)</MudChip>
+        }
+        @if (_run.FinishedAt is { } done)
+        {
+            <MudChip T="string" Size="Size.Small" Icon="@Icons.Material.Outlined.Timer">@((done - _run.CreatedAt).TotalSeconds.ToString("0.0"))s</MudChip>
+        }
+    </div>
+    @if (_run.FallbackReason is not null)
+    {
+        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">@T("Live model not used:") @_run.FallbackReason</MudAlert>
+    }
+    @if (_run.ReplayOf is not null)
+    {
+        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">@T("Replay of a recording made for:") “@_run.ReplayOf”</MudAlert>
+    }
+    <MudPaper Outlined="true" Class="pa-5">
+        <AgentTrace Run="_run" OnDecide="Decide" />
+        @if (_run.Error is not null)
+        {
+            <MudText Color="Color.Error" Class="mt-4">⚠️ @T(_run.Error)</MudText>
+        }
+    </MudPaper>
+    @if (_run.Status is not RunStatus.Running)
+    {
+        <RunExports RunId="@_run.Id" Class="mt-4" />
+    }
+}
+
+@code {
+    [Parameter] public string Id { get; set; } = "";
+    private AgentRun? _run;
+    private bool _loading = true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _run = await Store.GetAsync(Id);
+        _loading = false;
+    }
+
+    private async Task Decide((AgentStep Step, bool Approved) args)
+    {
+        var agent = Agents.FirstOrDefault(a => a.Name == _run!.Agent);
+        if (agent is null) return;
+        try
+        {
+            _run = await Runner.DecideAsync(agent, _run!.Id, args.Step.Id, args.Approved);
+            Snackbar.Add(args.Approved ? T("Approved and executed") : T("Rejected"), Severity.Success);
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+}

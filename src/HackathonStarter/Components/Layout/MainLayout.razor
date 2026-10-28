@@ -1,0 +1,69 @@
+@inherits LayoutComponentBase
+@inject NavigationManager Nav
+
+<MudThemeProvider Theme="AppTheme.Theme" @bind-IsDarkMode="_dark" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+@* App shell: glass sidebar, content straight on the page background under a toolbar that turns to glass on scroll (app.css: .app-*). *@
+<MudLayout>
+    <MudDrawer @bind-Open="_drawer" ClipMode="DrawerClipMode.Never" Elevation="0" Variant="DrawerVariant.Responsive" Class="app-drawer">
+        <div class="app-drawer-header">
+            <BrandLogo Compact="true" />
+        </div>
+        <NavMenu />
+    </MudDrawer>
+
+    <MudMainContent Class="@("app-main" + (SiteConfig.MobileNav.Length > 0 ? " has-mobile-nav" : ""))">
+        <div class="app-panel">
+            <header class="app-topbar">
+                <MudIconButton Icon="@Icons.Material.Rounded.Menu" Size="Size.Small" Color="Color.Inherit" OnClick="() => _drawer = !_drawer" aria-label="@T("Toggle menu")" />
+                @if (Current is { } current)
+                {
+                    <span class="app-topbar-title">@T(current.Label)</span>
+                }
+                <MudSpacer />
+                @if (SiteConfig.Pwa.Enabled)
+                {
+                    @* Visible only when the browser offers installation (wwwroot/pwa.js). *@
+                    <MudTooltip Text="@T("Install app")">
+                        <MudIconButton Class="pwa-install" Size="Size.Small" Icon="@Icons.Material.Rounded.InstallDesktop" Color="Color.Inherit" aria-label="@T("Install app")" />
+                    </MudTooltip>
+                }
+                <LangSwitch />
+                <MudTooltip Text="@T("Toggle dark mode")">
+                    <MudIconButton Size="Size.Small" Icon="@(_dark ? Icons.Material.Rounded.LightMode : Icons.Material.Rounded.DarkMode)" Color="Color.Inherit" OnClick="() => _dark = !_dark" aria-label="@T("Toggle dark mode")" />
+                </MudTooltip>
+                <UserMenu />
+            </header>
+            <div class="app-content">
+                @Body
+                <AppFooter />
+            </div>
+        </div>
+    </MudMainContent>
+    <MobileNav />
+</MudLayout>
+
+<div id="blazor-error-ui" data-nosnippet>
+    @T("An unhandled error has occurred.")
+    <a href="." class="reload">@T("Reload")</a>
+    <span class="dismiss">🗙</span>
+</div>
+
+@code {
+    private bool _drawer = true;
+    private bool _dark = SiteConfig.DarkModeByDefault;
+
+    private NavItem? Current
+    {
+        get
+        {
+            var path = "/" + Nav.ToBaseRelativePath(Nav.Uri).Split('?')[0];
+            return SiteConfig.Nav.FirstOrDefault(n => path == n.Href || path.StartsWith(n.Href + "/"));
+        }
+    }
+
+    protected override void OnInitialized() => Nav.LocationChanged += (_, _) => InvokeAsync(StateHasChanged);
+}

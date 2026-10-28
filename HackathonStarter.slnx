@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/HackathonStarter/HackathonStarter.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/HackathonStarter.E2E/HackathonStarter.E2E.csproj" />
+    <Project Path="tests/HackathonStarter.Tests/HackathonStarter.Tests.csproj" />
+  </Folder>
+</Solution>

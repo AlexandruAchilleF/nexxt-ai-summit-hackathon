@@ -1,0 +1,19 @@
+<MudPaper Outlined="true" Class="app-state app-enter">
+    <div class="app-state-glyph app-state-float"><MudIcon Icon="@Icon" /></div>
+    <div class="app-state-title">@Title</div>
+    @if (!string.IsNullOrEmpty(Description))
+    {
+        <div class="app-state-text">@Description</div>
+    }
+    @if (ChildContent is not null)
+    {
+        <div class="d-flex flex-wrap justify-center gap-2 mt-2">@ChildContent</div>
+    }
+</MudPaper>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter] public string? Description { get; set; }
+    [Parameter] public string Icon { get; set; } = Icons.Material.Rounded.Inbox;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

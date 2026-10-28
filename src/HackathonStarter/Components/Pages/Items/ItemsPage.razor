@@ -1,0 +1,122 @@
+@page "/items"
+@using HackathonStarter.Features.Items
+@inject ItemService Items
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+@inject CurrentUser CurrentUser
+
+<PageTitle>@T("Items") · @SiteConfig.Name</PageTitle>
+
+<PageHeader Title="@T("Items")" Description="@T("Example feature: copy Features/Items and Components/Pages/Items for your own entities.")">
+    <Actions>
+        @if (_canEdit)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="() => Edit(new Item())">@T("New item")</MudButton>
+        }
+    </Actions>
+</PageHeader>
+
+<div class="d-flex flex-wrap gap-3 mb-3">
+    <MudTextField T="string" Value="_search" ValueChanged="OnSearch" Placeholder="@T("Search items…")" Variant="Variant.Outlined" Margin="Margin.Dense"
+                  Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Immediate="true" DebounceInterval="300" Style="min-width:260px;flex:1" />
+    <MudSelect T="ItemStatus?" Value="_status" ValueChanged="OnStatus" Label="@T("Status")" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" Style="max-width:200px">
+        @foreach (var s in Enum.GetValues<ItemStatus>())
+        {
+            <MudSelectItem T="ItemStatus?" Value="s">@T(s.ToString())</MudSelectItem>
+        }
+    </MudSelect>
+</div>
+
+@if (_error is not null)
+{
+    <ErrorState Message="@_error" OnRetry="Load" />
+}
+else if (_items is not null && _items.Count == 0)
+{
+    <EmptyState Title="@T(Filtered ? "No matching items" : "No items yet")" Description="@T(Filtered ? "Try another search or filter." : "Create your first item to get started.")" />
+}
+else
+{
+    <MudDataGrid T="Item" Items="_items" Loading="@(_items is null)" Hover="true" Dense="true" SortMode="SortMode.Single"
+                 RowClick="@(args => Nav.NavigateTo($"/items/{args.Item.Id}"))" RowStyle="cursor:pointer" Outlined="true" Elevation="0">
+        <Columns>
+            <PropertyColumn Property="x => x.Title" Title="@T("Title")">
+                <CellTemplate>
+                    <MudText Typo="Typo.body2" Style="font-weight:500">@context.Item.Title</MudText>
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary" Style="display:block;max-width:min(360px, 55vw);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">@context.Item.Description</MudText>
+                </CellTemplate>
+            </PropertyColumn>
+            <PropertyColumn Property="x => x.Status" Title="@T("Status")"><CellTemplate><ItemStatusChip Status="context.Item.Status" /></CellTemplate></PropertyColumn>
+            <PropertyColumn Property="x => x.Priority" Title="@T("Priority")"><CellTemplate><ItemPriorityChip Priority="context.Item.Priority" /></CellTemplate></PropertyColumn>
+            <PropertyColumn Property="x => x.Value" Title="@T("Value")"><CellTemplate>@Format.Money(context.Item.Value)</CellTemplate></PropertyColumn>
+            <PropertyColumn Property="x => x.CreatedAt" Title="@T("Created")"><CellTemplate><span class="mud-text-secondary">@Format.Relative(context.Item.CreatedAt)</span></CellTemplate></PropertyColumn>
+            <TemplateColumn Sortable="false" CellClass="d-flex justify-end">
+                <CellTemplate>
+                    @if (_canEdit || _canDelete)
+                    {
+                        <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" @onclick:stopPropagation="true">
+                            @if (_canEdit)
+                            {
+                                <MudMenuItem Icon="@Icons.Material.Outlined.Edit" OnClick="() => Edit(context.Item)">@T("Edit")</MudMenuItem>
+                            }
+                            @if (_canDelete)
+                            {
+                                <MudMenuItem Icon="@Icons.Material.Outlined.Delete" IconColor="Color.Error" OnClick="() => Delete(context.Item)">@T("Delete")</MudMenuItem>
+                            }
+                        </MudMenu>
+                    }
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+        <PagerContent><MudDataGridPager T="Item" PageSizeOptions="[10, 25, 50]" /></PagerContent>
+    </MudDataGrid>
+}
+
+@code {
+    private List<Item>? _items;
+    private string? _search, _error;
+    private ItemStatus? _status;
+    private bool _canEdit, _canDelete;
+    private bool Filtered => !string.IsNullOrWhiteSpace(_search) || _status is not null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = await CurrentUser.GetAsync();
+        _canEdit = user.Role is Roles.Admin or Roles.Member; // keep in sync with ItemService
+        _canDelete = user.Role is Roles.Admin;
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        try
+        {
+            _error = null;
+            _items = await Items.ListAsync(new ItemFilter(_search, _status));
+        }
+        catch (Exception ex) { _error = ex.Message; }
+    }
+
+    private async Task OnSearch(string? value) { _search = value; await Load(); }
+    private async Task OnStatus(ItemStatus? value) { _status = value; await Load(); }
+
+    private async Task Edit(Item item)
+    {
+        var dialog = await Dialogs.ShowAsync<ItemDialog>(null, new DialogParameters<ItemDialog> { { d => d.Item, item } },
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        if (!(await dialog.Result)!.Canceled) await Load();
+    }
+
+    private async Task Delete(Item item)
+    {
+        if (!await Dialogs.ConfirmAsync(T("Delete \"{0}\"?", item.Title), T("This can't be undone."), T("Delete"), destructive: true)) return;
+        try
+        {
+            await Items.DeleteAsync(item.Id);
+            Snackbar.Add(T("Item deleted"), Severity.Success);
+            await Load();
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+}

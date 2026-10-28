@@ -1,0 +1,27 @@
+@* One small tinted capsule for every status in the app (app.css: .app-pill). Status = word + icon + tone, never colour alone. *@
+<span class="@($"app-pill{(Tone is null ? "" : $" app-pill-{Tone}")}")" title="@Title">
+    @if (Live)
+    {
+        <span class="app-dot app-dot-live"></span>
+    }
+    else if (Dot)
+    {
+        <span class="app-dot"></span>
+    }
+    else if (Icon is not null)
+    {
+        <MudIcon Icon="@Icon" />
+    }
+    @ChildContent
+</span>
+
+@code {
+    /// <summary>"accent", "success", "warning", "danger" or null for neutral grey.</summary>
+    [Parameter] public string? Tone { get; set; }
+    [Parameter] public string? Icon { get; set; }
+    [Parameter] public bool Dot { get; set; }
+    /// <summary>A pulsing dot: only for things happening right now (a running agent).</summary>
+    [Parameter] public bool Live { get; set; }
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

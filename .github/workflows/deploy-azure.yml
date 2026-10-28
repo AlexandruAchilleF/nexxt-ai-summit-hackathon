@@ -1,0 +1,37 @@
+# Optional: deploy to Azure App Service on every push to main.
+# Setup (once): see docs/DEPLOY.md → "Azure App Service". Until the secret and variable below exist,
+# this workflow skips the deploy, so it's safe to keep even if you only use Render.
+#   Secret   AZURE_WEBAPP_PUBLISH_PROFILE  (Web App → Download publish profile, paste the whole XML)
+#   Variable AZURE_WEBAPP_NAME             (the Web App name)
+name: Deploy to Azure
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      HAS_PROFILE: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE != '' }}
+    steps:
+      - name: Skip if Azure is not configured
+        if: env.HAS_PROFILE != 'true' || vars.AZURE_WEBAPP_NAME == ''
+        run: echo "Azure not configured (see docs/DEPLOY.md). Skipping deploy."
+
+      - uses: actions/checkout@v4
+        if: env.HAS_PROFILE == 'true' && vars.AZURE_WEBAPP_NAME != ''
+      - uses: actions/setup-dotnet@v4
+        if: env.HAS_PROFILE == 'true' && vars.AZURE_WEBAPP_NAME != ''
+        with:
+          global-json-file: global.json
+      - name: Publish
+        if: env.HAS_PROFILE == 'true' && vars.AZURE_WEBAPP_NAME != ''
+        run: dotnet publish src/HackathonStarter -c Release -o ./publish
+      - uses: azure/webapps-deploy@v3
+        if: env.HAS_PROFILE == 'true' && vars.AZURE_WEBAPP_NAME != ''
+        with:
+          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: ./publish

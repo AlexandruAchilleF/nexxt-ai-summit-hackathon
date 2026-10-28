@@ -1,0 +1,13 @@
+@* Top bar of the landing page and the public pages (privacy, contact, legal). *@
+<header class="lp-nav">
+    <div class="lp-wrap lp-nav-inner">
+        <BrandLogo />
+        <nav class="lp-nav-links" aria-label="@T("Sections")">
+            <a href="/#product">@T("Product")</a>
+            <a href="/#how">@T("How it works")</a>
+        </nav>
+        <span class="lp-nav-sep"></span>
+        <LangSwitch />
+        <a class="lp-btn lp-btn-light lp-btn-sm" href="@SiteConfig.Landing.CtaHref">@SiteConfig.Landing.CtaLabel</a>
+    </div>
+</header>

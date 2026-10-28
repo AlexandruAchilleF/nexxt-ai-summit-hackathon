@@ -1,0 +1,11 @@
+@using HackathonStarter.Features.Items
+@switch (Status)
+{
+    case ItemStatus.Active: <Pill Tone="accent" Dot="true">@T("Active")</Pill> break;
+    case ItemStatus.Archived: <Pill Icon="@Icons.Material.Rounded.Inventory2">@T("Archived")</Pill> break;
+    default: <Pill>@T(Status.ToString())</Pill> break;
+}
+
+@code {
+    [Parameter] public ItemStatus Status { get; set; }
+}

@@ -1,0 +1,10 @@
+@page "/privacy-policy"
+@layout PublicLayout
+@using HackathonStarter.Features.Legal
+@inject ChatClientProvider Ai
+@inject Microsoft.Extensions.Options.IOptionsMonitor<PrivacyOptions> PrivacySettings
+
+<PageTitle>@T("Privacy policy") · @SiteConfig.Name</PageTitle>
+
+<PageHeader Title="@T("Privacy policy")" />
+<Markdown Class="legal" Text="@LegalTexts.Privacy(SiteConfig.Legal, PrivacySettings.CurrentValue.RetentionDays, DataFlows.Models(Ai))" />

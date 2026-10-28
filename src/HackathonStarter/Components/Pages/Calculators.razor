@@ -1,0 +1,114 @@
+@page "/calculators"
+@using HackathonStarter.Features.Finance
+
+<PageTitle>@T("Calculators") · @SiteConfig.Name</PageTitle>
+
+<PageHeader Title="@T("Financial calculators")" Description="@T("Tested formulas (Features/Finance). The same functions are tools for the AI agents, so the AI never does the math itself.")" />
+
+<MudTabs Outlined="true" Rounded="true" TabPanelsClass="pa-5" Elevation="0">
+    <MudTabPanel Text="@T("Loan")" Icon="@Icons.Material.Outlined.AccountBalance">
+        <MudGrid Spacing="4">
+            <MudItem xs="12" md="4">
+                <MudNumericField @bind-Value="_principal" Label="@T("Amount ({0})", SiteConfig.Currency)" Variant="Variant.Outlined" Min="0" Step="1000" Class="mb-3" />
+                <MudNumericField @bind-Value="_rate" Label="@T("Annual interest rate (%)")" Variant="Variant.Outlined" Min="0" Max="50" Step="0.1m" Class="mb-3" />
+                <MudNumericField @bind-Value="_years" Label="@T("Duration (years)")" Variant="Variant.Outlined" Min="1" Max="40" />
+            </MudItem>
+            <MudItem xs="12" md="8">
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" sm="4"><StatCard Label="@T("Monthly payment")" Value="@Format.Money(Loan.MonthlyPayment)" Icon="@Icons.Material.Outlined.CalendarMonth" /></MudItem>
+                    <MudItem xs="12" sm="4"><StatCard Label="@T("Total interest")" Value="@Format.Money(Loan.TotalInterest)" Icon="@Icons.Material.Outlined.Percent" /></MudItem>
+                    <MudItem xs="12" sm="4"><StatCard Label="@T("Total paid")" Value="@Format.Money(Loan.TotalPaid)" Icon="@Icons.Material.Outlined.Payments" /></MudItem>
+                </MudGrid>
+                <MudText Typo="Typo.subtitle2" Class="mt-4">@T("Remaining balance per year")</MudText>
+                <MudChart T="double" ChartType="ChartType.Line" ChartSeries="LoanSeries" ChartLabels="LoanLabels" Height="240px" Width="100%" />
+            </MudItem>
+        </MudGrid>
+    </MudTabPanel>
+
+    <MudTabPanel Text="@T("Savings")" Icon="@Icons.Material.Outlined.Savings">
+        <MudGrid Spacing="4">
+            <MudItem xs="12" md="4">
+                <MudNumericField @bind-Value="_initial" Label="@T("Starting amount ({0})", SiteConfig.Currency)" Variant="Variant.Outlined" Min="0" Step="500" Class="mb-3" />
+                <MudNumericField @bind-Value="_monthly" Label="@T("Monthly contribution")" Variant="Variant.Outlined" Min="0" Step="50" Class="mb-3" />
+                <MudNumericField @bind-Value="_return" Label="@T("Expected annual return (%)")" Variant="Variant.Outlined" Min="0" Max="20" Step="0.5m" Class="mb-3" />
+                <MudNumericField @bind-Value="_savingYears" Label="@T("Years")" Variant="Variant.Outlined" Min="1" Max="50" Class="mb-3" />
+                <MudNumericField @bind-Value="_inflation" Label="@T("Inflation (%)")" Variant="Variant.Outlined" Min="0" Max="20" Step="0.5m" />
+            </MudItem>
+            <MudItem xs="12" md="8">
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" sm="4"><StatCard Label="@T("Final balance")" Value="@Format.Money(Savings[^1].Balance)" /></MudItem>
+                    <MudItem xs="12" sm="4"><StatCard Label="@T("You contributed")" Value="@Format.Money(Savings[^1].Contributed)" /></MudItem>
+                    <MudItem xs="12" sm="4"><StatCard Label="@T("In today's money")" Value="@Format.Money(Savings[^1].RealValue)" Hint="@T("after inflation")" /></MudItem>
+                </MudGrid>
+                <MudChart T="double" ChartType="ChartType.Line" ChartSeries="SavingsSeries" ChartLabels="SavingsLabels" Height="260px" Width="100%" Class="mt-4" />
+            </MudItem>
+        </MudGrid>
+    </MudTabPanel>
+
+    <MudTabPanel Text="@T("Retirement")" Icon="@Icons.Material.Outlined.Elderly">
+        <MudGrid Spacing="4">
+            <MudItem xs="12" md="4">
+                <MudNumericField @bind-Value="_income" Label="@T("Desired monthly income")" Variant="Variant.Outlined" Min="0" Step="100" Class="mb-3" />
+                <MudNumericField @bind-Value="_yearsToRetire" Label="@T("Years until retirement")" Variant="Variant.Outlined" Min="1" Max="50" Class="mb-3" />
+                <MudNumericField @bind-Value="_currentSavings" Label="@T("Current savings")" Variant="Variant.Outlined" Min="0" Step="1000" />
+            </MudItem>
+            <MudItem xs="12" md="8">
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" sm="6"><StatCard Label="@T("Capital needed")" Value="@Format.Money(Retirement.CapitalNeeded)" Hint="@T("at a {0}% yearly withdrawal rate", Retirement.WithdrawalRatePct)" /></MudItem>
+                    <MudItem xs="12" sm="6"><StatCard Label="@T("Save every month")" Value="@Format.Money(Retirement.MonthlySaving)" Hint="@T("assuming {0}% yearly return", Retirement.AnnualReturnPct)" /></MudItem>
+                </MudGrid>
+            </MudItem>
+        </MudGrid>
+    </MudTabPanel>
+
+    <MudTabPanel Text="IBAN" Icon="@Icons.Material.Outlined.CreditCard">
+        <MudTextField @bind-Value="_iban" Label="IBAN" Variant="Variant.Outlined" Immediate="true" Style="max-width:480px" />
+        @if (!string.IsNullOrWhiteSpace(_iban))
+        {
+            var check = Iban.Validate(_iban);
+            <MudAlert Severity="@(check.IsValid ? Severity.Success : Severity.Error)" Class="mt-3" Style="max-width:480px">
+                @if (check.IsValid)
+                {
+                    <span>@T("Valid:") <b class="mono">@Iban.Format(_iban)</b>@(check.BankCode is null ? "" : " · " + T("bank code {0}", check.BankCode))</span>
+                }
+                else
+                {
+                    @check.Error
+                }
+            </MudAlert>
+        }
+    </MudTabPanel>
+</MudTabs>
+
+@code {
+    private decimal _principal = 50_000, _rate = 7.5m;
+    private int _years = 5;
+    private decimal _initial = 1_000, _monthly = 200, _return = 6, _inflation = 3;
+    private int _savingYears = 20;
+    private decimal _income = 1_500, _currentSavings = 5_000;
+    private int _yearsToRetire = 30;
+    private string _iban = "RO49 AAAA 1B31 0075 9384 0000";
+
+    private LoanSummary Loan => FinanceCalculator.LoanSummary(_principal, _rate, Math.Max(1, _years) * 12);
+
+    private List<ChartSeries<double>> LoanSeries
+    {
+        get
+        {
+            var schedule = FinanceCalculator.AmortizationSchedule(_principal, _rate, Math.Max(1, _years) * 12);
+            return [new ChartSeries<double> { Name = T("Balance"), Data = new[] { (double)_principal }.Concat(schedule.Where(r => r.Month % 12 == 0).Select(r => (double)r.Balance)).ToArray() }];
+        }
+    }
+    private string[] LoanLabels => Enumerable.Range(0, Math.Max(1, _years) + 1).Select(y => T("Y{0}", y)).ToArray();
+
+    private List<SavingsPoint> Savings => FinanceCalculator.SavingsProjection(_initial, _monthly, _return, Math.Max(1, _savingYears), _inflation);
+    private List<ChartSeries<double>> SavingsSeries =>
+    [
+        new() { Name = T("Balance"), Data = Savings.Select(p => (double)p.Balance).ToArray() },
+        new() { Name = T("Contributed"), Data = Savings.Select(p => (double)p.Contributed).ToArray() },
+        new() { Name = T("Today's money"), Data = Savings.Select(p => (double)p.RealValue).ToArray() },
+    ];
+    private string[] SavingsLabels => Savings.Select(p => p.Year % 5 == 0 ? T("Y{0}", p.Year) : "").ToArray();
+
+    private RetirementPlan Retirement => FinanceCalculator.RetirementPlan(_income, Math.Max(1, _yearsToRetire), _currentSavings);
+}

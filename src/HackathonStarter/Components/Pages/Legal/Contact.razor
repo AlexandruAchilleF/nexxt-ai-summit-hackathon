@@ -1,0 +1,43 @@
+@page "/contact"
+@layout PublicLayout
+
+<PageTitle>@T("Contact") · @SiteConfig.Name</PageTitle>
+
+<PageHeader Title="@T("Contact")" Description="@T("Questions about the product, a demo, your data or a security issue: write to the right address and we'll answer within one business day.")" />
+
+<MudGrid Spacing="3">
+    @foreach (var channel in Channels)
+    {
+        <MudItem xs="12" sm="6">
+            <MudPaper Outlined="true" Class="pa-4 d-flex flex-column gap-2" Style="height:100%">
+                <div class="d-flex align-center gap-2">
+                    <MudIcon Icon="@channel.Icon" Size="Size.Small" Color="Color.Primary" />
+                    <MudText Typo="Typo.subtitle2">@channel.Title</MudText>
+                </div>
+                <MudText Typo="Typo.body2" Class="mud-text-secondary" Style="flex:1">@channel.Description</MudText>
+                <MudLink Href="@($"mailto:{channel.Email}")" Typo="Typo.body2" Class="mono">@channel.Email</MudLink>
+            </MudPaper>
+        </MudItem>
+    }
+    <MudItem xs="12">
+        <MudPaper Outlined="true" Class="pa-4">
+            <MudText Typo="Typo.subtitle2" Class="mb-1">@T("Company details")</MudText>
+            <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                @SiteConfig.Legal.CompanyName · @T("Trade Register") @SiteConfig.Legal.RegistrationNumber · @T("Fiscal code") @SiteConfig.Legal.FiscalCode<br />
+                @SiteConfig.Legal.Address
+            </MudText>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private record Channel(string Icon, string Title, string Description, string Email);
+
+    private static Channel[] Channels =>
+    [
+        new(Icons.Material.Outlined.Mail, T("Sales and demos"), T("Pricing, pilots and a walkthrough with your own scenarios."), SiteConfig.Legal.Email),
+        new(Icons.Material.Outlined.SupportAgent, T("Support"), T("Help with accounts, agents, exports and integrations."), SiteConfig.Legal.Email),
+        new(Icons.Material.Outlined.Shield, T("Privacy and data requests"), T("Access, correction or deletion of your data, and data processing agreements."), SiteConfig.Legal.PrivacyEmail),
+        new(Icons.Material.Outlined.BugReport, T("Security"), T("Report a vulnerability responsibly. Please don't test systems you don't own."), SiteConfig.Legal.SecurityEmail),
+    ];
+}

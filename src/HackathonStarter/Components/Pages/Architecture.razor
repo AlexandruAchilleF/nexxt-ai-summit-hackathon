@@ -1,0 +1,130 @@
+@page "/architecture"
+@using Microsoft.EntityFrameworkCore
+@inject IEnumerable<AgentDefinition> Agents
+@inject ChatClientProvider Ai
+@inject IConfiguration Config
+@inject IServiceProvider Services
+@inject CurrentUser CurrentUser
+@inject RunStore Store
+
+<PageTitle>@T("Architecture") · @SiteConfig.Name</PageTitle>
+
+@* "How it works" page, built for the architecture part of the pitch video. Agents and tools are read live. *@
+<PageHeader Title="@T("Architecture")" Description="@T("How a request flows through the system, from the user to the agent, its tools and the data.")" />
+
+<div class="d-flex flex-wrap align-center gap-2 mb-6">
+    @for (var i = 0; i < _layers.Count; i++)
+    {
+        var layer = _layers[i];
+        <MudPaper Outlined="true" Class="pa-4" Style="flex:1;min-width:170px">
+            <div class="d-flex align-center gap-2 mb-2">
+                <MudAvatar Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined" Rounded="true"><MudIcon Icon="@layer.Icon" Size="Size.Small" /></MudAvatar>
+                <MudText Typo="Typo.subtitle2">@layer.Title</MudText>
+            </div>
+            @foreach (var line in layer.Items)
+            {
+                <MudText Typo="Typo.caption" Class="mono mud-text-secondary d-block">@line</MudText>
+            }
+        </MudPaper>
+        @if (i < _layers.Count - 1)
+        {
+            <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Class="mud-text-secondary" />
+        }
+    }
+</div>
+
+@if (_stats is { } st)
+{
+    <MudGrid Spacing="3" Class="mb-2">
+        <MudItem xs="6" md="3"><StatCard Label="@T("Agent runs")" Value="@Format.Number(st.Runs)" Icon="@Icons.Material.Outlined.History" /></MudItem>
+        <MudItem xs="6" md="3"><StatCard Label="@T("Avg duration")" Value="@($"{st.AvgSeconds:0.0}s")" Icon="@Icons.Material.Outlined.Timer" /></MudItem>
+        <MudItem xs="6" md="3"><StatCard Label="@T("Avg tokens / run")" Value="@Format.Number((decimal)st.AvgTokens)" Icon="@Icons.Material.Outlined.DataUsage" Hint="@T("live runs")" /></MudItem>
+        <MudItem xs="6" md="3"><StatCard Label="@T("Avg cost / run")" Value="@(st.AvgCost is { } c ? "$" + c.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture) : "–")" Icon="@Icons.Material.Outlined.Paid" Hint="@T(st.AvgCost is null ? "set AI:InputPricePerMillion" : "estimate")" /></MudItem>
+    </MudGrid>
+}
+
+<MudGrid Spacing="3">
+    <MudItem xs="12" md="6">
+        <MudPaper Outlined="true" Class="pa-5" Style="height:100%">
+            <MudText Typo="Typo.subtitle1" Style="font-weight:600" Class="mb-3"><MudIcon Icon="@Icons.Material.Outlined.Shield" Size="Size.Small" /> @T("Safe by design")</MudText>
+            <MudText Typo="Typo.body2" Class="mb-2"><b>@T("Human in the loop:")</b> @T("actions that change data are only proposed by the agent; a person approves them.")</MudText>
+            <MudText Typo="Typo.body2" Class="mb-2"><b>@T("Full audit trail:")</b> @T("every run is stored with each tool call, its input and output, and who approved what.")</MudText>
+            <MudText Typo="Typo.body2" Class="mb-2"><b>@T("Privacy:")</b> @T("personal data (CNP, IBAN, card, email, phone) is masked before anything reaches the model and restored in the answer.")</MudText>
+            <MudText Typo="Typo.body2" Class="mb-2"><b>@T("Deterministic finance:")</b> @T("the AI calls tested C# functions for every calculation; it never does the math.")</MudText>
+            <MudText Typo="Typo.body2" Class="mb-3"><b>@T("Model-agnostic:")</b> @T("Microsoft.Extensions.AI with Azure OpenAI, OpenAI-compatible (incl. self-hosted open-weight models) or Anthropic; models without tool calling use a JSON fallback.")</MudText>
+            <div class="d-flex flex-wrap align-center gap-1">
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@T("Live model")</MudChip>
+                <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Size="Size.Small" />
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@T("Recorded run")</MudChip>
+                <MudIcon Icon="@Icons.Material.Filled.ArrowForward" Size="Size.Small" />
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@T("Scripted mock")</MudChip>
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">@T("fallback chain: never a blank screen")</MudText>
+            </div>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" md="6">
+        <MudPaper Outlined="true" Class="pa-5" Style="height:100%">
+            <MudText Typo="Typo.subtitle1" Style="font-weight:600">@T("Agents")</MudText>
+            <MudText Typo="Typo.caption" Class="mud-text-secondary">@T("Registered in Program.cs")</MudText>
+            @foreach (var agent in Agents)
+            {
+                <div class="mt-3">
+                    <div class="d-flex align-center gap-2">
+                        <MudIcon Icon="@(agent switch { PanelAgent => Icons.Material.Outlined.Groups, ScenarioAgent => Icons.Material.Outlined.Forum, _ => Icons.Material.Outlined.SmartToy })" Size="Size.Small" />
+                        <MudText Typo="Typo.body2" Style="font-weight:600">@agent.Label</MudText>
+                        <MudChip T="string" Size="Size.Small">@T(agent switch { PanelAgent => "multi-agent", ScenarioAgent => "scenario", _ => "tool agent" })</MudChip>
+                    </div>
+                    <div class="d-flex flex-wrap gap-1 mt-1">
+                        @if (agent is ToolAgent ta && _ctx is not null)
+                        {
+                            @foreach (var t in ta.Tools(_ctx))
+                            {
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="mono">@t.Name@(t.NeedsApproval ? " · " + T("approval") : "")</MudChip>
+                            }
+                        }
+                        else if (agent is PanelAgent pa)
+                        {
+                            @foreach (var p in pa.Participants.Append(pa.Judge))
+                            {
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@p.Name: @p.Role</MudChip>
+                            }
+                        }
+                    </div>
+                </div>
+            }
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private record Layer(string Icon, string Title, string[] Items);
+    private record Stats(int Runs, double AvgSeconds, double AvgTokens, decimal? AvgCost);
+    private List<Layer> _layers = [];
+    private ToolContext? _ctx;
+    private Stats? _stats;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _ctx = new ToolContext(await CurrentUser.GetAsync(), [], Services);
+        var runs = await Store.ListAsync(100);
+        var finished = runs.Where(r => r.FinishedAt is not null).ToList();
+        var live = runs.Where(r => r.InputTokens + r.OutputTokens > 0).ToList();
+        var priced = runs.Where(r => r.EstimatedCost is not null).ToList();
+        _stats = new Stats(
+            runs.Count,
+            finished.Count == 0 ? 0 : finished.Average(r => (r.FinishedAt!.Value - r.CreatedAt).TotalSeconds),
+            live.Count == 0 ? 0 : live.Average(r => r.InputTokens + r.OutputTokens),
+            priced.Count == 0 ? null : Math.Round(priced.Average(r => r.EstimatedCost!.Value), 6));
+        var tools = Agents.OfType<ToolAgent>().SelectMany(a => a.Tools(_ctx)).Select(t => t.Name).Distinct().ToArray();
+        var db = Config["Database:Provider"] ?? "Sqlite";
+        var model = Ai.IsConfigured ? $"{Ai.Options.Provider}: {Ai.Options.Model}" : T("none (replay / mock)");
+        _layers =
+        [
+            new(Icons.Material.Outlined.Monitor, T("Web app"), ["Blazor Server", "MudBlazor UI", T("Live agent timeline")]),
+            new(Icons.Material.Outlined.Dns, T("Services + API"), ["ASP.NET Core", T("Cookie auth + roles"), "REST API (/api-docs)"]),
+            new(Icons.Material.Outlined.SmartToy, T("Agent runtime"), [T("Tool-calling loop"), T("Human approval"), T("Record / replay")]),
+            new(Icons.Material.Outlined.Build, T("Tools"), tools.Take(6).ToArray()),
+            new(Icons.Material.Outlined.Storage, T("Data & models"), [$"EF Core · {db}", $"LLM: {model}", T("Run history (audit)")]),
+        ];
+    }
+}

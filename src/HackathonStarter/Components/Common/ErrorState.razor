@@ -1,0 +1,18 @@
+<MudPaper Outlined="true" Class="app-state app-state-error app-enter my-2">
+    <div class="app-state-glyph"><MudIcon Icon="@Icons.Material.Rounded.ErrorOutline" /></div>
+    <div class="app-state-title">@Title</div>
+    @if (!string.IsNullOrEmpty(Message))
+    {
+        <div class="app-state-text">@Message</div>
+    }
+    @if (OnRetry.HasDelegate)
+    {
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Class="mt-2" StartIcon="@Icons.Material.Rounded.Refresh" OnClick="OnRetry">@T("Try again")</MudButton>
+    }
+</MudPaper>
+
+@code {
+    [Parameter] public string Title { get; set; } = T("Something went wrong");
+    [Parameter] public string? Message { get; set; }
+    [Parameter] public EventCallback OnRetry { get; set; }
+}

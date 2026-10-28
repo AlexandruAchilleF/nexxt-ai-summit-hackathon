@@ -1,0 +1,11 @@
+@using HackathonStarter.Features.Items
+@switch (Priority)
+{
+    case ItemPriority.High: <Pill Tone="danger" Icon="@Icons.Material.Rounded.North">@T("High")</Pill> break;
+    case ItemPriority.Medium: <Pill Tone="warning" Icon="@Icons.Material.Rounded.DragHandle">@T("Medium")</Pill> break;
+    default: <Pill Icon="@Icons.Material.Rounded.South">@T(Priority.ToString())</Pill> break;
+}
+
+@code {
+    [Parameter] public ItemPriority Priority { get; set; }
+}

@@ -1,0 +1,12 @@
+bin/
+obj/
+*.db
+*.db-shm
+*.db-wal
+*.db-journal
+.vs/
+.vscode/
+.idea/
+*.user
+appsettings.Local.json
+.screenshots/

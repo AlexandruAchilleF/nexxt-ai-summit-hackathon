@@ -1,0 +1,148 @@
+@* Exports of agent runs: create a draft from a run, review it, approve or reject it, download approved ones.
+   With RunId: the exports of that run + the "create" controls. Without: every export (the /exports page). *@
+@inject RunExportService Exports
+@inject CurrentUser CurrentUser
+@inject ISnackbar Snackbar
+
+<MudPaper Outlined="true" Class="@($"pa-5 {Class}")">
+    <div class="d-flex align-center gap-3 flex-wrap mb-3">
+        <div style="flex:1;min-width:200px">
+            <MudText Typo="Typo.subtitle1" Style="font-weight:600">@T(RunId is null ? "All exports" : "Export this run")</MudText>
+            <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                @T("Drafts become downloadable only after a person approves them. Personal data is masked in every export.")
+            </MudText>
+        </div>
+        @if (RunId is not null && _canEdit)
+        {
+            <MudSelect T="string" @bind-Value="_format" Label="@T("Format")" Dense="true" Variant="Variant.Outlined" Style="min-width:200px;max-width:240px">
+                @foreach (var exporter in Exports.Exporters)
+                {
+                    <MudSelectItem Value="@exporter.Format">@exporter.Label</MudSelectItem>
+                }
+            </MudSelect>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.NoteAdd" Disabled="_busy" OnClick="Create">@T("Create draft")</MudButton>
+        }
+    </div>
+
+    @if (_error is not null)
+    {
+        <ErrorState Message="@_error" OnRetry="Load" />
+    }
+    else if (_items is null)
+    {
+        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="64px" />
+    }
+    else if (_items.Count == 0)
+    {
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">
+            @T(RunId is null ? "No exports yet. Open a run in Agent runs and export it as a test or a report." : "This run hasn't been exported yet.")
+        </MudText>
+    }
+    else
+    {
+        <div class="dense-list">
+            @foreach (var export in _items)
+            {
+                var open = _open.Contains(export.Id);
+                <div class="dense-item">
+                    <div class="d-flex align-center gap-2 flex-wrap">
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined"
+                                 Color="@(export.Status switch { ExportStatus.Approved => Color.Success, ExportStatus.Rejected => Color.Error, _ => Color.Warning })">@T(export.Status.ToString())</MudChip>
+                        <span class="mono" style="font-size:12px;font-weight:600">@export.FileName</span>
+                        @if (RunId is null)
+                        {
+                            <MudLink Href="@($"/runs/{export.RunId}")" Typo="Typo.caption" Style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:320px">@export.Title</MudLink>
+                        }
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary ml-auto">
+                            @export.CreatedBy · @Format.Relative(export.CreatedAt)@(export.DecidedBy is null ? "" : " · " + T(export.Status == ExportStatus.Approved ? "approved by {0}" : "rejected by {0}", export.DecidedBy))
+                        </MudText>
+                    </div>
+                    @if (!string.IsNullOrEmpty(export.Checks))
+                    {
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary d-block mt-1">@T("Must pass:") <span class="mono">@export.Checks.Replace(",", ", ")</span></MudText>
+                    }
+                    <div class="d-flex gap-2 mt-2 flex-wrap">
+                        <MudButton Size="Size.Small" Variant="Variant.Text" StartIcon="@(open ? Icons.Material.Filled.ExpandLess : Icons.Material.Outlined.Visibility)"
+                                   OnClick="() => Toggle(export.Id)">@T(open ? "Hide" : "Review")</MudButton>
+                        @if (export.Status == ExportStatus.Draft && _canEdit)
+                        {
+                            <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Check"
+                                       Disabled="_busy" OnClick="() => Decide(export, true)">@T("Approve")</MudButton>
+                            <MudButton Size="Size.Small" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Close"
+                                       Disabled="_busy" OnClick="() => Decide(export, false)">@T("Reject")</MudButton>
+                        }
+                        @if (export.Status == ExportStatus.Approved)
+                        {
+                            <MudButton Size="Size.Small" Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.Download"
+                                       Href="@($"/api/exports/{export.Id}/download")" Target="_blank">@T("Download")</MudButton>
+                        }
+                    </div>
+                    @if (open)
+                    {
+                        <pre class="json-block mono mt-2" style="max-height:420px;overflow:auto">@export.Content</pre>
+                    }
+                </div>
+            }
+        </div>
+    }
+</MudPaper>
+
+@code {
+    /// <summary>Show this run's exports and allow creating new ones. Null = all exports.</summary>
+    [Parameter] public string? RunId { get; set; }
+    [Parameter] public string? Class { get; set; }
+
+    private List<RunExport>? _items;
+    private readonly HashSet<string> _open = [];
+    private string? _error;
+    private string _format = "json-test";
+    private bool _busy;
+    private bool _canEdit;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var user = await CurrentUser.GetAsync();
+        _canEdit = user.Role is Roles.Admin or Roles.Member;
+        if (Exports.Exporters.Count > 0 && Exports.Exporters.All(e => e.Format != _format)) _format = Exports.Exporters[0].Format;
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        _error = null;
+        try { _items = await Exports.ListAsync(RunId); }
+        catch (Exception ex) { _error = ex.Message; }
+    }
+
+    private void Toggle(string id)
+    {
+        if (!_open.Remove(id)) _open.Add(id);
+    }
+
+    private async Task Create()
+    {
+        _busy = true;
+        try
+        {
+            var export = await Exports.CreateAsync(RunId!, _format);
+            _open.Add(export.Id);
+            Snackbar.Add(T("Draft created: review it, then approve or reject it."), Severity.Success);
+            await Load();
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+
+    private async Task Decide(RunExport export, bool approved)
+    {
+        _busy = true;
+        try
+        {
+            await Exports.DecideAsync(export.Id, approved);
+            Snackbar.Add(approved ? T("Approved: it can be downloaded now.") : T("Rejected."), Severity.Success);
+            await Load();
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+}

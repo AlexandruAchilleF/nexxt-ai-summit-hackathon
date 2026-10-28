@@ -1,0 +1,82 @@
+@page "/items/{Id:int}"
+@using HackathonStarter.Features.Items
+@inject ItemService Items
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+@inject CurrentUser CurrentUser
+
+<PageTitle>@(_item?.Title ?? T("Item")) · @SiteConfig.Name</PageTitle>
+
+<MudButton Href="/items" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Class="mb-4" Size="Size.Small">@T("All items")</MudButton>
+
+@if (_loading)
+{
+    <MudSkeleton Width="50%" Height="48px" />
+    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="180px" />
+}
+else if (_item is null)
+{
+    <EmptyState Title="@T("Item not found")" Description="@T("It may have been deleted.")" />
+}
+else
+{
+    <PageHeader Title="@_item.Title" Description="@_item.Description">
+        <Actions>
+            @if (_canEdit)
+            {
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.Edit" OnClick="Edit">@T("Edit")</MudButton>
+            }
+            @if (_canDelete)
+            {
+                <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Outlined.Delete" OnClick="Delete">@T("Delete")</MudButton>
+            }
+        </Actions>
+    </PageHeader>
+
+    <MudPaper Outlined="true" Class="pa-5">
+        <MudGrid>
+            <MudItem xs="6" sm="4"><MudText Typo="Typo.caption" Class="mud-text-secondary">@T("Status")</MudText><div><ItemStatusChip Status="_item.Status" /></div></MudItem>
+            <MudItem xs="6" sm="4"><MudText Typo="Typo.caption" Class="mud-text-secondary">@T("Priority")</MudText><div><ItemPriorityChip Priority="_item.Priority" /></div></MudItem>
+            <MudItem xs="6" sm="4"><MudText Typo="Typo.caption" Class="mud-text-secondary">@T("Value")</MudText><MudText Style="font-weight:600">@Format.Money(_item.Value)</MudText></MudItem>
+            <MudItem xs="6" sm="4"><MudText Typo="Typo.caption" Class="mud-text-secondary">@T("Owner")</MudText><MudText Style="font-weight:600">@(SiteConfig.Users.FirstOrDefault(u => u.Id == _item.OwnerId)?.Name ?? _item.OwnerId)</MudText></MudItem>
+            <MudItem xs="6" sm="4"><MudText Typo="Typo.caption" Class="mud-text-secondary">@T("Created")</MudText><MudText Style="font-weight:600">@Format.Date(_item.CreatedAt)</MudText></MudItem>
+            <MudItem xs="6" sm="4"><MudText Typo="Typo.caption" Class="mud-text-secondary">@T("Updated")</MudText><MudText Style="font-weight:600">@Format.DateTime(_item.UpdatedAt)</MudText></MudItem>
+        </MudGrid>
+    </MudPaper>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private Item? _item;
+    private bool _loading = true, _canEdit, _canDelete;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var user = await CurrentUser.GetAsync();
+        _canEdit = user.Role is Roles.Admin or Roles.Member;
+        _canDelete = user.Role is Roles.Admin;
+        _item = await Items.GetAsync(Id);
+        _loading = false;
+    }
+
+    private async Task Edit()
+    {
+        var dialog = await Dialogs.ShowAsync<ItemDialog>(null, new DialogParameters<ItemDialog> { { d => d.Item, _item! } },
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        if (!(await dialog.Result)!.Canceled) _item = await Items.GetAsync(Id);
+    }
+
+    private async Task Delete()
+    {
+        if (!await Dialogs.ConfirmAsync(T("Delete \"{0}\"?", _item!.Title), T("This can't be undone."), T("Delete"), destructive: true)) return;
+        try
+        {
+            await Items.DeleteAsync(Id);
+            Snackbar.Add(T("Item deleted"), Severity.Success);
+            Nav.NavigateTo("/items");
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+}

@@ -1,0 +1,35 @@
+@* Footer of the landing page and the public pages: app pages by nav group, then legal and contact. *@
+<footer class="lp-footer">
+    <div class="lp-wrap lp-footer-grid" style="--cols:@(Groups.Length + 2)">
+        <div class="lp-footer-brand"><BrandLogo Compact="true" /></div>
+        @foreach (var group in Groups)
+        {
+            <div>
+                <h3>@T(group.Key == "" ? "Product" : group.Key)</h3>
+                @foreach (var item in group.Take(5))
+                {
+                    <a href="@item.Href">@T(item.Label)</a>
+                }
+            </div>
+        }
+        <div>
+            <h3>@T("Legal")</h3>
+            <a href="/terms">@T("Terms and conditions")</a>
+            <a href="/privacy-policy">@T("Privacy policy")</a>
+            <a href="/privacy">@T("Data and privacy")</a>
+        </div>
+        <div>
+            <h3>@T("Contact")</h3>
+            <a href="/contact">@T("Contact")</a>
+            <a href="mailto:@SiteConfig.Legal.Email">@SiteConfig.Legal.Email</a>
+            <a href="mailto:@SiteConfig.Legal.SecurityEmail">@T("Report a vulnerability")</a>
+        </div>
+    </div>
+    <p class="lp-wrap lp-footer-legal">© @DateTime.UtcNow.Year @SiteConfig.Legal.CompanyName · @SiteConfig.Legal.Address</p>
+</footer>
+
+@code {
+    // The first two nav groups (ungrouped pages first), so renaming or hiding groups never leaves an empty column.
+    private static readonly IGrouping<string, NavItem>[] Groups =
+        SiteConfig.Nav.GroupBy(n => n.Group ?? "").Where(g => g.Key != "Account").Take(2).ToArray();
+}

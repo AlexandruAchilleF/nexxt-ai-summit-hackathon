@@ -1,0 +1,32 @@
+@* Where an answer came from. Be honest with judges if they ask. *@
+@if (Source is { } s)
+{
+    <MudTooltip Text="@Hint(s)">
+        <Pill Tone="@Tone(s)" Icon="@Icon(s)">@T(s.ToString())</Pill>
+    </MudTooltip>
+}
+
+@code {
+    [Parameter] public RunSource? Source { get; set; }
+
+    private static string? Tone(RunSource s) => s switch
+    {
+        RunSource.Live => "success",
+        RunSource.Replay => "warning",
+        _ => null,
+    };
+
+    private static string Icon(RunSource s) => s switch
+    {
+        RunSource.Live => Icons.Material.Rounded.Bolt,
+        RunSource.Replay => Icons.Material.Rounded.Replay,
+        _ => Icons.Material.Rounded.TheaterComedy,
+    };
+
+    private static string Hint(RunSource s) => s switch
+    {
+        RunSource.Live => T("Answered by the configured model"),
+        RunSource.Replay => T("Recorded run replayed (model unavailable or AgentMode = Replay)"),
+        _ => T("Scripted planner using real tools (no model configured)"),
+    };
+}

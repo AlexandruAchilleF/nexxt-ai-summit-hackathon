@@ -1,0 +1,92 @@
+@using HackathonStarter.Features.Items
+@inject ItemService Items
+@inject StructuredAi Ai
+@inject ISnackbar Snackbar
+
+@* Create / edit form. Validation comes from the [Required]/[StringLength]/[Range] attributes on Item. *@
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">@T(Item.Id == 0 ? "New item" : "Edit item")</MudText>
+    </TitleContent>
+    <DialogContent>
+        <EditForm Model="_model" OnValidSubmit="Save" id="item-form">
+            <DataAnnotationsValidator />
+            <MudTextField @bind-Value="_model.Title" For="() => _model.Title" Label="@T("Title")" Variant="Variant.Outlined" AutoFocus="true" Immediate="true" Class="mb-3" />
+            <div class="d-flex align-center justify-end">
+                <MudButton Size="Size.Small" StartIcon="@Icons.Material.Outlined.AutoAwesome" Disabled="@(_suggesting || (_model.Title?.Trim().Length ?? 0) < 2)" OnClick="Suggest">
+                    @T(_suggesting ? "Thinking…" : "Suggest description")
+                </MudButton>
+            </div>
+            <MudTextField @bind-Value="_model.Description" For="() => _model.Description" Label="@T("Description")" Variant="Variant.Outlined" Lines="3" Sizing="InputSizing.Auto" Class="mb-3" />
+            <MudGrid Spacing="2">
+                <MudItem xs="12" sm="4">
+                    <MudSelect @bind-Value="_model.Status" Label="@T("Status")" Variant="Variant.Outlined">
+                        @foreach (var s in Enum.GetValues<ItemStatus>())
+                        {
+                            <MudSelectItem Value="s">@T(s.ToString())</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudSelect @bind-Value="_model.Priority" Label="@T("Priority")" Variant="Variant.Outlined">
+                        @foreach (var p in Enum.GetValues<ItemPriority>())
+                        {
+                            <MudSelectItem Value="p">@T(p.ToString())</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudNumericField @bind-Value="_model.Value" For="() => _model.Value" Label="@T("Value ({0})", SiteConfig.Currency)" Variant="Variant.Outlined" Min="0" />
+                </MudItem>
+            </MudGrid>
+        </EditForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => Dialog.Cancel()">@T("Cancel")</MudButton>
+        <MudButton ButtonType="ButtonType.Submit" form="item-form" Variant="Variant.Filled" Color="Color.Primary" Disabled="_saving">
+            @T(Item.Id == 0 ? "Create item" : "Save changes")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+    [Parameter] public Item Item { get; set; } = new();
+
+    private Item _model = new();
+    private bool _saving, _suggesting;
+
+    protected override void OnInitialized() => _model = Item.Clone();
+
+    private async Task Save()
+    {
+        _saving = true;
+        try
+        {
+            var saved = _model.Id == 0 ? await Items.CreateAsync(_model) : await Items.UpdateAsync(_model);
+            Snackbar.Add(T(_model.Id == 0 ? "Item created" : "Item updated"), Severity.Success);
+            Dialog.Close(DialogResult.Ok(saved));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally { _saving = false; }
+    }
+
+    private record Suggestion(string Description);
+
+    /// <summary>Example of StructuredAi: typed AI output, with a mock when no model is configured.</summary>
+    private async Task Suggest()
+    {
+        _suggesting = true;
+        var title = _model.Title.Trim();
+        var result = await Ai.GenerateAsync(
+            $"Write a one-sentence description (max 25 words) for a task titled \"{title}\".",
+            () => new Suggestion($"{title}: define the scope, ship a first version and validate it with users."),
+            system: "You write concise, concrete descriptions for a task tracker.");
+        _model.Description = result.Data.Description;
+        if (result.Source == "mock") Snackbar.Add(T("AI not configured: used a mock suggestion"), Severity.Info);
+        _suggesting = false;
+    }
+}

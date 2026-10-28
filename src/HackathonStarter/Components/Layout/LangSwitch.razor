@@ -1,0 +1,12 @@
+@inject NavigationManager Nav
+
+@* RO / EN: sets the language cookie and reloads the page (the language is fixed for a Blazor circuit). *@
+<button type="button" class="lang-switch" title="@T("Switch language")" @onclick="Switch">@(Lang.IsEn ? "RO" : "EN")</button>
+
+@code {
+    private void Switch()
+    {
+        var returnUrl = "/" + Nav.ToBaseRelativePath(Nav.Uri);
+        Nav.NavigateTo($"/lang/{(Lang.IsEn ? "ro" : "en")}?returnUrl={Uri.EscapeDataString(returnUrl)}", forceLoad: true);
+    }
+}

@@ -1,0 +1,121 @@
+@page "/privacy"
+@layout PublicLayout
+@using HackathonStarter.Features.Targets
+@inject ChatClientProvider Ai
+@inject TargetClient Targets
+@inject RetentionService Retention
+@inject Microsoft.Extensions.Options.IOptionsMonitor<PrivacyOptions> PrivacySettings
+
+<PageTitle>@T("Data and privacy") · @SiteConfig.Name</PageTitle>
+
+<PageHeader Title="@T("Data and privacy")" Description="@T("What happens to personal data in this app, read from the live configuration: what reaches a model, what is stored, and for how long.")" />
+
+<div class="d-flex flex-column gap-4">
+    <MudPaper Outlined="true" Class="pa-5">
+        <MudText Typo="Typo.subtitle1" Style="font-weight:600">@T("What reaches a model")</MudText>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary mb-3">
+            @if (Ai.Options.MaskPii)
+            {
+                <span>@T("CNPs, IBANs, card numbers, emails and phone numbers are replaced with placeholders such as [CNP_1] before any text leaves the app, and restored only in the answer shown to you. Tools receive the real values; the model never does.")</span>
+            }
+            else
+            {
+                <span><b>@T("Masking is off")</b> (AI:MaskPii = false): @T("text is sent to the model as typed.")</span>
+            }
+        </MudText>
+        @if (_models.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info" Dense="true">@T("No model is configured: agents replay recorded runs or run scripted mocks, so nothing leaves the app.")</MudAlert>
+        }
+        else
+        {
+            <MudSimpleTable Dense="true" Elevation="0">
+                <thead><tr><th>@T("Role")</th><th>@T("Model")</th><th>@T("Runs on")</th></tr></thead>
+                <tbody>
+                    @foreach (var m in _models)
+                    {
+                        <tr>
+                            <td>@m.Name</td>
+                            <td class="mono">@m.Provider · @m.Model</td>
+                            <td>
+                                <span class="mono">@m.Host</span>
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="@(m.OnOwnInfrastructure ? Color.Success : Color.Default)">@T(m.OnOwnInfrastructure ? "your infrastructure" : "external provider")</MudChip>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        }
+        <MudText Typo="Typo.caption" Class="mud-text-secondary d-block mt-2">@T("Images are sent to vision-capable models as they are: masking applies to text only.")</MudText>
+    </MudPaper>
+
+    <MudPaper Outlined="true" Class="pa-5">
+        <MudText Typo="Typo.subtitle1" Style="font-weight:600">@T("What is stored")</MudText>
+        <MudSimpleTable Dense="true" Elevation="0" Class="mt-2">
+            <tbody>
+                <tr><td>@T("Run history (audit trail)")</td><td>@T("Personal data replaced with one-way placeholders such as [IBAN-1] before saving. They can't be turned back into the original values.")</td></tr>
+                <tr><td>@T("Actions awaiting approval")</td><td>@T("Their arguments are kept encrypted (ASP.NET Core Data Protection) until a person approves or rejects them, then deleted.") @T("The encryption keys are stored in the same database: enough for a demo; in production they belong in a key vault.")</td></tr>
+                <tr><td>@T("Recorded runs (demo fallback)")</td><td>@T(PrivacySettings.CurrentValue.RedactRecordings ? "Masked like the run history." : "Not masked (Privacy:RedactRecordings = false): use synthetic data only.")</td></tr>
+                <tr><td>@T("Exports (tests, reports)")</td><td>@T("Built from the masked history and downloadable only after a person approves them.")</td></tr>
+                <tr><td>@T("Uploaded documents")</td><td>@T("Kept in memory for the current conversation only. Passages an agent reads from them become part of the run history, masked like the rest.")</td></tr>
+            </tbody>
+        </MudSimpleTable>
+    </MudPaper>
+
+    <MudPaper Outlined="true" Class="pa-5">
+        <MudText Typo="Typo.subtitle1" Style="font-weight:600">@T("How long")</MudText>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary mt-1">
+            @if (PrivacySettings.CurrentValue.RetentionDays > 0)
+            {
+                <span>@T("Agent runs are deleted automatically after") <b>@T("{0} days", PrivacySettings.CurrentValue.RetentionDays)</b> (Privacy:RetentionDays), @T("checked every hour.")</span>
+            }
+            else
+            {
+                <span>@T("Automatic deletion is off (Privacy:RetentionDays = 0): runs are kept until an admin resets the data.")</span>
+            }
+            @if (Retention.LastRun is { } last)
+            {
+                <span> @T("Last check: {0}, {1} run(s) deleted.", Format.Relative(last), Retention.LastDeleted)</span>
+            }
+        </MudText>
+    </MudPaper>
+
+    @if (_targets.Count > 0)
+    {
+        <MudPaper Outlined="true" Class="pa-5">
+            <MudText Typo="Typo.subtitle1" Style="font-weight:600">@T("External systems this app talks to")</MudText>
+            <MudText Typo="Typo.body2" Class="mud-text-secondary mb-2">
+                @T("Messages to these targets are sent as written, because a target is often the system being tested for leaks. Use synthetic data with them.")
+            </MudText>
+            <MudSimpleTable Dense="true" Elevation="0">
+                <tbody>
+                    @foreach (var t in _targets)
+                    {
+                        <tr>
+                            <td>@t.Label</td>
+                            <td class="mono">@t.Kind</td>
+                            <td>
+                                <span class="mono">@(t.Host ?? T("not configured"))</span>
+                                @if (t.Host is "this app" || DataFlows.IsOwnInfrastructure(t.Host))
+                                {
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Success">@T("your infrastructure")</MudChip>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        </MudPaper>
+    }
+</div>
+
+@code {
+    private List<DataFlows.ModelEndpoint> _models = [];
+    private IReadOnlyList<TargetInfo> _targets = [];
+
+    protected override void OnInitialized()
+    {
+        _models = DataFlows.Models(Ai);
+        _targets = Targets.List();
+    }
+}

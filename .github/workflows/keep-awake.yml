@@ -1,0 +1,16 @@
+# Free Render instances sleep after ~15 min idle and take ~30-60 s to wake up.
+# ON for NEXXT AI Hackathon (28–29 Oct 2026) and the finals: comment `schedule` out again afterwards (it spends Actions minutes).
+# Set the repository variable APP_URL (Settings → Secrets and variables → Actions → Variables), e.g. https://my-app.onrender.com
+name: Keep awake
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/10 * * * *"   # every 10 minutes (GitHub may delay scheduled runs by a few minutes)
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    if: vars.APP_URL != ''
+    steps:
+      - run: curl -fsS --retry 3 --retry-delay 20 --max-time 90 "${{ vars.APP_URL }}/health"

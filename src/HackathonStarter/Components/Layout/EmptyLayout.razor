@@ -1,0 +1,11 @@
+@inherits LayoutComponentBase
+
+<MudThemeProvider Theme="AppTheme.Theme" IsDarkMode="SiteConfig.DarkModeByDefault" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+@Body
+<MudContainer MaxWidth="MaxWidth.Large" Class="px-3 px-sm-6">
+    <AppFooter />
+</MudContainer>

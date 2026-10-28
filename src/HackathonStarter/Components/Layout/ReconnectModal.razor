@@ -1,0 +1,31 @@
+﻿<script type="module" src="@Assets["Components/Layout/ReconnectModal.razor.js"]"></script>
+
+<dialog id="components-reconnect-modal" data-nosnippet>
+    <div class="components-reconnect-container">
+        <div class="components-rejoining-animation" aria-hidden="true">
+            <div></div>
+            <div></div>
+        </div>
+        <p class="components-reconnect-first-attempt-visible">
+            @T("Rejoining the server...")
+        </p>
+        <p class="components-reconnect-repeated-attempt-visible">
+            @T("Rejoin failed... trying again in") <span id="components-seconds-to-next-attempt"></span> @T("seconds.")
+        </p>
+        <p class="components-reconnect-failed-visible">
+            @T("Failed to rejoin.")<br />@T("Please retry or reload the page.")
+        </p>
+        <button id="components-reconnect-button" class="components-reconnect-failed-visible">
+            @T("Retry")
+        </button>
+        <p class="components-pause-visible">
+            @T("The session has been paused by the server.")
+        </p>
+        <p class="components-resume-failed-visible">
+            @T("Failed to resume the session.")<br />@T("Please retry or reload the page.")
+        </p>
+        <button id="components-resume-button" class="components-pause-visible components-resume-failed-visible">
+            @T("Resume")
+        </button>
+    </div>
+</dialog>

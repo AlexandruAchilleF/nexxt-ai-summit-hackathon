@@ -1,0 +1,48 @@
+@* KPI tile: label, one big number, a hint and an optional sparkline that draws in on first render. *@
+<MudPaper Outlined="true" Class="@("pa-4 app-enter" + (Href is null ? "" : " app-card-link"))" Style="@($"height:100%;position:relative;animation-delay:{Delay}ms")">
+    @if (Href is not null)
+    {
+        <a href="@Href" style="position:absolute;inset:0;border-radius:inherit" aria-label="@Label"></a>
+    }
+    <div class="stat-label">
+        @if (Icon is not null)
+        {
+            <MudIcon Icon="@Icon" />
+        }
+        @Label
+    </div>
+    <div class="stat-value">@Value</div>
+    @if (!string.IsNullOrEmpty(Hint))
+    {
+        <div class="stat-hint" style="@(Tone is null ? null : $"color:var(--mud-palette-{Tone})")">@Hint</div>
+    }
+    @if (Series is { Count: > 1 })
+    {
+        <svg class="stat-spark" viewBox="0 0 100 32" preserveAspectRatio="none" aria-hidden="true">
+            <path class="area" d="@($"{SparkPath()} L100 32 L0 32Z")" />
+            <path class="line" d="@SparkPath()" vector-effect="non-scaling-stroke" />
+        </svg>
+    }
+</MudPaper>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    [Parameter, EditorRequired] public string Value { get; set; } = "";
+    [Parameter] public string? Hint { get; set; }
+    [Parameter] public string? Icon { get; set; }
+    /// <summary>Colors the hint when it is good or bad news: "success" or "error". Neutral facts stay grey.</summary>
+    [Parameter] public string? Tone { get; set; }
+    /// <summary>Optional trend (e.g. last 14 days) drawn as a sparkline under the value.</summary>
+    [Parameter] public IReadOnlyList<double>? Series { get; set; }
+    [Parameter] public string? Href { get; set; }
+    /// <summary>Entrance stagger in ms, so a row of cards appears in reading order.</summary>
+    [Parameter] public int Delay { get; set; }
+
+    private string SparkPath()
+    {
+        var s = Series!;
+        double min = Math.Min(0, s.Min()), max = s.Max(), range = Math.Max(4, max - min);
+        return "M" + string.Join(" L", s.Select((v, i) =>
+            FormattableString.Invariant($"{i * 100.0 / (s.Count - 1):0.##} {30 - (v - min) / range * 28:0.##}")));
+    }
+}

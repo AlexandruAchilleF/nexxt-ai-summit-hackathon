@@ -1,0 +1,242 @@
+@* Renders an agent run as a timeline: reasoning, tool calls (input/output), approvals, text, verdicts, checks.
+   In a chat (Chat="true") the spine and nodes go away and the agent's text becomes bubbles. *@
+<div class="@(Chat ? "app-trace app-trace-chat" : "app-trace")">
+    @{ var steps = Run.Snapshot(); }
+    @foreach (var step in steps)
+    {
+        switch (step.Kind)
+        {
+            case StepKind.Text when step.Agent is not null:
+                <div class="app-step d-flex gap-3" @key="step.Id">
+                    <span class="app-step-node"><MudIcon Icon="@Icons.Material.Rounded.ChatBubble" /></span>
+                    <span class="app-avatar" style="@($"background:{SpeakerColor(step.Agent)}")">@step.Agent[..Math.Min(2, step.Agent.Length)].ToUpperInvariant()</span>
+                    <div style="min-width:0;flex:1">
+                        <MudText Typo="Typo.subtitle2">@step.Agent</MudText>
+                        <Markdown Text="@(string.IsNullOrEmpty(step.Text) ? "…" : step.Text)" />
+                    </div>
+                </div>
+                break;
+
+            case StepKind.Text:
+                if (!string.IsNullOrEmpty(step.Text) || Running)
+                {
+                    <div class="app-step d-flex flex-column" @key="step.Id">
+                        <span class="app-step-node"><MudIcon Icon="@Icons.Material.Rounded.ChatBubble" /></span>
+                        <div class="app-step-text"><Markdown Text="@(string.IsNullOrEmpty(step.Text) ? "…" : step.Text)" /></div>
+                    </div>
+                }
+                break;
+
+            case StepKind.Reasoning:
+                <div class="app-step" @key="step.Id">
+                    <span class="app-step-node"><MudIcon Icon="@Icons.Material.Rounded.Psychology" /></span>
+                    <div class="app-step-reason">@step.Text</div>
+                </div>
+                break;
+
+            case StepKind.ToolCall:
+                var result = steps.FirstOrDefault(s => s.Kind == StepKind.ToolResult && s.Id == step.Id);
+                var open = _expanded.Contains(step.Id);
+                var state = result is null ? "run" : result.Error is not null ? "bad" : "ok";
+                <div class="app-step d-flex flex-column" @key="step.Id">
+                    <span class="@($"app-step-node {state}")"><MudIcon Icon="@(state == "bad" ? Icons.Material.Rounded.ErrorOutline : Icons.Material.Rounded.Build)" /></span>
+                    <div class="@(open ? "app-tool open" : "app-tool")">
+                        <button type="button" class="app-tool-head" aria-expanded="@(open ? "true" : "false")" @onclick="() => Toggle(step.Id)">
+                            @if (result is null)
+                            {
+                                <span class="app-spin"></span>
+                            }
+                            else if (Chat)
+                            {
+                                <MudIcon Icon="@(result.Error is null ? Icons.Material.Rounded.CheckCircle : Icons.Material.Rounded.ErrorOutline)" Size="Size.Small"
+                                         Color="@(result.Error is null ? Color.Success : Color.Error)" />
+                            }
+                            <span class="app-tool-name">@step.Tool</span>
+                            <span class="app-tool-sum">@Summary(result)</span>
+                            <MudIcon Icon="@Icons.Material.Rounded.ChevronRight" Size="Size.Small" Class="app-tool-chev" />
+                        </button>
+                        @if (open)
+                        {
+                            <div class="app-tool-body">
+                                <span class="app-tool-label">@T("Input")</span>
+                                <pre class="json-block mono">@Pretty(step.Input)</pre>
+                                @if (result is not null)
+                                {
+                                    <span class="app-tool-label">@T(result.Error is null ? "Output" : "Error")</span>
+                                    <pre class="json-block mono">@(result.Error ?? Pretty(result.Output))</pre>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+                break;
+
+            case StepKind.Approval:
+                var css = step.State switch { ApprovalState.Approved => "app-approval approved", ApprovalState.Rejected => "app-approval rejected", _ => "app-approval" };
+                <div class="app-step" @key="step.Id">
+                    <span class="app-step-node warn"><MudIcon Icon="@Icons.Material.Rounded.PanTool" /></span>
+                    <div class="@css">
+                        <div class="d-flex align-center gap-3">
+                            <span class="app-approval-icon">
+                                <MudIcon Icon="@(step.State switch { ApprovalState.Approved => Icons.Material.Rounded.CheckCircle, ApprovalState.Rejected => Icons.Material.Rounded.Block, _ => Icons.Material.Rounded.PanTool })" />
+                            </span>
+                            <div style="min-width:0">
+                                <MudText Typo="Typo.subtitle1">
+                                    @(step.State switch { ApprovalState.Pending => T("Approval needed"), ApprovalState.Approved => T("Approved by {0}", step.DecidedBy), _ => T("Rejected by {0}", step.DecidedBy) })
+                                </MudText>
+                                <MudText Typo="Typo.body2" Class="mud-text-secondary">@step.Summary</MudText>
+                            </div>
+                        </div>
+                        @if (step.State == ApprovalState.Pending && OnDecide.HasDelegate)
+                        {
+                            <div class="d-flex gap-2 mt-3">
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Rounded.Check"
+                                           Disabled="_deciding" OnClick="() => Decide(step, true)">@T("Approve")</MudButton>
+                                <MudButton Variant="Variant.Outlined" Size="Size.Small"
+                                           Disabled="_deciding" OnClick="() => Decide(step, false)">@T("Reject")</MudButton>
+                            </div>
+                        }
+                    </div>
+                </div>
+                break;
+
+            case StepKind.Verdict:
+                <div class="app-step" @key="step.Id">
+                    <span class="app-step-node"><MudIcon Icon="@Icons.Material.Rounded.Gavel" /></span>
+                    <MudPaper Outlined="true" Class="pa-4">
+                        <div class="d-flex align-center gap-2 mb-1">
+                            <MudIcon Icon="@Icons.Material.Rounded.Gavel" Size="Size.Small" Class="mud-text-secondary" />
+                            <span class="app-card-title">@T("{0}'s verdict", step.Agent ?? T("Judge"))</span>
+                            <span class="ml-auto"><Pill Tone="accent" Icon="@Icons.Material.Rounded.EmojiEvents">@step.Winner</Pill></span>
+                        </div>
+                        @{ var k = 0; }
+                        @foreach (var (name, score) in step.Scores ?? [])
+                        {
+                            <div class="app-verdict-row">
+                                <span class="app-avatar" style="@($"background:{SpeakerColor(name)}")">@name[..Math.Min(2, name.Length)].ToUpperInvariant()</span>
+                                <span style="font-weight:500">@name</span>
+                                <div class="app-verdict-bar"><i style="@($"width:{score * 10}%;background:{SpeakerColor(name)};animation-delay:{k++ * 120}ms")"></i></div>
+                                <span class="tabular" style="text-align:right;font-weight:600">@score/10</span>
+                            </div>
+                        }
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary mt-3">@step.Text</MudText>
+                    </MudPaper>
+                </div>
+                break;
+
+            case StepKind.Check:
+                var failed = step.Checks?.Count(c => c.Outcome == CheckOutcome.Fail) ?? 0;
+                var total = step.Checks?.Count ?? 0;
+                <div class="app-step" @key="step.Id">
+                    <span class="@($"app-step-node {(failed > 0 ? "bad" : "ok")}")"><MudIcon Icon="@Icons.Material.Rounded.FactCheck" /></span>
+                    <MudPaper Outlined="true" Class="pa-4">
+                        <div class="d-flex flex-wrap align-center gap-3 mb-2">
+                            <span class="app-card-title">@T("Checks:") @CheckSummary(step, failed, total)</span>
+                            @if (failed > 0)
+                            {
+                                <Pill Tone="danger" Icon="@Icons.Material.Rounded.Cancel">@failed / @total</Pill>
+                            }
+                            else
+                            {
+                                <Pill Tone="success" Icon="@Icons.Material.Rounded.CheckCircle">@total / @total</Pill>
+                            }
+                            <div class="app-check-meter"><i style="@($"width:{(total == 0 ? 100 : (total - failed) * 100 / total)}%")"></i></div>
+                            <MudTooltip Text="@T("Same answer + same check versions = same fingerprint. Computed by code, not by a model.")">
+                                <span class="mono mud-text-secondary" style="font-size:11px">@step.Output</span>
+                            </MudTooltip>
+                        </div>
+                        @foreach (var check in step.Checks ?? [])
+                        {
+                            <div class="@(check.Outcome == CheckOutcome.Fail ? "app-check fail" : "app-check")">
+                                <MudIcon Size="Size.Small" Style="flex-shrink:0;margin-top:2px"
+                                         Icon="@(check.Outcome switch { CheckOutcome.Pass => Icons.Material.Rounded.CheckCircle, CheckOutcome.Fail => Icons.Material.Rounded.Cancel, _ => Icons.Material.Rounded.RemoveCircleOutline })"
+                                         Color="@(check.Outcome switch { CheckOutcome.Pass => Color.Success, CheckOutcome.Fail => Color.Error, _ => Color.Default })" />
+                                <div style="min-width:0">
+                                    <MudText Typo="Typo.body2" Style="font-weight:600">@T(check.Title) <span class="mono mud-text-secondary" style="font-size:11px;font-weight:400">@($"{check.CheckId} v{check.Version}")</span></MudText>
+                                    <MudText Typo="Typo.caption" Class="mud-text-secondary d-block">@T(check.Reason)</MudText>
+                                    @foreach (var finding in check.Findings)
+                                    {
+                                        <MudText Typo="Typo.caption" Class="d-block mono mt-1" Style="word-break:break-word">@(finding.Excerpt is null ? finding.What : $"{finding.What}: {finding.Excerpt}")</MudText>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </MudPaper>
+                </div>
+                break;
+        }
+    }
+    @if (Running && steps.Count == 0)
+    {
+        <div class="app-step d-flex flex-column">
+            <span class="app-step-node run"><span class="app-spin"></span></span>
+            <div class="@(Chat ? "app-step-text" : "app-step-reason")">
+                <span class="d-flex align-center gap-2"><span class="app-spin"></span>@T("Thinking…")</span>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public AgentRun Run { get; set; } = default!;
+    [Parameter] public bool Running { get; set; }
+    /// <summary>Chat look: no timeline spine, agent text as bubbles, tool calls as one-line rows.</summary>
+    [Parameter] public bool Chat { get; set; }
+    /// <summary>Called when the user approves/rejects a proposed action. Omit to make approvals read-only.</summary>
+    [Parameter] public EventCallback<(AgentStep Step, bool Approved)> OnDecide { get; set; }
+
+    private readonly HashSet<string> _expanded = [];
+    private bool _deciding;
+
+    private void Toggle(string id)
+    {
+        if (!_expanded.Remove(id)) _expanded.Add(id);
+    }
+
+    private async Task Decide(AgentStep step, bool approved)
+    {
+        _deciding = true;
+        try { await OnDecide.InvokeAsync((step, approved)); }
+        finally { _deciding = false; }
+    }
+
+    // Built here rather than shown from step.Text, which is saved in English; scenarios add the turn they stopped at.
+    private static string CheckSummary(AgentStep step, int failed, int total)
+    {
+        var text = failed == 0 ? T("{0} passed", total) : T("{0} of {1} failed", failed, total);
+        var stop = System.Text.RegularExpressions.Regex.Match(step.Text ?? "", @"stopped at turn (\d+)");
+        return stop.Success ? text + T(", conversation stopped at turn {0}", stop.Groups[1].Value) : text;
+    }
+
+    private static string Summary(AgentStep? result)
+    {
+        if (result is null) return T("running…");
+        if (result.Error is not null) return result.Error;
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(result.Output ?? "null");
+            return doc.RootElement.ValueKind switch
+            {
+                System.Text.Json.JsonValueKind.Array => doc.RootElement.GetArrayLength() == 1 ? T("1 result") : T("{0} results", doc.RootElement.GetArrayLength()),
+                System.Text.Json.JsonValueKind.Object => string.Join(", ", doc.RootElement.EnumerateObject().Take(4).Select(p => p.Name)),
+                _ => doc.RootElement.ToString(),
+            };
+        }
+        catch { return T("done"); }
+    }
+
+    private static string Pretty(string? json)
+    {
+        if (string.IsNullOrEmpty(json)) return "";
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            return System.Text.Json.JsonSerializer.Serialize(doc.RootElement, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+        }
+        catch { return json; }
+    }
+
+    // speaker-1…5 from the design system: white initials pass 4.5:1 on all five.
+    private static readonly string[] Palette = ["#0071E3", "#C93400", "#007A87", "#5856D6", "#D30F45"];
+    private static string SpeakerColor(string name) => Palette[name.Aggregate(17u, (h, c) => unchecked(h * 31 + c)) % (uint)Palette.Length];
+}
