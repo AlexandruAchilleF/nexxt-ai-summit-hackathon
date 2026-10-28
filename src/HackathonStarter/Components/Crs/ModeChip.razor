@@ -1,0 +1,32 @@
+@inject ChatClientProvider Ai
+
+@* The top-bar chip that says, on every frame, what the viewer is looking at: synthetic data, and whether the agent runs on a
+   real model or on the scripted planner with the real tools (AgentRunner: Live, then a recording, then the mock). *@
+<MudTooltip Text="@Hint">
+    <span class="@($"app-mode-chip{(_tone is null ? "" : " is-" + _tone)}")">
+        <MudIcon Icon="@_icon" Size="Size.Small" />
+        <span>@T("Synthetic data")</span>
+        <span class="app-mode-chip-sep" aria-hidden="true"></span>
+        <span>@_agent</span>
+    </span>
+</MudTooltip>
+
+@code {
+    private string _agent = "", _icon = "";
+    private string? _tone;
+
+    private string Hint => T("All clients and documents are synthetic. Live: the agent's model runs on the configured provider. Simulated: scripted answers, the same tools and checks.");
+
+    protected override void OnInitialized()
+    {
+        var o = Ai.Options;
+        if (o.AgentMode.Equals("Replay", StringComparison.OrdinalIgnoreCase))
+            (_agent, _icon, _tone) = (T("Agent: replay"), Icons.Material.Rounded.Replay, "warning");
+        else if (Ai.IsConfigured)
+            (_agent, _icon, _tone) = (o.Provider.Equals("Bedrock", StringComparison.OrdinalIgnoreCase)
+                ? T("Agent: live (Bedrock {0})", o.BedrockRegion)
+                : T("Agent: live ({0})", o.Provider), Icons.Material.Rounded.Bolt, "live");
+        else
+            (_agent, _icon, _tone) = (T("Agent: simulated, real tools"), Icons.Material.Rounded.TheaterComedy, null);
+    }
+}
