@@ -1,0 +1,43 @@
+@using HackathonStarter.Features.Rules
+@using HackathonStarter.Features.Tin
+@* A country as an ISO 3166-1 alpha-2 code, picked by code or name ("de", "Germ", "Germania"). Any two letters typed are kept,
+   so a country missing from the list still works; ChangeService validates the code again. *@
+<MudAutocomplete T="string" Value="@Value" ValueChanged="OnChanged" SearchFunc="SearchAsync" ToStringFunc="Display" Label="@(Label ?? T("Country"))"
+                 Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" CoerceValue="true" MaxItems="10" ResetValueOnEmptyText="true"
+                 Placeholder="DE" Disabled="Disabled" Class="@Class" HelperText="@Helper" />
+
+@code {
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public string? Label { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public string? Class { get; set; }
+
+    private static readonly string[] Codes = [.. Jurisdictions.EuMemberStates.Concat(TinFormat.Countries)
+        .Concat(["US", "GB", "CH", "NO", "MD", "AE", "CA", "AU", "TR", "UA", "RS"]).Select(Jurisdictions.Normalize).Distinct().Order()];
+
+    private string? Helper => Value is { Length: 2 } ? null : T("Code or name, e.g. DE or Germany");
+
+    private static string Display(string? code) => string.IsNullOrWhiteSpace(code) ? "" : CrsUi.Country(code);
+
+    private Task OnChanged(string? value)
+    {
+        // A typed value comes back as the label ("Germany (DE)"): keep the code.
+        var code = value?.Trim() ?? "";
+        if (code.Length > 2 && code.EndsWith(')') && code.LastIndexOf('(') is var open and >= 0) code = code[(open + 1)..^1];
+        Value = code.ToUpperInvariant();
+        return ValueChanged.InvokeAsync(Value);
+    }
+
+    private static Task<IEnumerable<string>> SearchAsync(string? text, CancellationToken _)
+    {
+        var q = text?.Trim() ?? "";
+        IEnumerable<string> hits = q.Length == 0
+            ? Codes
+            : Codes.Where(c => c.StartsWith(q, StringComparison.OrdinalIgnoreCase)
+                               || TextMatch.ContainsAny(Jurisdictions.Display(c, en: false), q) || TextMatch.ContainsAny(Jurisdictions.Display(c, en: true), q));
+        // The chosen label ("Germany (DE)") searches as itself: show that country first.
+        if (q.Length > 2 && q.EndsWith(')')) hits = Codes.Where(c => Display(c) == q).Concat(hits);
+        return Task.FromResult(hits.Distinct());
+    }
+}

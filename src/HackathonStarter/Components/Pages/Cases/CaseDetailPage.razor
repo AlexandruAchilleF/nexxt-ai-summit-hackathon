@@ -1,13 +1,363 @@
 @page "/cases/{Code}"
+@using HackathonStarter.Features.Audit
+@using HackathonStarter.Features.Cases
+@using HackathonStarter.Features.Changes
+@using HackathonStarter.Features.Clients
+@using HackathonStarter.Features.Deadlines
+@using HackathonStarter.Features.Rules
+@using HackathonStarter.Features.Shield
+@implements IDisposable
+@inject ICaseService Cases
+@inject IClientService Clients
+@inject IChangeService Changes
+@inject IAuditLog Audit
+@inject ICrsRuleEngine Engine
+@inject ISimClock Clock
+@inject SimClockControl ClockControl
+@inject CurrentUser CurrentUser
+@inject ISnackbar Snackbar
 
 <PageTitle>@T("Case {0}", Code) · @SiteConfig.Name</PageTitle>
 
 <MudButton Href="/cases" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Class="mb-4" Size="Size.Small">@T("All cases")</MudButton>
 
-<PageHeader Title="@T("Case {0}", Code)" Description="@T("Indicia with the guide page, evidence, the client request and the deadline.")" />
+@if (_error is not null)
+{
+    <ErrorState Message="@_error" OnRetry="LoadAsync" />
+}
+else if (!_loaded)
+{
+    <MudSkeleton SkeletonType="SkeletonType.Text" Width="320px" Height="48px" />
+    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="230px" Style="border-radius:20px" Class="mt-6" />
+    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="180px" Style="border-radius:20px" Class="mt-4" />
+}
+else if (_case is null)
+{
+    <EmptyState Icon="@Icons.Material.Rounded.SearchOff" Title="@T("No case {0}", Code)" Description="@T("The code may be mistyped, or the demo data was recreated on restart.")">
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Href="/cases">@T("All cases")</MudButton>
+    </EmptyState>
+}
+else
+{
+    var c = _case;
+    <PageHeader Title="@T("Case {0}", c.Code)">
+        <Actions>
+            <Pill Icon="@Icons.Material.Rounded.Gavel">@CrsUi.Label(c.Regime)</Pill>
+            <CaseStatusPill Status="c.Status" />
+        </Actions>
+    </PageHeader>
+    <div class="crs-meta mb-6" style="margin-top:-20px">
+        <a href="@($"/clients/{c.ClientCode}")" class="d-inline-flex align-center gap-2" style="text-decoration:none">
+            <span class="crs-initials" style="width:28px;height:28px;font-size:11px">@Initials</span>
+            <span><b style="color:var(--mud-palette-text-primary);font-weight:600">@(_client?.FullName ?? c.ClientCode)</b> · <span class="crs-code">@c.ClientCode</span></span>
+        </a>
+        @if (_trigger is { } t)
+        {
+            <span class="d-inline-flex align-center gap-1"><MudIcon Icon="@CrsUi.Icon(t.Kind)" Style="font-size:16px" /> @CrsUi.Label(t.Kind) · @CrsUi.Channel(t.SourceChannel) · @CrsUi.Date(t.ReceivedAt)</span>
+        }
+        <span>@T("Assigned to {0}", c.AssignedTo == CaseService.DefaultAssignee ? T("the operator") : c.AssignedTo)</span>
+    </div>
 
-<EmptyState Icon="@Icons.Material.Rounded.FactCheck" Title="@T("Coming in the next phase")" Description="@T("The backend for this page is being built.")" />
+    <div class="crs-stack">
+        <MudPaper Outlined="true" Class="pa-4"><CaseStages Status="c.Status" /></MudPaper>
+
+        <CaseNextStep @ref="_next" Case="c" Now="_now" RequiredDocs="_requiredDocs" Current="_currentOutcome" IsOperator="_isOperator" IsEditor="_isEditor"
+                      User="_user" ClientName="@_client?.FullName" OnChanged="LoadAsync" />
+
+        <DeadlineClock Case="c" Now="_now" />
+
+        <div class="crs-grid two">
+            <MudPaper Outlined="true" Class="pa-4">
+                <div class="crs-head">
+                    <div>
+                        <div class="app-card-title d-flex align-center gap-1">@T("Indicia from the law")
+                            <MudTooltip Text="@T("An indicium is a fact in the bank's data that the law lists as a sign of tax residence abroad (guide p. 29-31). The list is closed: only these start an action.")">
+                                <MudIcon Icon="@Icons.Material.Rounded.HelpOutline" Class="crs-help" />
+                            </MudTooltip>
+                        </div>
+                        <div class="crs-hint">@T("Found by code, each with its rule and guide page. Only these can start a deadline.")</div>
+                    </div>
+                    <Pill Tone="@(Uncovered > 0 ? "warning" : "success")">@T("{0} of {1} covered", c.Indicia.Count - Uncovered, c.Indicia.Count)</Pill>
+                </div>
+                @{ var i = 0; }
+                @foreach (var ind in c.Indicia)
+                {
+                    var hit = Coverage(ind);
+                    var covered = hit is not null && hit.CoveredBy != Features.Rules.Coverage.None;
+                    <div class="@($"crs-ind{(covered ? " is-covered" : "")}")" style="@($"--i:{i++}")">
+                        <span class="crs-ind-mark"><MudIcon Icon="@(covered ? Icons.Material.Rounded.TaskAlt : Icons.Material.Rounded.Gavel)" /></span>
+                        <div>
+                            <div class="crs-ind-top">
+                                <span class="crs-ind-title">@CrsUi.RuleTitle(ind.RuleId)</span>
+                                <Pill Icon="@Icons.Material.Rounded.Public">@CrsUi.Country(ind.Jurisdiction)</Pill>
+                            </div>
+                            <div class="crs-ind-text">@Lang.Pick(ind.ExplanationRo, ind.Explanation)</div>
+                            <div class="crs-quote-meta">
+                                <span class="crs-code">@ind.RuleId</span><span>·</span><span>@CrsUi.Page(ind.GuidePage)</span><span>·</span>
+                                <span>@(covered ? CrsUi.Label(hit!.CoveredBy) : T("Uncovered: starts the deadline"))</span>
+                                @if (!covered && hit?.Basis is { } basis && basis != RuleBasis.Verified)
+                                {
+                                    <Pill Tone="warning" Icon="@Icons.Material.Rounded.Psychology">@CrsUi.Label(basis)</Pill>
+                                }
+                            </div>
+                            @foreach (var ev in c.Evidence.Where(e => e.LinkedRuleId == ind.RuleId))
+                            {
+                                @EvidenceQuote(ev)
+                            }
+                        </div>
+                    </div>
+                }
+                @if (_cleared.Count > 0)
+                {
+                    <MudDivider Class="my-4" />
+                    <div class="crs-title">@T("Checked, does not apply")</div>
+                    <div class="crs-hint mb-2">@T("Rules code checked on the client's data today, with the reason they do not apply.")</div>
+                    @foreach (var rule in _cleared.Take(_allCleared ? 50 : 4))
+                    {
+                        <div class="crs-cleared">
+                            <MudIcon Icon="@Icons.Material.Rounded.CheckCircleOutline" />
+                            <div><b>@CrsUi.RuleTitle(rule.RuleId)</b>@(string.IsNullOrEmpty(rule.Jurisdiction) ? "" : $" ({rule.Jurisdiction})"): @Lang.Pick(rule.ExplanationRo, rule.Explanation) <span class="crs-code">@rule.RuleId</span>, @CrsUi.Page(rule.GuidePage)</div>
+                        </div>
+                    }
+                    @if (_cleared.Count > 4)
+                    {
+                        <MudButton Variant="Variant.Text" Size="Size.Small" Class="mt-1" OnClick="() => _allCleared = !_allCleared">
+                            @(_allCleared ? T("Show fewer") : T("Show all {0}", _cleared.Count))
+                        </MudButton>
+                    }
+                }
+            </MudPaper>
+
+            <div class="crs-stack">
+                <MudPaper Outlined="true" Class="pa-4">
+                    <div class="app-card-title d-flex align-center gap-1">@T("Context signals")
+                        <MudTooltip Text="@T("Something found in a document that is not on the law's list, such as a salary from a foreign employer. It is shown with its quote and never opens a case.")">
+                            <MudIcon Icon="@Icons.Material.Rounded.HelpOutline" Class="crs-help" />
+                        </MudTooltip>
+                    </div>
+                    <div class="crs-hint mb-4">@T("Found in the documents, with a quote. A signal is shown; it never starts an alert or changes the decision.")</div>
+                    @if (c.Signals.Count == 0)
+                    {
+                        <div class="crs-hint">@T("No signal recorded on this case.")</div>
+                    }
+                    @{ var s = 0; }
+                    @foreach (var signal in c.Signals)
+                    {
+                        <div class="crs-signal" style="@($"--i:{s++}")">
+                            <span class="crs-signal-mark"><MudIcon Icon="@Icons.Material.Rounded.Lightbulb" /></span>
+                            <div>
+                                <div class="d-flex flex-wrap align-center gap-2">
+                                    <Pill Icon="@Icons.Material.Rounded.NotificationsOff">@T("Signal, no alert")</Pill>
+                                    <span class="crs-hint" style="margin:0">@(signal.Strength == SignalStrength.Moderate ? T("moderate") : T("weak"))</span>
+                                </div>
+                                <div class="mt-1">@signal.Description</div>
+                                @if (c.Evidence.FirstOrDefault(e => e.Id == signal.EvidenceId) is { } ev)
+                                {
+                                    @EvidenceQuote(ev)
+                                }
+                            </div>
+                        </div>
+                    }
+                </MudPaper>
+
+                @if (c.Evidence.Any(e => e.LinkedRuleId is null && !c.Signals.Any(sg => sg.EvidenceId == e.Id)))
+                {
+                    <MudPaper Outlined="true" Class="pa-4">
+                        <div class="app-card-title">@T("Other evidence")</div>
+                        <div class="crs-hint mb-2">@T("Quotes checked by code against the visible text of the document.")</div>
+                        @foreach (var ev in c.Evidence.Where(e => e.LinkedRuleId is null && !c.Signals.Any(sg => sg.EvidenceId == e.Id)))
+                        {
+                            @EvidenceQuote(ev)
+                        }
+                    </MudPaper>
+                }
+
+                <MudPaper Outlined="true" Class="pa-4">
+                    <div class="app-card-title mb-3">@T("Correspondence")</div>
+                    @if (c.Requests.Count == 0 && c.Responses.Count == 0)
+                    {
+                        <div class="crs-hint">@T("Nothing sent or received yet.")</div>
+                    }
+                    else
+                    {
+                        <div class="crs-timeline">
+                            @{ var k = 0; }
+                            @foreach (var item in Correspondence())
+                            {
+                                <div class="@($"crs-tl {item.Css}")" style="@($"--i:{k++}")">
+                                    <div class="crs-tl-head"><b>@item.Title</b> <Pill Tone="@item.Tone">@item.Status</Pill></div>
+                                    <div class="crs-tl-meta">@item.Meta</div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </MudPaper>
+            </div>
+        </div>
+
+        <MudPaper Outlined="true" Class="pa-4">
+            <div class="crs-head">
+                <div>
+                    <div class="app-card-title">@T("Case log")</div>
+                    <div class="crs-hint">@T("Every step of this case in the hash-chained audit log, newest first.")</div>
+                </div>
+                <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Primary" Href="/audit" EndIcon="@Icons.Material.Rounded.ChevronRight">@T("Audit log")</MudButton>
+            </div>
+            @if (_audit.Count == 0)
+            {
+                <div class="crs-hint">@T("No entries yet")</div>
+            }
+            else
+            {
+                <div class="crs-timeline">
+                    @{ var a = 0; }
+                    @foreach (var entry in _audit.Where(e => e.Kind != AuditKinds.RuleApplied).Take(_allAudit ? 200 : 8))
+                    {
+                        <div class="@($"crs-tl{(entry.Actor == CaseService.SystemActor ? " is-system" : "")}{(entry.Kind is AuditKinds.CaseEscalated or AuditKinds.CaseReminded or AuditKinds.CaseExpired ? " is-warn" : "")}{(entry.Kind == AuditKinds.CaseClosed ? " is-good" : "")}")"
+                             style="@($"--i:{a++}")" @key="entry.Seq">
+                            <div class="crs-tl-head"><b>@CrsUi.AuditKind(entry.Kind)</b> <span class="crs-tl-meta">@CrsUi.Actor(entry.Actor)</span></div>
+                            <div class="crs-tl-meta">#@entry.Seq · @CrsUi.DateTimeText(entry.At) · <span class="crs-code" title="@entry.Hash">@entry.Hash[..Math.Min(10, entry.Hash.Length)]</span></div>
+                        </div>
+                    }
+                </div>
+                @if (_audit.Count(e => e.Kind != AuditKinds.RuleApplied) > 8)
+                {
+                    <MudButton Variant="Variant.Text" Size="Size.Small" Class="mt-1" OnClick="() => _allAudit = !_allAudit">@(_allAudit ? T("Show fewer") : T("Show the whole log"))</MudButton>
+                }
+            }
+        </MudPaper>
+    </div>
+}
 
 @code {
     [Parameter] public string Code { get; set; } = "";
+
+    private Case? _case;
+    private Client? _client;
+    private ChangeEvent? _trigger;
+    private List<AuditEntry> _audit = [];
+    private IReadOnlyList<string> _requiredDocs = [];
+    private RuleOutcome? _currentOutcome;
+    private List<RuleHit> _cleared = [];
+    private Dictionary<int, DocumentInfo> _documents = [];
+    private DateTime _now;
+    private DemoUser? _user;
+    private CaseNextStep? _next;
+    private string? _error;
+
+    [CascadingParameter] public DemoContext? Demo { get; set; }
+    private bool _loaded, _isOperator, _isEditor, _allCleared, _allAudit;
+
+    private int Uncovered => _case!.Indicia.Count(i => Coverage(i) is not { CoveredBy: not Features.Rules.Coverage.None });
+
+    private string Initials => _client is null ? "?" : $"{_client.FirstName.FirstOrDefault()}{_client.LastName.FirstOrDefault()}".ToUpperInvariant();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = _user = await CurrentUser.GetAsync();
+        _isOperator = user.Role == Roles.Operator; // CaseService checks every role again
+        _isEditor = user.Role is Roles.Admin or Roles.Member;
+        CrsSignals.Changed += OnSignal;
+    }
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private Task OnSignal() => InvokeAsync(LoadAsync);
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            _error = null;
+            _now = Clock.UtcNow;
+            _case = await Cases.GetAsync(Code);
+            if (_case is not null)
+            {
+                _client = await Clients.GetAsync(_case.ClientCode);
+                _documents = (await Clients.ListDocumentsAsync(_case.ClientCode)).ToDictionary(d => d.Id);
+                _trigger = (await Changes.ListAsync(_case.ClientCode, 200)).FirstOrDefault(ch => ch.Id == _case.TriggerChangeId);
+                _audit = await Audit.ListAsync(_case.Id);
+                _requiredDocs = _case.IsOpen ? await Cases.RequiredDocumentsAsync(Code) : [];
+                if (_client is not null && await Clients.SnapshotAsync(_client.Id) is { } snapshot)
+                {
+                    _currentOutcome = Engine.EvaluateCurrent(snapshot);
+                    _cleared = [.. _currentOutcome.Cleared];
+                }
+            }
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        _loaded = true;
+        StateHasChanged();
+        OfferDemo();
+    }
+
+    /// <summary>This case's shortcuts in the Demo menu: jump to its next milestone, fill in the golden answer.</summary>
+    private void OfferDemo()
+    {
+        if (Demo is null) return;
+        if (_case is not { IsOpen: true } c) { Demo.Withdraw(this); return; }
+        var actions = new List<DemoContext.DemoAction>();
+        int Days(DateTime at) => Math.Clamp((int)Math.Ceiling((at - Clock.UtcNow).TotalDays), 1, SimClockControl.MaxDays);
+        if (_isOperator && c.RemindAt is { } remind && c.RemindedAt is null && remind > _now)
+            actions.Add(new(T("To the reminder day"), Icons.Material.Rounded.NotificationsActive, () => MoveAsync(Days(remind)), T("day {0}", CrsUi.DayNumber(c.OpenedAt, remind))));
+        if (_isOperator && c.DueAt is { } due && due > _now)
+            actions.Add(new(T("Past the deadline"), Icons.Material.Rounded.EventBusy, () => MoveAsync(Days(due) + 1), T("the case expires"), Destructive: true));
+        if (_next?.CanFillSample == true)
+            actions.Add(new(T("Fill in the sample answer"), Icons.Material.Rounded.AutoFixHigh, () => { _next.FillSample(); return Task.CompletedTask; }, T("from the golden case")));
+        if (actions.Count == 0) Demo.Withdraw(this);
+        else Demo.Offer(this, T("Case {0}", c.Code), actions);
+    }
+
+    private async Task MoveAsync(int days)
+    {
+        var tick = await CrsSignals.MoveClockAsync(() => ClockControl.AdvanceDaysAsync(days), Cases, Clock);
+        if (tick.Reminded + tick.Expired > 0)
+            Snackbar.Add(T("Deadline check: {0} reminded and escalated, {1} expired", tick.Reminded, tick.Expired), Severity.Warning);
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        // The next-step component exists only after the first render with data: offer the sample answer then.
+        if (_loaded && _next is not null && _offeredSample != _next.CanFillSample) { _offeredSample = _next.CanFillSample; OfferDemo(); }
+    }
+
+    private bool? _offeredSample;
+
+    /// <summary>What code says about this indicium on the client's data today: covered by a new self-certification or not.</summary>
+    private RuleHit? Coverage(Indicium ind) => _currentOutcome?.Indicia.FirstOrDefault(h => h.RuleId == ind.RuleId && h.Jurisdiction == ind.Jurisdiction);
+
+    private RenderFragment EvidenceQuote(Evidence ev) => @<div class="crs-quote">
+        <q>@ev.Quote</q>
+        <div class="crs-quote-meta">
+            <EvidenceBadge Check="Check(ev)" />
+            <span>@(ev.Source == EvidenceSource.BankData ? T("From the bank's data") : DocumentName(ev))</span>
+            <span>· @CrsUi.Actor(ev.RecordedBy)</span>
+        </div>
+    </div>;
+
+    private static EvidenceCheck Check(Evidence ev) => new(ev.Verified, ev.Page, ev.VerificationNote ?? "");
+
+    private string DocumentName(Evidence ev) =>
+        (ev.DocumentId is { } id && _documents.TryGetValue(id, out var doc) ? doc.FileName : T("Document"))
+        + (ev.Page is { } page ? $", {T("Page {0}", page).ToLowerInvariant()}" : "");
+
+    private sealed record Letter(DateTime At, string Title, string Status, string? Tone, string Meta, string Css);
+
+    private IEnumerable<Letter> Correspondence() => _case!.Requests
+        .Select(r => new Letter(r.ApprovedAt ?? r.RejectedAt ?? r.CreatedAt, CrsUi.Label(r.Kind), CrsUi.Label(r.Status), CrsUi.Tone(r.Status),
+            r.Status switch
+            {
+                RequestStatus.Sent => T("Approved by {0} · {1} · {2}", r.ApprovedBy, CrsUi.Channel(r.Channel), CrsUi.DateTimeText(r.ApprovedAt!.Value)),
+                RequestStatus.Rejected => T("Rejected by {0}: {1}", r.RejectedBy, r.RejectionReason),
+                _ => T("Drafted by {0} · {1}", CrsUi.Actor(r.DraftedBy), CrsUi.DateTimeText(r.CreatedAt)),
+            }, r.DraftedBy == CaseService.SystemActor ? "is-system" : ""))
+        .Concat(_case.Responses.Select(r => new Letter(r.ReceivedAt, CrsUi.Label(r.Kind), T("Received"), "accent",
+            $"{CrsUi.Channel(r.Channel)} · {CrsUi.DateTimeText(r.ReceivedAt)}{(string.IsNullOrWhiteSpace(r.Summary) ? "" : " · " + r.Summary)}", "is-good")))
+        .OrderByDescending(l => l.At);
+
+    public void Dispose()
+    {
+        CrsSignals.Changed -= OnSignal;
+        Demo?.Withdraw(this);
+    }
 }

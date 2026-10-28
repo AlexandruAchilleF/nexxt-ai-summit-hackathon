@@ -1,0 +1,44 @@
+@* A segmented control in the app's pill language: one choice of a few, the selected segment lights up. A radio group: one
+   tab stop, arrow keys move the choice. *@
+<div class="crs-seg" role="radiogroup" aria-label="@Label" @onkeydown="OnKeyAsync">
+    @foreach (var option in Options)
+    {
+        var on = option.Value == Value;
+        <button type="button" role="radio" aria-checked="@(on ? "true" : "false")" tabindex="@(on || (Value is null && option == Options[0]) ? 0 : -1)"
+                class="@($"crs-seg-item{(on ? " is-on" : "")}")" @onclick="() => SelectAsync(option.Value)">
+            @option.Text
+            @if (option.Count is { } n)
+            {
+                <span class="crs-seg-count tabular">@n</span>
+            }
+        </button>
+    }
+</div>
+
+@code {
+    public sealed record Option(string Value, string Text, int? Count = null);
+
+    [Parameter, EditorRequired] public IReadOnlyList<Option> Options { get; set; } = [];
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public string? Label { get; set; }
+
+    [Inject] private IJSRuntime JS { get; set; } = default!;
+
+    private async Task SelectAsync(string value)
+    {
+        if (value == Value) return;
+        Value = value;
+        await ValueChanged.InvokeAsync(value);
+    }
+
+    private async Task OnKeyAsync(KeyboardEventArgs e)
+    {
+        var step = e.Key switch { "ArrowRight" or "ArrowDown" => 1, "ArrowLeft" or "ArrowUp" => -1, _ => 0 };
+        if (step == 0 || Options.Count == 0) return;
+        var index = Options.ToList().FindIndex(o => o.Value == Value);
+        var next = Options[((index < 0 ? 0 : index) + step + Options.Count) % Options.Count];
+        await SelectAsync(next.Value);
+        try { await JS.InvokeVoidAsync("focusChecked"); } catch (JSException) { } catch (JSDisconnectedException) { }
+    }
+}
