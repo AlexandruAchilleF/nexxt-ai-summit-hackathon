@@ -87,7 +87,8 @@
                                 <MudText Typo="Typo.body2" Class="mud-text-secondary">@step.Summary</MudText>
                             </div>
                         </div>
-                        @if (step.State == ApprovalState.Pending && OnDecide.HasDelegate)
+                        @* Not while the run still executes: it saves itself at the end, over the decision (DecideAsync refuses too). *@
+                        @if (step.State == ApprovalState.Pending && OnDecide.HasDelegate && Run.Status != RunStatus.Running)
                         {
                             <div class="d-flex gap-2 mt-3">
                                 <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Rounded.Check"

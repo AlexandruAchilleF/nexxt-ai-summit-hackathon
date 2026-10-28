@@ -56,7 +56,7 @@ else
         <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">@T("Replay of a recording made for:") “@_run.ReplayOf”</MudAlert>
     }
     <MudPaper Outlined="true" Class="pa-5">
-        <AgentTrace Run="_run" OnDecide="@(_canDecide ? EventCallback.Factory.Create<(AgentStep Step, bool Approved)>(this, Decide) : default)" />
+        <AgentTrace Run="_run" OnDecide="@(_canDecide && _run.Status != RunStatus.Running ? EventCallback.Factory.Create<(AgentStep Step, bool Approved)>(this, Decide) : default)" />
         @if (_run.Error is not null)
         {
             <MudText Color="Color.Error" Class="mt-4">@T(_run.Error)</MudText>
@@ -75,7 +75,8 @@ else
 
     protected override async Task OnParametersSetAsync()
     {
-        // Approve / reject only for roles that can decide (read-only card otherwise); DecideAsync checks again.
+        // Approve / reject only for roles that can decide (read-only card otherwise) and not while the run is still running;
+        // DecideAsync checks again.
         _canDecide = (await CurrentUser.GetAsync()).Role is Roles.Admin or Roles.Member;
         _run = await Store.GetAsync(Id);
         _loading = false;
@@ -90,6 +91,6 @@ else
             _run = await Runner.DecideAsync(agent, _run!.Id, args.Step.Id, args.Approved);
             Snackbar.Add(args.Approved ? T("Approved and executed") : T("Rejected"), Severity.Success);
         }
-        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        catch (Exception ex) { Snackbar.Add(T(ex.Message), Severity.Error); }
     }
 }

@@ -212,6 +212,60 @@ public class AgentRunnerTests
     }
 
     [Fact]
+    public async Task An_approval_of_a_run_still_running_is_refused_and_nothing_runs()
+    {
+        await using var host = await TestHost.CreateAsync(client: null);
+        var target = (await host.Get<ItemService>().ListAsync(new ItemFilter("Old prototype"))).Single();
+        var run = await host.RunAsync("assistant", "Archive the 'Old prototype' item");
+        var approval = run.Steps.Single(s => s.Kind == StepKind.Approval);
+        run.Status = RunStatus.Running; // as saved while the run still executes
+        await host.Get<RunStore>().SaveAsync(run);
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            host.Get<AgentRunner>().DecideAsync(host.Agent("assistant"), run.Id, approval.Id, approved: true));
+
+        Assert.Equal(AgentRunner.StillRunning, error.Message);
+        Assert.Equal(ItemStatus.Draft, (await host.Get<ItemService>().GetAsync(target.Id))!.Status);
+        var saved = (await host.Get<RunStore>().GetAsync(run.Id))!;
+        Assert.Equal(ApprovalState.Pending, saved.Steps.Single(s => s.Kind == StepKind.Approval).State);
+        Assert.DoesNotContain(saved.Steps, s => s is { Kind: StepKind.ToolCall, Tool: "updateItem" });
+    }
+
+    [Fact]
+    public async Task A_proposal_shown_while_the_model_still_writes_can_be_decided_only_once_the_run_ends()
+    {
+        var model = new FakeChatClient();
+        await using var host = await TestHost.CreateAsync(model);
+        var target = (await host.Get<ItemService>().ListAsync(new ItemFilter("Old prototype"))).Single();
+        var writing = new TaskCompletionSource();
+        using var release = new ManualResetEventSlim();
+        model.CallTool("updateItem", new { id = target.Id, title = "Old prototype", status = "Archived" })
+            .ReplyWith(_ =>
+            {
+                writing.TrySetResult(); // the approval card is on screen, the model writes its last turn
+                release.Wait(TimeSpan.FromSeconds(10));
+                return "proposed";
+            });
+        var service = (AgentRunService)host.Root.GetService(typeof(AgentRunService))!;
+
+        var active = await service.StartAsync("assistant", [new ChatTurn("user", "Archive the 'Old prototype' item")], [], SiteConfig.Users[0], "conv-3");
+        await writing.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        var approval = active.Run.Snapshot().Single(s => s.Kind == StepKind.Approval);
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            host.Get<AgentRunner>().DecideAsync(host.Agent("assistant"), active.Run.Id, approval.Id, approved: true));
+        Assert.Equal(AgentRunner.StillRunning, error.Message);
+        Assert.Equal(ItemStatus.Draft, (await host.Get<ItemService>().GetAsync(target.Id))!.Status);
+
+        release.Set();
+        var run = await active.Completion.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Equal(RunStatus.AwaitingApproval, run.Status);
+        var decided = await host.Get<AgentRunner>().DecideAsync(host.Agent("assistant"), run.Id, approval.Id, approved: true);
+        Assert.Equal(RunStatus.Completed, decided.Status);
+        Assert.Equal(ItemStatus.Archived, (await host.Get<ItemService>().GetAsync(target.Id))!.Status);
+    }
+
+    [Fact]
     public async Task Cancelling_marks_the_run_cancelled()
     {
         var model = new FakeChatClient { Delay = TimeSpan.FromSeconds(10) }.Reply("too late");

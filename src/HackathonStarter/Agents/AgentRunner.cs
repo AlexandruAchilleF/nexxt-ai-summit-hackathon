@@ -316,11 +316,16 @@ public class AgentRunner(
         return result is JsonElement je ? je.GetRawText() : JsonSerializer.Serialize(result, RunStore.Json);
     }
 
+    /// <summary>Why <see cref="DecideAsync"/> refuses a run that is still executing (shown translated).</summary>
+    public const string StillRunning = "The agent is still running: approve or reject once it has finished.";
+
     /// <summary>Human-in-the-loop decision. On approval the tool runs now (no model call) and the run is updated.</summary>
     public async Task<AgentRun> DecideAsync(AgentDefinition agent, string runId, string approvalId, bool approved)
     {
         var user = await currentUser.Require(Roles.Admin, Roles.Member);
         var run = await store.GetAsync(runId) ?? throw new KeyNotFoundException("Run not found");
+        // The run saves itself once more when it finishes, which would undo a decision taken now.
+        if (run.Status == RunStatus.Running) throw new InvalidOperationException(StillRunning);
         var step = run.Steps.FirstOrDefault(s => s.Id == approvalId && s.Kind == StepKind.Approval)
                    ?? throw new KeyNotFoundException("Approval not found");
         if (step.State != ApprovalState.Pending) throw new InvalidOperationException($"Already {step.State}");

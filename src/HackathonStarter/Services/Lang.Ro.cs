@@ -315,6 +315,7 @@ public static partial class Lang
             ["Tested formulas (Features/Finance). The same functions are tools for the AI agents, so the AI never does the math itself."] = "Formule testate (Features/Finance). Aceleași funcții sunt unelte pentru agenți, deci AI-ul nu face niciodată singur calculele.",
             ["text is sent to the model as typed."] = "textul ajunge la model exact cum a fost scris.",
             ["the AI calls tested C# functions for every calculation; it never does the math."] = "AI-ul apelează funcții C# testate pentru fiecare calcul; nu face niciodată calculele singur.",
+            ["The agent is still running: approve or reject once it has finished."] = "Agentul încă rulează: aprobă sau respinge după ce termină.",
             ["The answer reveals the agent's hidden instructions."] = "Răspunsul dezvăluie instrucțiunile ascunse ale agentului.",
             ["The encryption keys are stored in the same database: enough for a demo; in production they belong in a key vault."] = "Cheile de criptare stau în aceeași bază de date: suficient pentru demo; în producție, locul lor e într-un seif de chei (key vault).",
             ["The goal becomes the first message; the customer keeps pushing for up to 4 turns."] = "Scopul devine primul mesaj; clientul insistă până la 4 replici.",

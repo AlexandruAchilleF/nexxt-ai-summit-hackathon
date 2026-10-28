@@ -63,7 +63,7 @@ public class LangTests
             .Concat(SiteConfig.Users.Select(u => u.Role))
             .Concat(Enum.GetNames<RunStatus>()).Concat(Enum.GetNames<RunSource>()).Concat(Enum.GetNames<ExportStatus>())
             .Concat(Enum.GetNames<ItemStatus>()).Concat(Enum.GetNames<ItemPriority>())
-            .Append(RunStore.InterruptedError);
+            .Append(RunStore.InterruptedError).Append(AgentRunner.StillRunning);
 
         Assert.All(keys, k => Assert.True(Lang.Translations.ContainsKey(k), $"No Romanian for \"{k}\""));
     }

@@ -243,9 +243,14 @@
     private string WithoutContext(string input) =>
         !string.IsNullOrWhiteSpace(Context) && input.StartsWith($"{Context}\n\n", StringComparison.Ordinal) ? input[(Context.Length + 2)..] : input;
 
-    /// <summary>Approve / reject only for roles that can decide (read-only card otherwise); DecideAsync checks again.</summary>
+    /// <summary>
+    /// Approve / reject only for roles that can decide (read-only card otherwise) and only once the run has finished
+    /// and been saved (it is no longer active); DecideAsync checks again.
+    /// </summary>
     private EventCallback<(AgentStep Step, bool Approved)> DecideFor(Turn turn) =>
-        _canDecide ? EventCallback.Factory.Create<(AgentStep Step, bool Approved)>(this, args => Decide(turn, args)) : default;
+        _canDecide && turn.Run is { Status: not RunStatus.Running } run && RunService.Get(run.Id) is null
+            ? EventCallback.Factory.Create<(AgentStep Step, bool Approved)>(this, args => Decide(turn, args))
+            : default;
 
     private async Task Decide(Turn turn, (AgentStep Step, bool Approved) args)
     {
@@ -257,7 +262,7 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Add(ex.Message, Severity.Error);
+            Snackbar.Add(T(ex.Message), Severity.Error);
         }
     }
 
