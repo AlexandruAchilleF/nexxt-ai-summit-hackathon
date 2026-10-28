@@ -55,6 +55,7 @@ public static partial class Lang
         ro["Something went wrong: {0}"] = "Ceva nu a mers: {0}";
         ro["Tamper mode"] = "Modul de falsificare";
         ro["the case expires"] = "cazul expiră";
+        ro["then Maria's change"] = "apoi modificarea Mariei";
         ro["TIN format"] = "Format TIN";
         ro["To"] = "Către";
         ro["US citizen"] = "Cetățean SUA";

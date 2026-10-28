@@ -7,6 +7,8 @@
 @inject CurrentUser CurrentUser
 @inject ISnackbar Snackbar
 @inject NavigationManager Nav
+@inject IDialogService Dialogs
+@inject HackathonStarter.Data.DemoData DemoData
 
 @* The Demo menu in the top bar: the demo date (docs/PLAN.md 9.1) and every demo shortcut in one place, so the pages show only
    the bank's workflow. The page in view adds its own shortcuts through DemoContext (this case's reminder day, the sample
@@ -71,6 +73,14 @@
         <div class="demo-menu-group">@T("Scenarios")</div>
         <MudMenuItem Icon="@Icons.Material.Rounded.AutoAwesomeMotion" OnClick="@(() => Nav.NavigateTo("/changes/new?golden=1"))">@T("Golden cases")</MudMenuItem>
         <MudMenuItem Icon="@Icons.Material.Rounded.Insights" OnClick="@(() => Nav.NavigateTo("/metrics"))">@T("Measure the rules")</MudMenuItem>
+        @if (_isOperator)
+        {
+            @* Between two takes of the video: the seed back, the real date, then Maria's change ready to record (golden case 4). *@
+            <MudMenuItem Icon="@Icons.Material.Rounded.RestartAlt" IconColor="Color.Error" OnClick="ResetDemoAsync" Disabled="_busy">
+                @T("Reset demo data")
+                <span class="app-card-sub ml-2">@T("then Maria's change")</span>
+            </MudMenuItem>
+        }
     </ChildContent>
 </MudMenu>
 
@@ -109,6 +119,21 @@
             var tick = await CrsSignals.MoveClockAsync(move, Cases, Clock);
             if (tick.Reminded + tick.Expired > 0)
                 Snackbar.Add(T("Deadline check: {0} reminded and escalated, {1} expired", tick.Reminded, tick.Expired), Severity.Warning);
+        }
+        catch (Exception ex) { Snackbar.Add(CrsUi.Problem(ex), Severity.Error); }
+        finally { _busy = false; }
+    }
+
+    private async Task ResetDemoAsync()
+    {
+        if (!await Dialogs.ConfirmAsync(T("Reset demo data?"), T("All agent runs and changes to the data will be lost."), T("Reset"), destructive: true)) return;
+        _busy = true;
+        try
+        {
+            await DemoData.ResetAsync();
+            await CrsSignals.RaiseAsync();
+            Snackbar.Add(T("Demo data reset"), Severity.Success);
+            Nav.NavigateTo("/changes/new?scenario=4", forceLoad: true);
         }
         catch (Exception ex) { Snackbar.Add(CrsUi.Problem(ex), Severity.Error); }
         finally { _busy = false; }
