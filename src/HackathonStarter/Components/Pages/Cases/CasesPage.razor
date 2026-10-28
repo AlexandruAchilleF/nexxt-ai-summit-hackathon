@@ -1,7 +1,98 @@
 @page "/cases"
+@inject ICaseService CaseService
+@inject ISimClock SimClock
+@inject CurrentUser CurrentUser
 
 <PageTitle>@T("Cases") · @SiteConfig.Name</PageTitle>
 
 <PageHeader Title="@T("Cases")" Description="@T("The queue of CRS/FATCA cases, ordered by deadline.")" />
 
-<EmptyState Icon="@Icons.Material.Rounded.AssignmentLate" Title="@T("Coming in the next phase")" Description="@T("The backend for this page is being built.")" />
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Class="mb-4" />
+}
+else if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@_error</MudAlert>
+}
+else if (_cases.Count == 0)
+{
+    <EmptyState Icon="@Icons.Material.Rounded.CheckCircle" Title="@T("No cases")" Description="@T("All cases are closed or there are no open cases yet.")" />
+}
+else
+{
+    <MudContainer MaxWidth="MaxWidth.False" Class="pa-0">
+        <MudSimpleTable Dense="true" Striped="true" Class="crs-cases-table">
+            <thead>
+                <tr>
+                    <th>@T("Case")</th>
+                    <th>@T("Client")</th>
+                    <th>@T("Regime")</th>
+                    <th>@T("Indicia")</th>
+                    <th>@T("Due date")</th>
+                    <th>@T("Days left")</th>
+                    <th>@T("Status")</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var case_ in _cases)
+                {
+                    <tr class="crs-cases-row" @onclick="() => NavigateTo(case_.Code)">
+                        <td>
+                            <MudLink Href="@($"/cases/{case_.Code}")">@case_.Code</MudLink>
+                        </td>
+                        <td>@case_.ClientCode</td>
+                        <td>@case_.Regime</td>
+                        <td>@case_.Indicia.Count</td>
+                        <td>
+                            @if (case_.DueAt is { } due)
+                            {
+                                <span class="mud-text-secondary">@Format.Date(due)</span>
+                            }
+                            else
+                            {
+                                <span class="mud-text-secondary">—</span>
+                            }
+                        </td>
+                        <td>
+                            <DaysLeft Case="case_" Now="_now" />
+                        </td>
+                        <td>
+                            <CaseStatusPill Status="case_.Status" />
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </MudSimpleTable>
+    </MudContainer>
+}
+
+@code {
+    private List<Case> _cases = [];
+    private bool _loading = true;
+    private string? _error;
+    private DateTime _now = DateTime.UtcNow;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _now = SimClock.UtcNow;
+            var user = await CurrentUser.GetAsync();
+            _cases = await CaseService.QueueAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void NavigateTo(string code)
+    {
+        // Navigation happens via the MudLink
+    }
+}
