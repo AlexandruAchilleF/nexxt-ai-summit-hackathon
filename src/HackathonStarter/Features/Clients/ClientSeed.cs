@@ -1,4 +1,6 @@
+using HackathonStarter.Features.Changes;
 using HackathonStarter.Features.Evaluation;
+using HackathonStarter.Features.Shield;
 using HackathonStarter.Features.Synthetic;
 using HackathonStarter.Services;
 using UglyToad.PdfPig;
@@ -32,18 +34,26 @@ public static class ClientSeed
 
     private sealed record Street(string Name, string PostalCode);
 
-    // Real streets and postal codes, none of them a golden client's address.
+    // Real streets and postal codes, none of them a street of a golden card, even with another kind ("Str. Republicii",
+    // "Bd. Republicii"): SeedTests checks it. A city with none left here (Brașov) is moved to FallbackCity.
     private static readonly Dictionary<string, Street[]> Streets = new()
     {
         ["București"] = [new("Calea Victoriei", "010063"), new("Str. Baba Novac", "031622"), new("Bd. Iuliu Maniu", "061103")],
-        ["Cluj-Napoca"] = [new("Str. Horea", "400174"), new("Calea Dorobanților", "400117")],
-        ["Iași"] = [new("Str. Lăpușneanu", "700057"), new("Bd. Independenței", "700102")],
-        ["Timișoara"] = [new("Bd. Republicii", "300159"), new("Calea Șagului", "300516")],
+        ["Cluj-Napoca"] = [new("Calea Dorobanților", "400117")],
+        ["Iași"] = [new("Bd. Independenței", "700102")],
+        ["Timișoara"] = [new("Calea Șagului", "300516")],
         ["Constanța"] = [new("Bd. Tomis", "900178"), new("Str. Mircea cel Bătrân", "900658")],
-        ["Brașov"] = [new("Str. Lungă", "500035"), new("Bd. Eroilor", "500030")],
-        ["Craiova"] = [new("Calea Unirii", "200409"), new("Str. Brestei", "200581")],
+        ["Craiova"] = [new("Str. Brestei", "200581")],
         ["Oradea"] = [new("Calea Aradului", "410223"), new("Str. Nufărului", "410582")],
     };
+
+    private const string FallbackCity = "București";
+
+    /// <summary>The streets the filler lives on.</summary>
+    public static IEnumerable<string> StreetNames => Streets.Values.SelectMany(s => s).Select(s => s.Name);
+
+    // SyntheticData draws from fixed name lists: this many draws in a row with no new name means none is left.
+    private const int MaxMisses = 10_000;
 
     private static readonly DateOnly FirstOpening = new(2016, 1, 4), LastOpening = new(2025, 12, 15);
 
@@ -58,17 +68,25 @@ public static class ClientSeed
     /// One client per code of the golden cases that have input (CL-0013 serves 8 and 13, CL-0015 serves 1 and 15), from
     /// <see cref="GoldenClients.Create"/>, so a case transcribed later is seeded with no change here. Each gets the documents
     /// its cards list (<see cref="GoldenCase.Documents"/>) that <see cref="SyntheticPdfs"/> generates; an answer's document
-    /// (<see cref="GoldenResponse.Document"/>) is not on file yet: it arrives during the demo.
+    /// (<see cref="GoldenResponse.Document"/>) is not on file yet: it arrives during the demo. The shield scans each document
+    /// here, except those that are a case's change (DocumentUploaded): they stay NotScanned until ChangeService scans them.
     /// </summary>
     private static List<Client> Golden(DateTime now)
     {
         var codes = GoldenCases.All.Where(c => c.HasInput).Select(c => c.ClientCode).Distinct().Order(StringComparer.Ordinal);
+        var shield = new HiddenTextShield();
         return [.. codes.Select(code =>
         {
             var client = GoldenClients.Create(code);
-            var files = GoldenCases.All.Where(c => c.ClientCode == code).SelectMany(c => c.Documents).DistinctBy(d => d.FileName)
-                .Where(d => SyntheticPdfs.FileNames.Contains(d.FileName));
-            client.Documents.AddRange(files.Select(d => Document(SyntheticPdfs.Get(d.FileName), d.Kind, now)));
+            var cases = GoldenCases.All.Where(c => c.ClientCode == code).ToList();
+            var uploads = cases.Where(c => c.Change?.Kind == ChangeKind.DocumentUploaded).SelectMany(c => c.Documents)
+                .Select(d => d.FileName).ToHashSet();
+            var files = cases.SelectMany(c => c.Documents).DistinctBy(d => d.FileName).Where(d => SyntheticPdfs.FileNames.Contains(d.FileName));
+            client.Documents.AddRange(files.Select(d =>
+            {
+                var pdf = SyntheticPdfs.Get(d.FileName);
+                return Document(pdf, d.Kind, now, uploads.Contains(d.FileName) ? ShieldVerdict.NotScanned : shield.Scan(pdf.Bytes).Verdict);
+            }));
             return client;
         })];
     }
@@ -77,7 +95,7 @@ public static class ClientSeed
     /// Ordinary RO residents with nothing to report (the "standard RO resident" of GOLDEN-CASES.md, 1): residence and mobile
     /// in RO, citizenship [RO], a current account opened from 2016 on (new for CRS and FATCA), sometimes a savings account,
     /// a Valid self-certification [RO, TIN = CNP] signed at the counter. The first <paramref name="count"/> of one fixed
-    /// sequence, so a longer list starts with the shorter one.
+    /// sequence, so a longer list starts with the shorter one. Throws when SyntheticData has fewer names clear of the golden ones.
     /// </summary>
     public static List<Client> Filler(int count)
     {
@@ -87,16 +105,25 @@ public static class ClientSeed
             .SelectMany(n => n.Split(' ')).Select(TextMatch.Normalize).ToHashSet();
         var taken = new HashSet<string>();
         var clients = new List<Client>(count);
+        var misses = 0;
 
         while (clients.Count < count)
         {
             var person = data.Person();
-            if (Clashes(person.FirstName, reserved) || Clashes(person.LastName, reserved) || !taken.Add(person.FullName)) continue;
+            if (Clashes(person.FirstName, reserved) || Clashes(person.LastName, reserved) || !taken.Add(person.FullName))
+            {
+                if (++misses == MaxMisses)
+                    throw new InvalidOperationException(
+                        $"Filler: {count} clients asked, but SyntheticData has only {clients.Count} full names clear of the golden people.");
+                continue;
+            }
+            misses = 0;
 
+            var (city, streets) = Streets.TryGetValue(person.City, out var known) ? (person.City, known) : (FallbackCity, Streets[FallbackCity]);
             var adult = person.BirthDate.AddYears(18);
             var opened = Day(random, adult > FirstOpening ? adult : FirstOpening, LastOpening);
             var signedAt = opened.ToDateTime(new TimeOnly(7, 0), DateTimeKind.Utc).AddMinutes(random.Next(0, 480));
-            var street = Streets[person.City][random.Next(Streets[person.City].Length)];
+            var street = streets[random.Next(streets.Length)];
             var number = FillerFirstNumber + clients.Count;
             var client = new Client
             {
@@ -113,7 +140,7 @@ public static class ClientSeed
                     new Address
                     {
                         Kind = AddressKind.Residence, Line = $"{street.Name} {random.Next(1, 120)}, ap. {random.Next(1, 80)}",
-                        City = $"{street.PostalCode} {person.City}", Country = "RO", ValidFrom = opened,
+                        City = $"{street.PostalCode} {city}", Country = "RO", ValidFrom = opened,
                     },
                 ],
                 Phones = [new Phone { Number = data.PhoneE164("RO"), Country = "RO" }],
@@ -141,10 +168,13 @@ public static class ClientSeed
         return clients;
     }
 
-    private static ClientDocument Document(SyntheticPdf pdf, DocumentKind kind, DateTime now)
+    private static ClientDocument Document(SyntheticPdf pdf, DocumentKind kind, DateTime now, ShieldVerdict verdict)
     {
         using var parsed = PdfDocument.Open(pdf.Bytes);
-        return new ClientDocument { Kind = kind, FileName = pdf.FileName, Content = pdf.Bytes, Pages = parsed.NumberOfPages, UploadedAt = now };
+        return new ClientDocument
+        {
+            Kind = kind, FileName = pdf.FileName, Content = pdf.Bytes, Pages = parsed.NumberOfPages, ShieldVerdict = verdict, UploadedAt = now,
+        };
     }
 
     /// <summary>Equal to a golden name, or one inside the other ("Ion" in "Ionescu", "Stan" in "Constantin").</summary>

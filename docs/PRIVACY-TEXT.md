@@ -93,13 +93,17 @@ Ce face codul acum: `RunRedaction.Redact` copiază pașii rulării și îi masch
 | Audit log (hash chain) | Jurnalul (lanț de hash-uri) | cheie nouă · după R3 (`AuditLog` cu lanț de hash-uri, PLAN 12) |
 | Every change received, rule applied, case transition and human decision, with personal data masked like the run history. Each entry holds the SHA-256 hash of the previous one, so an edited entry is found on verification. | Fiecare modificare primită, fiecare regulă aplicată, fiecare tranziție de caz și fiecare decizie umană, cu datele personale mascate ca în istoricul rulărilor. Fiecare intrare conține hash-ul SHA-256 al celei anterioare, deci o intrare modificată e găsită la verificare. | cheie nouă · după R3 (`AuditLog` cu lanț de hash-uri, PLAN 12) |
 | Clients and cases | Clienți și cazuri | cheie nouă · după R5 (`ClientSeed`) și R2 (`CaseService`) |
-| Synthetic clients and their cases (changes, evidence, requests, deadlines), stored as entered, not masked, like any bank record. | Clienții sintetici și cazurile lor (modificări, dovezi, cereri, termene), păstrate așa cum au fost introduse, nemascate, ca orice evidență a băncii. | cheie nouă · după R5 (`ClientSeed`) și R2 (`CaseService`) |
+| Synthetic clients, their documents and their cases (changes, evidence, requests, deadlines), stored as entered, not masked, like any bank record. Wherever they are copied (audit log, run history, prompts), they are masked. | Clienții sintetici, documentele lor și cazurile lor (modificări, dovezi, cereri, termene), păstrate așa cum au fost introduse, nemascate, ca orice evidență a băncii. Oriunde sunt copiate (jurnal, istoricul rulărilor, prompturi), sunt mascate. | cheie nouă · după R5 (`ClientSeed`) și R2 (`CaseService`) |
 
 Rândul „Clients and cases” spune „nemascate”: PLAN 13.1 spune că argumentele uneltelor ajung la cod demascate
 (inclusiv citatele pentru `recordEvidence`). Pe `main`, tabelele (`Clients`, `Cases`, `Evidence`, `AuditEntries` etc.)
-există de la Faza 0. `ClientSeed` pune la pornire 25 de clienți sintetici (clienții cazurilor-etalon, cu PDF-urile lor
-sintetice în `ClientDocuments`, plus clienți de umplutură), dar `CaseService` nu salvează nimic, iar `AuditLog` nu
-salvează nimic. R3 confirmă înainte să-l publice (vezi HANDOFF).
+există de la Faza 0. `ClientSeed` (#25) pune la pornire 25 de clienți sintetici: clienții cazurilor-etalon, cu PDF-urile
+lor sintetice păstrate nemascate în `ClientDocuments`, plus clienți de umplutură. Cei 50 de clienți din `SyntheticClients`
+rămân doar în memorie, pentru `/metrics`; în baza de date intră doar seed-ul de demo. Decizia omului (28.10.2026):
+`OldValueJson` și `NewValueJson` rămân nemascate în `ChangeEvents`, ca evidență a băncii, și se mascează oriunde sunt
+copiate (jurnal, rulări, prompturi). Pe `main` (3b60c07), `ChangeService` (#28) le mascează deja la salvare
+(`PiiVault.ForStorage()`), deci codul și decizia nu se potrivesc încă. `AuditLog` salvează intrările, cu lanț de
+hash-uri. R3 confirmă înainte să-l publice (vezi HANDOFF).
 
 ## 3. Cât timp
 
@@ -249,9 +253,10 @@ alin. (11) apare la fel și în OUG 102/2022.
 
 Pași pentru R3 (`security-engineer`, proprietarul `/privacy`). Sunt propuneri; Tech Lead-ul decide.
 
-**Înainte:** Faza 0 (#13) e pe `main` din 28.10.2026, dar are doar contracte și înlocuitori: `AuditLog` nu salvează
-nimic, `CrsRuleEngine` întoarce `NoCase`, `CaseService` aruncă excepții, agentul nu are unelte. `ClientSeed` pune
-clienții sintetici (r5/seed), fără cazuri.
+**Înainte:** Faza 0 (#13) a pus pe `main`, din 28.10.2026, contractele și înlocuitorii; o parte au fost înlocuiți de
+atunci. Pe `main` (3b60c07): `AuditLog` salvează intrările, cu lanț de hash-uri; `CaseService` și `ChangeService` (#28)
+salvează cazurile și modificările și scriu în jurnal; `CrsRuleEngine` întoarce încă `NoCase`. `ClientSeed` pune
+clienții sintetici (#25), fără cazuri.
 Rândurile marcate „după R1”–„după R5” sau „după #5” intră doar când e pe `main` codul pe care îl descriu. #9 e pe `main`
 (4c8addb), deci rândul „Test data” poate intra acum. Ce nu e gata rămâne afară, nu se scrie la viitor.
 

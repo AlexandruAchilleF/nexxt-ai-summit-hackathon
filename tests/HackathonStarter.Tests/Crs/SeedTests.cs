@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using HackathonStarter.Data;
+using HackathonStarter.Features.Changes;
 using HackathonStarter.Features.Clients;
 using HackathonStarter.Features.Evaluation;
 using HackathonStarter.Features.Rules;
@@ -91,7 +92,11 @@ public class SeedTests
             var expected = ClientSnapshot.From(GoldenClients.Create(code));
             Assert.Equal(int.Parse(code[3..]), expected.ClientId);
             Assert.Equal(Json(expected), Json((await service.SnapshotAsync(expected.ClientId))!));
-            Assert.All(GoldenCases.All.Where(c => c.ClientCode == code && c.HasInput), c => Assert.Equal(Json(expected), Json(c.Before!)));
+            var cases = GoldenCases.All.Where(c => c.ClientCode == code && c.HasInput).ToList();
+            // Case 1 starts where case 15 ends (Ioana already in Iași): the seed holds the first state.
+            Assert.Contains(cases, c => Json(c.Before!) == Json(expected));
+            Assert.All(cases, c => Assert.True(Json(c.Before!) == Json(expected) || cases.Any(o => Json(o.After!) == Json(c.Before!)),
+                $"case {c.Id}: Before is neither the seeded client nor another case's After"));
         }
     }
 
@@ -102,7 +107,7 @@ public class SeedTests
         var service = new ClientService(db.Factory);
 
         var maria = Assert.Single(await service.ListDocumentsAsync("CL-0001"));
-        Assert.Equal((SyntheticPdfs.PayslipMaria, DocumentKind.Payslip, 1, ShieldVerdict.NotScanned, Now),
+        Assert.Equal((SyntheticPdfs.PayslipMaria, DocumentKind.Payslip, 1, ShieldVerdict.Clean, Now),
             (maria.FileName, maria.Kind, maria.Pages, maria.ShieldVerdict, maria.UploadedAt));
         var bytes = (await service.GetDocumentAsync(maria.Id))!;
         Assert.Equal(SyntheticPdfs.Get(SyntheticPdfs.PayslipMaria).Bytes, bytes.Content);
@@ -119,11 +124,17 @@ public class SeedTests
             });
             var seeded = await service.ListDocumentsAsync(code);
             Assert.Equal(listed.Select(d => d.FileName).Distinct().Order(), seeded.Select(d => d.FileName).Order());
+            var uploads = cases.Where(c => c.Change?.Kind == ChangeKind.DocumentUploaded).SelectMany(c => c.Documents).Select(d => d.FileName).ToList();
             Assert.All(seeded, d =>
             {
                 var card = listed.First(l => l.FileName == d.FileName);
                 Assert.Equal(card.Kind, d.Kind);
                 if (card.Pages is { } pages) Assert.Equal(pages, d.Pages);
+                // The change itself is scanned by ChangeService when the demo sends it; the rest are scanned at seed.
+                var verdict = uploads.Contains(d.FileName)
+                    ? ShieldVerdict.NotScanned
+                    : new HiddenTextShield().Scan(SyntheticPdfs.Get(d.FileName).Bytes).Verdict;
+                Assert.Equal(verdict, d.ShieldVerdict);
             });
             // The answer arrives during the demo (run 2), so it is not on file at the start.
             Assert.All(cases.Where(c => c.Response?.Document is not null),
@@ -167,6 +178,34 @@ public class SeedTests
             foreach (var name in new[] { c.FirstName, c.LastName }.Select(TextMatch.Normalize))
                 Assert.DoesNotContain(goldenNames, g => g.Contains(name) || name.Contains(g));
         });
+    }
+
+    [Fact]
+    public void Filler_streets_are_not_on_any_golden_card()
+    {
+        var golden = GoldenClients.Codes.SelectMany(c => GoldenClients.Create(c).Addresses).Select(a => a.Line)
+            .Concat(GoldenCases.All.SelectMany(c => new[] { c.Before, c.After }).OfType<ClientSnapshot>().SelectMany(s => s.Addresses).Select(a => a.Line))
+            .Concat(GoldenCases.All.Select(c => c.Change?.Address?.Line).OfType<string>())
+            .Select(TextMatch.Normalize).Distinct().ToList();
+        var streets = ClientSeed.StreetNames.ToList();
+        Assert.Contains(golden, l => l.StartsWith("bd. unirii ", StringComparison.Ordinal)); // Maria, so the list is the cards'
+
+        // Without the kind ("Republicii" of "Bd. Republicii"), so "Str. Republicii" on a card counts too.
+        Assert.All(streets, street =>
+        {
+            var name = TextMatch.Normalize(street[(street.IndexOf(' ') + 1)..]);
+            Assert.DoesNotContain(golden, line => line.Contains(name, StringComparison.Ordinal));
+        });
+        Assert.All(ClientSeed.Filler(ClientSeed.DemoClientCount),
+            c => Assert.Contains(streets, s => c.Addresses[0].Line.StartsWith(s + " ", StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public void Filler_throws_when_asked_for_more_names_than_SyntheticData_has()
+    {
+        // SyntheticData has 24 first and 16 last names: at most 384 full names, before the golden ones are left out.
+        var error = Assert.Throws<InvalidOperationException>(() => ClientSeed.Filler(1_000));
+        Assert.Contains("1000 clients asked", error.Message);
     }
 
     [Fact]
