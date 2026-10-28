@@ -210,14 +210,21 @@ Cifrele se completează aici după prima rulare completă, cu data rulării. Nic
 ## 9. Confidențialitate
 
 - **Doar date sintetice.** Clienții, documentele și TIN-urile sunt generate; actele de identitate poartă „SPECIMEN”.
-- **Temeiul legal** este obligația legală (art. 6 alin. (1) lit. (c) GDPR): Legea 207/2015 privind Codul de procedură
-  fiscală (art. 62 alin. (7), art. 291 alin. (4) și Anexa nr. 1) și Acordul FATCA, așa cum le citează ghidul (p. 4).
+- **Temeiul legal** este obligația legală (art. 6 alin. (1) lit. (c) GDPR). Codul de procedură fiscală (Legea 207/2015)
+  cere băncii să aplice procedurile de diligență fiscală din anexele nr. 1 și 2 (art. 291 alin. (4)) și să raporteze
+  anual conturile la ANAF (art. 62 alin. (1)); pentru FATCA, procedurile din Acordul FATCA (art. 62 alin. (3), Legea
+  233/2015). Citatele sunt în [`docs/PRIVACY-TEXT.md`](docs/PRIVACY-TEXT.md#7-surse).
+- **Păstrarea:** rulările agentului se șterg automat după `Privacy:RetentionDays` (implicit 30 de zile). Nicio regulă
+  de retenție nu șterge clienții, cazurile sau jurnalul. Legea cere băncii să păstreze înregistrările de diligență
+  fiscală și de raportare, și probele pe care s-a bazat, 10 ani de la termenul de raportare de 15 mai
+  (art. 62 alin. (11)).
 - **Art. 22 GDPR nu se aplică:** nicio decizie nu se ia exclusiv automat. Codul aplică regulile, omul aprobă cererea și
   închiderea.
-- **Mascarea** CNP-urilor, IBAN-urilor, numerelor de card, e-mailurilor și telefoanelor înainte de model ține de
-  minimizarea datelor (art. 5 alin. (1) lit. (c) GDPR) și de securitatea prelucrării (art. 32 GDPR).
-- Numele și adresele nu sunt mascate înainte de model (datele sunt sintetice). Pagina `/privacy` arată, din configurația
-  live, ce ajunge la care model, ce se salvează și cât timp.
+- **Mascarea** CNP-urilor, IBAN-urilor, numerelor de card, e-mailurilor și telefoanelor românești înainte de model ține
+  de reducerea la minimum a datelor (art. 5 alin. (1) lit. (c) GDPR) și de securitatea prelucrării, prin pseudonimizare
+  și criptare (art. 32 alin. (1) lit. (a) GDPR).
+- Numele, adresele, datele de naștere, TIN-urile străine și telefoanele străine nu sunt mascate înainte de model (datele
+  sunt sintetice). Pagina `/privacy` arată, din configurația live, ce ajunge la care model, ce se salvează și cât timp.
 
 ## 10. Pornire rapidă
 
