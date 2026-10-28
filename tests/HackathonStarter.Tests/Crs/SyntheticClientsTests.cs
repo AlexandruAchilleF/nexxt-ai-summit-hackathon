@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using HackathonStarter.Features.Finance;
 using HackathonStarter.Features.Synthetic;
@@ -39,6 +41,31 @@ public class SyntheticClientsTests
         ["trap-foreign-salary"] = "doc=Payslip",
     };
 
+    // What each scenario should produce, written again here from its source, not read from the template: RuleId@country
+    // ({J} = the scenario's jurisdiction); a rule without "@" is a GEN-* rule, whose jurisdiction is not compared.
+    private static readonly Dictionary<string, (ScenarioDecision Decision, string Hits, string Cleared, string Source)> Outcomes = new()
+    {
+        ["domestic-move"] = (ScenarioDecision.NoCase, "", "GEN-DOMESTIC", "golden 15"),
+        ["domestic-phone-changed"] = (ScenarioDecision.NoCase, "", "GEN-DOMESTIC", "golden 1"),
+        ["domestic-phone-added"] = (ScenarioDecision.NoCase, "", "GEN-DOMESTIC", "PLAN 8.3 pas 2"),
+        ["domestic-mailing"] = (ScenarioDecision.NoCase, "", "GEN-DOMESTIC", "PLAN 8.3 pas 2"),
+        ["domestic-order"] = (ScenarioDecision.NoCase, "", "GEN-DOMESTIC", "PLAN 8.3 pas 2"),
+        ["domestic-poa"] = (ScenarioDecision.NoCase, "", "GEN-DOMESTIC", "PLAN 8.3 pas 2"),
+        ["crs-move"] = (ScenarioDecision.Clarification, "CRS-IND-ADDR@{J}", "", "golden 16"),
+        ["crs-move-phone"] = (ScenarioDecision.Clarification, "CRS-IND-ADDR@{J} CRS-IND-PHONE@{J}", "", "golden 4"),
+        ["crs-phone"] = (ScenarioDecision.Clarification, "CRS-IND-PHONE@{J}", "", "golden 4, the phone alone"),
+        ["crs-custodial-order"] = (ScenarioDecision.Clarification, "CRS-IND-SO@{J}", "", "golden 5b"),
+        ["crs-poa"] = (ScenarioDecision.Clarification, "CRS-IND-POA@{J}", "", "golden 11"),
+        ["crs-mailing"] = (ScenarioDecision.Clarification, "CRS-IND-MAIL@{J}", "", "PLAN 8.2 CRS-IND-MAIL, p. 29 lit. b"),
+        ["fatca-phone"] = (ScenarioDecision.FatcaAlert, "FATCA-IND-PHONE@US", "CRS-IND-PHONE@US", "golden 14"),
+        ["fatca-order"] = (ScenarioDecision.FatcaAlert, "FATCA-IND-SO@US", "CRS-IND-SO@US", "golden 5c"),
+        ["fatca-citizenship"] = (ScenarioDecision.FatcaAlert, "FATCA-IND-CIT@US", "", "golden 7"),
+        ["trap-depository-order"] = (ScenarioDecision.NoCase, "", "CRS-IND-SO@{J}", "golden 5a"),
+        ["trap-foreign-phone"] = (ScenarioDecision.NoCase, "", "CRS-IND-PHONE@{J}", "golden 13"),
+        ["trap-citizenship"] = (ScenarioDecision.NoCase, "", "", "PLAN 8.2, nationality is not a signal"),
+        ["trap-foreign-salary"] = (ScenarioDecision.NoCase, "", "GEN-DOMESTIC", "golden 8"),
+    };
+
     public static TheoryData<string> Scenarios => [.. AfterChange.Keys];
 
     [Theory]
@@ -60,7 +87,32 @@ public class SyntheticClientsTests
     }
 
     [Fact]
-    public void Expected_decision_and_rules_come_from_the_scenario_template()
+    public void Templates_expect_exactly_the_outcomes_of_this_test()
+    {
+        Assert.All(Outcomes.Values, o => Assert.False(string.IsNullOrWhiteSpace(o.Source)));
+        Assert.Equal(
+            Outcomes.OrderBy(o => o.Key, StringComparer.Ordinal).Select(o => Outcome(o.Key, o.Value.Decision, RuleIds(o.Value.Hits), RuleIds(o.Value.Cleared))),
+            SyntheticClients.Templates.OrderBy(t => t.Id, StringComparer.Ordinal).Select(t => Outcome(t.Id, t.Expected, t.Hits, t.Cleared)));
+    }
+
+    [Theory]
+    [MemberData(nameof(Scenarios))]
+    public void Each_client_expects_the_rules_of_its_scenario_in_its_jurisdiction(string scenario)
+    {
+        var (decision, hits, cleared, _) = Outcomes[scenario];
+        var cases = SyntheticClients.All.Where(c => c.Scenario.Id == scenario).ToList();
+
+        Assert.NotEmpty(cases);
+        foreach (var c in cases)
+        {
+            Assert.Equal(decision, c.Expected);
+            Assert.Equal(Rules(hits, c.Jurisdiction), Rules(c.ExpectedHits));
+            Assert.Equal(Rules(cleared, c.Jurisdiction), Rules(c.ExpectedCleared));
+        }
+    }
+
+    [Fact]
+    public void Labels_and_jurisdictions_follow_the_scenario_group()
     {
         Assert.Equal(SyntheticClients.Templates.Count, SyntheticClients.Templates.Select(t => t.Id).Distinct().Count());
         Assert.Equal(SyntheticClients.Templates.Count, SyntheticClients.Templates.Select(t => t.Label).Distinct().Count());
@@ -68,22 +120,13 @@ public class SyntheticClientsTests
 
         foreach (var c in SyntheticClients.All)
         {
-            var (decision, prefix, jurisdictions) = c.Scenario.Group switch
+            string[] jurisdictions = c.Scenario.Group switch
             {
-                ScenarioGroup.Nothing => (ScenarioDecision.NoCase, "", new[] { "RO" }),
-                ScenarioGroup.Trap => (ScenarioDecision.NoCase, "", Reportable),
-                ScenarioGroup.Crs => (ScenarioDecision.Clarification, "CRS-IND-", Reportable),
-                _ => (ScenarioDecision.FatcaAlert, "FATCA-IND-", new[] { "US" }),
+                ScenarioGroup.Nothing => ["RO"],
+                ScenarioGroup.Fatca => ["US"],
+                _ => Reportable,
             };
-            Assert.Equal(decision, c.Expected);
-            Assert.Equal(c.Scenario.Label, c.Label);
             Assert.Contains(c.Jurisdiction, jurisdictions);
-            Assert.Equal(c.Scenario.Hits, c.ExpectedHits.Select(h => h.RuleId));
-            Assert.All(c.ExpectedHits.Concat(c.ExpectedCleared), r =>
-                Assert.Equal(r.RuleId.StartsWith("GEN-", StringComparison.Ordinal) ? null : c.Jurisdiction, r.Jurisdiction));
-
-            if (decision == ScenarioDecision.NoCase) Assert.Empty(c.ExpectedHits);
-            else Assert.All(c.ExpectedHits, h => Assert.StartsWith(prefix, h.RuleId));
 
             if (c.Scenario.Group == ScenarioGroup.Trap)
             {
@@ -95,6 +138,39 @@ public class SyntheticClientsTests
 
         // Every reportable jurisdiction shows up at least once among the CRS and trap clients.
         Assert.All(Reportable, j => Assert.Contains(SyntheticClients.All, c => c.Scenario.Group != ScenarioGroup.Nothing && c.Jurisdiction == j));
+    }
+
+    // p. 25 lit. b, p. 38: a new depository account is reviewed for FATCA only once its balance exceeds 50.000 $ at a year
+    // end, so the account each FATCA scenario plays on holds more than that, without an exchange rate, by 31.12.2025.
+    [Fact]
+    public void Every_fatca_client_has_a_depository_account_over_the_threshold_by_the_end_of_2025()
+    {
+        for (var seed = 0; seed < 1000; seed++)
+        {
+            foreach (var c in SyntheticClients.Generate(seed).Where(c => c.Scenario.Group == ScenarioGroup.Fatca))
+            {
+                Assert.True(c.Before.Accounts.Any(OverFatcaThreshold), $"seed {seed} {c.Code} {c.Scenario.Id}");
+                Assert.True(c.After.Accounts.Any(OverFatcaThreshold), $"seed {seed} {c.Code} {c.Scenario.Id}");
+                if (c.Scenario.Id != "fatca-order") continue;
+
+                var source = c.After.Accounts.Single(a => a.StandingOrders.Any(o => o.BeneficiaryCountry == "US"));
+                Assert.Equal("Cont curent EUR", source.Product);
+                Assert.True(OverFatcaThreshold(source), $"seed {seed} {c.Code} {source.OpenedOn} {source.Balance} {source.Currency}");
+            }
+        }
+    }
+
+    // The /metrics figures and the video come from these 50 clients: anything that reshuffles or changes them must fail here
+    // and be announced, then the pins are updated.
+    [Fact]
+    public void Seed_2026_gives_exactly_the_clients_behind_the_metrics()
+    {
+        Assert.Equal(2026, SyntheticClients.Seed);
+        Assert.Equal("CL-1001 Ion Tudor 5040810440768 domestic-phone-changed RO", Pin(SyntheticClients.All[0]));
+        Assert.Equal("CL-1050 Cristian Gheorghe 1590621068722 domestic-poa RO", Pin(SyntheticClients.All[^1]));
+        Assert.Equal("CL-1037 fatca-citizenship, CL-1038 fatca-order, CL-1044 fatca-phone",
+            string.Join(", ", SyntheticClients.All.Where(c => c.Scenario.Group == ScenarioGroup.Fatca).Select(c => $"{c.Code} {c.Scenario.Id}")));
+        Assert.Equal("231d7102661c70b6f5cd5be1b51f285995a905d17e3117a8f055667e5263c202", Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(Json(SyntheticClients.All)))));
     }
 
     [Fact]
@@ -109,9 +185,11 @@ public class SyntheticClientsTests
     }
 
     [Fact]
-    public void Every_scenario_has_its_expected_state_in_this_test()
+    public void Every_scenario_has_its_expected_state_and_outcome_in_this_test()
     {
-        Assert.Equal(SyntheticClients.Templates.Select(t => t.Id).Order(StringComparer.Ordinal), AfterChange.Keys.Order(StringComparer.Ordinal));
+        var ids = SyntheticClients.Templates.Select(t => t.Id).Order(StringComparer.Ordinal).ToList();
+        Assert.Equal(ids, AfterChange.Keys.Order(StringComparer.Ordinal));
+        Assert.Equal(ids, Outcomes.Keys.Order(StringComparer.Ordinal));
     }
 
     [Theory]
@@ -194,6 +272,21 @@ public class SyntheticClientsTests
     }
 
     private static string List(IEnumerable<string> items) => string.Join(',', items.Order(StringComparer.Ordinal));
+
+    private static string Outcome(string id, ScenarioDecision decision, IEnumerable<string> hits, IEnumerable<string> cleared) =>
+        $"{id}: {decision} hits={List(hits)} cleared={List(cleared)}";
+
+    private static IEnumerable<string> RuleIds(string rules) => rules.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(r => r.Split('@')[0]);
+
+    private static string Rules(string rules, string jurisdiction) => List(rules.Replace("{J}", jurisdiction).Split(' ', StringSplitOptions.RemoveEmptyEntries));
+
+    private static string Rules(IEnumerable<ExpectedRule> rules) => List(rules.Select(r => r.Jurisdiction is null ? r.RuleId : $"{r.RuleId}@{r.Jurisdiction}"));
+
+    private static bool OverFatcaThreshold(SyntheticAccount a) =>
+        a.Type == SyntheticAccountType.Depository && a.OpenedOn <= new DateOnly(2025, 12, 31)
+        && (a.Currency, a.Balance) is ("USD", >= 60_000m) or ("EUR", >= 75_000m);
+
+    private static string Pin(SyntheticClientCase c) => $"{c.Code} {c.After.FullName} {c.After.Cnp} {c.Scenario.Id} {c.Jurisdiction}";
 
     private static string Json(IReadOnlyList<SyntheticClientCase> cases) => JsonSerializer.Serialize(cases);
 
