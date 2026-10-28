@@ -158,10 +158,10 @@
                                          Color="@(check.Outcome switch { CheckOutcome.Pass => Color.Success, CheckOutcome.Fail => Color.Error, _ => Color.Default })" />
                                 <div style="min-width:0">
                                     <MudText Typo="Typo.body2" Style="font-weight:600">@T(check.Title) <span class="mono mud-text-secondary" style="font-size:11px;font-weight:400">@($"{check.CheckId} v{check.Version}")</span></MudText>
-                                    <MudText Typo="Typo.caption" Class="mud-text-secondary d-block">@T(check.Reason)</MudText>
+                                    <MudText Typo="Typo.caption" Class="mud-text-secondary d-block">@TFilled(check.Reason)</MudText>
                                     @foreach (var finding in check.Findings)
                                     {
-                                        <MudText Typo="Typo.caption" Class="d-block mono mt-1" Style="word-break:break-word">@(finding.Excerpt is null ? finding.What : $"{finding.What}: {finding.Excerpt}")</MudText>
+                                        <MudText Typo="Typo.caption" Class="d-block mono mt-1" Style="word-break:break-word">@(finding.Excerpt is null ? T(finding.What) : $"{T(finding.What)}: {finding.Excerpt}")</MudText>
                                     }
                                 </div>
                             </div>

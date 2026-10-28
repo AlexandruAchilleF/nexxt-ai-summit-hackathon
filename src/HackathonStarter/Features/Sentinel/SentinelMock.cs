@@ -155,7 +155,7 @@ internal static partial class SentinelMock
         }
         await m.CallAsync("sendClientRequest", new { caseCode = code, requestId = draft.Int("requestId"), channel = "email" });
 
-        var documents = string.Join("; ", draft.Arr("requiredDocuments").Select(d => d.GetString()));
+        var documents = string.Join("; ", draft.Arr("requiredDocuments").Select(d => Lang.T(d.GetString() ?? "")));
         await m.SayAsync(Join(
             Header(c),
             Indicia(c),
@@ -180,7 +180,7 @@ internal static partial class SentinelMock
 
         if (form.ValueKind != JsonValueKind.Object)
         {
-            var documents = string.Join("; ", c.Arr("requiredDocuments").Select(d => d.GetString()));
+            var documents = string.Join("; ", c.Arr("requiredDocuments").Select(d => Lang.T(d.GetString() ?? "")));
             await m.SayAsync(Join(
                 L($"Cazul {code} ({StatusText(c.Str("status"))}). Așteptăm de la client: {documents}. Termen: {c.Str("deadline")}.",
                   $"Case {code} ({StatusText(c.Str("status"))}). We are waiting for the client to send: {documents}. Deadline: {c.Str("deadline")}."),
@@ -273,7 +273,7 @@ internal static partial class SentinelMock
         {
             var open = string.Join(", ", rules.Arr("hits").Where(h => h.Str("coveredBy") == "None").Select(Cite));
             await m.SayAsync(Join(before,
-                L($"Reevaluare în cod (evaluateRules): {decision}. Încă neacoperite: {open}. Nu propun închiderea cazului {code}.",
+                L($"Reevaluare în cod (evaluateRules): {DecisionRo(decision)}. Încă neacoperite: {open}. Nu propun închiderea cazului {code}.",
                   $"Re-evaluation by code (evaluateRules): {decision}. Still uncovered: {open}. I do not propose closing case {code}.")));
             return;
         }
@@ -281,7 +281,7 @@ internal static partial class SentinelMock
         await m.CallAsync("closeCase", new { caseCode = code, channel = "Online" });
         var covered = string.Join(L(" și ", " and "), rules.Arr("hits").Select(Cite));
         await m.SayAsync(Join(before,
-            L($"Reevaluare în cod (evaluateRules): Compliant. {covered} sunt acoperite de autocertificare.{reportableText}",
+            L($"Reevaluare în cod (evaluateRules): {DecisionRo("Compliant")}. {covered} sunt acoperite de autocertificare.{reportableText}",
               $"Re-evaluation by code (evaluateRules): Compliant. {covered} are covered by the self-certification.{reportableText}"),
             L($"Închiderea cazului {code} (canal: Online) așteaptă aprobarea unui operator; după aprobare, codul salvează dovada confirmării.",
               $"Closing case {code} (channel: Online) awaits an operator's approval; once approved, code saves the confirmation proof.")));
@@ -340,7 +340,7 @@ internal static partial class SentinelMock
                 $"- {d.Str("fileName")}: the shield removed {d.Int("hiddenFragmentsRemoved")} hidden text fragment(s) (p. {string.Join(", ", d.Arr("hiddenPages").Select(x => x.GetRawText()))}; {Reasons(d)}) before any model. The removed text was not read by a model; a person checks the document."))
             .ToList();
         await m.SayAsync(Join(
-            L($"Clientul {clientCode} nu are caz. Decizia motorului de reguli (cod): {rules.Str("decision")}.",
+            L($"Clientul {clientCode} nu are caz. Decizia motorului de reguli (cod): {DecisionRo(rules.Str("decision"))}.",
               $"Client {clientCode} has no case. The rule engine (code) decides: {rules.Str("decision")}."),
             string.Join("\n", hits),
             cleared.Any() ? L("Verificate și neaplicate:", "Checked and not applied:") + "\n" + string.Join("\n", cleared) : "",
@@ -395,7 +395,7 @@ internal static partial class SentinelMock
         var change = what.Count == 0 ? "date noi" : what.Count == 1 ? what[0] : string.Join(", ", what[..^1]) + " și " + what[^1];
         var where = countries.Count > 0 ? $", din {string.Join(", ", countries)}" : "";
         var due = c.Date("dueAt") is { } d ? $"până la {SentinelWording.DateRo(d)}" : "cât mai curând";
-        var documents = string.Join("\n", c.Arr("requiredDocuments").Select(x => $"- {x.GetString()}"));
+        var documents = string.Join("\n", c.Arr("requiredDocuments").Select(x => $"- {Ro(x.GetString() ?? "")}"));
 
         return $"""
             Bună ziua, vă rugăm să ne confirmați țara în care aveți rezidența fiscală.
@@ -425,6 +425,17 @@ internal static partial class SentinelMock
         "Expired" => L("expirat", "expired"),
         _ => status ?? "",
     };
+
+    /// <summary>The decision as the case page shows it, with the engine's name kept: "Conform (Compliant)".</summary>
+    private static string DecisionRo(string? decision) => (decision switch
+    {
+        "NoCase" => "No case",
+        "Compliant" => "Compliant",
+        "Clarification" => "Clarification",
+        "FatcaAlert" => "FATCA alert",
+        "ShieldAlert" => "Shield alert",
+        _ => null,
+    }) is { } key ? $"{Ro(key)} ({decision})" : decision ?? "";
 
     private static string FieldText(string? field) => field switch
     {
@@ -499,6 +510,9 @@ internal static partial class SentinelMock
     private static string Join(params string[] parts) => string.Join("\n\n", parts.Where(p => !string.IsNullOrWhiteSpace(p)));
 
     private static string L(string ro, string en) => Lang.Pick(ro, en);
+
+    /// <summary>The Romanian of a UI key whatever the UI language: the client letter is written in Romanian.</summary>
+    private static string Ro(string en) => Lang.Translations.GetValueOrDefault(en, en);
 
     // ─── JSON helpers over tool results ──────────────────────────────────────────────────────────────────────────────
 

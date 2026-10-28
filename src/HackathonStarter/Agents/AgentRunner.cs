@@ -385,13 +385,13 @@ public class AgentRunner(
             {
                 var output = await ExecuteAsync(tool, args, ctx, CancellationToken.None);
                 run.Steps.Add(new AgentStep { Kind = StepKind.ToolResult, Id = id, Tool = step.Tool, Output = output });
-                run.Steps.Add(new AgentStep { Kind = StepKind.Text, Text = $"Approved by {user.Name}. Done: {step.Summary}." });
+                run.Steps.Add(new AgentStep { Kind = StepKind.Text, Text = Lang.T("Approved by {0}. Done: {1}.", user.Name, step.Summary?.TrimEnd('.')) });
             }
             catch (Exception ex)
             {
                 var error = ToolError(ex);
                 run.Steps.Add(new AgentStep { Kind = StepKind.ToolResult, Id = id, Tool = step.Tool, Error = error });
-                run.Steps.Add(new AgentStep { Kind = StepKind.Text, Text = $"Approved by {user.Name}, but the action failed: {error.TrimEnd('.')}." });
+                run.Steps.Add(new AgentStep { Kind = StepKind.Text, Text = Lang.T("Approved by {0}, but the action failed: {1}.", user.Name, error.TrimEnd('.')) });
                 // No model call follows to recover from it: the run failed, like any run that cannot finish.
                 step.Error = error;
                 run.Error = error;
@@ -400,7 +400,7 @@ public class AgentRunner(
         else
         {
             step.State = ApprovalState.Rejected;
-            run.Steps.Add(new AgentStep { Kind = StepKind.Text, Text = $"Rejected by {user.Name}. No changes were made." });
+            run.Steps.Add(new AgentStep { Kind = StepKind.Text, Text = Lang.T("Rejected by {0}. No changes were made.", user.Name) });
         }
 
         run.Status = run.Error is not null ? RunStatus.Error

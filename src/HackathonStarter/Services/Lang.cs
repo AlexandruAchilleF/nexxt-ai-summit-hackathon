@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 using HackathonStarter.Config;
 
 namespace HackathonStarter.Services;
@@ -26,6 +27,36 @@ public static partial class Lang
 
     /// <summary><see cref="T(string)"/> with <see cref="string.Format(string, object?[])"/> placeholders: <c>T("Approved by {0}", name)</c>.</summary>
     public static string T(string en, params object?[] args) => string.Format(T(en), args);
+
+    /// <summary>
+    /// Saved English text that was filled in from a key with placeholders, such as a check reason
+    /// ("All 2 quotation(s) are verified evidence." from "All {0} quotation(s) are verified evidence."):
+    /// translated with the same values. Text that matches no key is shown as it is.
+    /// </summary>
+    public static string TFilled(string text)
+    {
+        if (IsEn || RoText.ContainsKey(text)) return T(text);
+        foreach (var (pattern, slots, ro) in Patterns.Value)
+        {
+            var match = pattern.Match(text);
+            if (match.Success) return string.Format(ro, [.. Enumerable.Range(0, slots).Select(i => (object?)match.Groups["p" + i].Value)]);
+        }
+        return text;
+    }
+
+    // Keys with {0}… and enough fixed text to be told apart, the most specific first.
+    private static readonly Lazy<List<(Regex Pattern, int Slots, string Ro)>> Patterns = new(() =>
+        [.. RoText
+            .Where(e => e.Key.Contains("{0}") && !e.Key.Contains("{{") && Regex.Replace(e.Key, @"\{\d+\}", "").Trim().Length >= 12)
+            .OrderByDescending(e => Regex.Replace(e.Key, @"\{\d+\}", "").Length)
+            .Select(e =>
+            {
+                var seen = new HashSet<string>();
+                var regex = Regex.Replace(Regex.Escape(e.Key), @"\\\{(\d+)}", m =>
+                    seen.Add(m.Groups[1].Value) ? $"(?<p{m.Groups[1].Value}>.+?)" : $@"\k<p{m.Groups[1].Value}>");
+                return (new Regex($"^{regex}$", RegexOptions.Singleline),
+                    seen.Select(int.Parse).Max() + 1, e.Value);
+            })]);
 
     /// <summary>Content written in both languages (SiteConfig copy, longer texts).</summary>
     public static TValue Pick<TValue>(TValue ro, TValue en) => IsEn ? en : ro;

@@ -157,6 +157,7 @@ public class SentinelGuardsTests
     [Fact]
     public async Task A_member_approving_the_request_gets_an_error_not_done_and_nothing_is_sent()
     {
+        using var _ = new UiLanguage("en-GB");
         var (host, _) = await RealWorld.CreateAsync();
         await using var __ = host;
         var code = (await host.RecordGoldenChangeAsync("4")).CaseCode!;

@@ -8,6 +8,7 @@ using HackathonStarter.Features.Sentinel;
 using HackathonStarter.Features.Sentinel.Demo;
 using HackathonStarter.Features.Shield;
 using HackathonStarter.Features.Synthetic;
+using HackathonStarter.Services;
 using HackathonStarter.Tests.Support;
 using Microsoft.Extensions.AI;
 
@@ -67,6 +68,7 @@ public class SentinelMariaTests
         var approved = await host.DecideAsync(run1, SentinelTools.SendClientRequest);
         Assert.Equal(RunStatus.Completed, approved.Status);
         Assert.Equal(CaseStatus.AwaitingClient, (await host.CaseAsync(CaseCode))!.Status);
+        Assert.DoesNotContain("..", approved.Steps.Last(st => st.Kind == StepKind.Text).Text); // the summary's own full stop is not doubled
 
         // S4: day 85, no answer: the watcher's tick reminds and escalates.
         clock.Advance(TimeSpan.FromDays(85));
@@ -116,6 +118,47 @@ public class SentinelMariaTests
         Assert.Equal(expected, kinds.Where(expected.Contains));
         Assert.True(kinds.Take(kinds.IndexOf(AuditKinds.EvidenceRecorded)).Count(k => k == AuditKinds.RuleApplied) >= 2); // the two indicia
         Assert.True((await host.VerifyAuditAsync()).Ok);
+    }
+
+    [Fact]
+    public async Task Maria_in_Romanian_shows_no_English_in_the_answers_the_checks_the_approvals_or_the_letter()
+    {
+        using var _ = new UiLanguage("ro-RO");
+        var (host, clock) = await RealWorld.CreateAsync();
+        await using var __ = host;
+        var code = (await host.RecordGoldenChangeAsync("4")).CaseCode!;
+        var run1 = await host.DecideAsync(await host.RunAsync(SentinelTools.AgentName, SentinelActions.Analyze(code)), SentinelTools.SendClientRequest);
+        clock.Advance(TimeSpan.FromDays(85));
+        await host.Get<ICaseService>().TickAsync(clock.UtcNow);
+        clock.Advance(TimeSpan.FromDays(1));
+        await host.Get<IDemoScenarios>().DeliverResponseAsync(code);
+        var run2 = await host.DecideAsync(await host.RunAsync(SentinelTools.AgentName, SentinelActions.Verify(code)), SentinelTools.CloseCase);
+
+        // What the trace shows (AgentTrace): the texts, the approval cards and the checks, translated like the page does.
+        var shown = new[] { run1, run2 }.SelectMany(r => r.Steps).SelectMany(st => st.Kind switch
+        {
+            StepKind.Text => [st.Text],
+            StepKind.Approval => [st.Summary ?? ""],
+            StepKind.Check => st.Checks!.SelectMany(c => new[] { Lang.T(c.Title), Lang.TFilled(c.Reason) }),
+            _ => [],
+        }).ToList();
+        var letter = (await host.CaseAsync(code))!.Requests.Single(r => r.Kind == RequestKind.Initial).Body;
+        string[] english =
+        [
+            "A new self-certification", "supporting documents", "Proof of the new address", "Approved by", "Done:", "No changes",
+            "Quotes are verified", "No personal data", "quotation(s)", "The answer", "evaluateRules): Compliant",
+        ];
+        Assert.All(english, e => Assert.DoesNotContain(shown, t => t.Contains(e, StringComparison.Ordinal)));
+        Assert.All(english, e => Assert.DoesNotContain(e, letter));
+        Assert.DoesNotContain(shown, t => t.Contains("..", StringComparison.Ordinal));
+
+        Assert.Contains("Documente cerute: O autocertificare nouă sau o explicație rezonabilă și documentele aferente (dacă este cazul); Dovada noii adrese.", run1.Answer());
+        Assert.Contains("- Dovada noii adrese", letter);
+        Assert.StartsWith($"Aprobată de Ana Admin. Executată: Trimite cererea pentru cazul {code} prin email:", run1.Steps.Last(st => st.Kind == StepKind.Text).Text);
+        Assert.Equal($"Aprobată de Ana Admin. Executată: Închide cazul {code} (canal: Online); codul reevaluează mai întâi regulile.", run2.Steps.Last(st => st.Kind == StepKind.Text).Text);
+        Assert.Contains("Citatele sunt dovezi verificate", shown);
+        Assert.Contains("Toate citatele (1) sunt dovezi verificate.", shown);
+        Assert.Contains("Reevaluare în cod (evaluateRules): Conform (Compliant).", run2.Answer());
     }
 
     [Fact]
