@@ -298,21 +298,27 @@ public class ConnectionCheckTests
     [Fact]
     public async Task Reports_each_model_profile_and_target()
     {
-        var main = new FakeChatClient().Reply("OK").Reply("Hello, I'm here."); // main model, then the built-in assistant target
-        var judge = new FakeChatClient().Fail("401 invalid api key");
-        await using var host = await TestHost.CreateAsync(main,
-            ai => ai.Profiles["judge"] = new AiProfile { Model = "judge-model" },
-            profiles: new Dictionary<string, IChatClient> { ["judge"] = judge },
-            targets: t => t["down"] = new TargetOptions { Kind = "Http", Endpoint = "http://127.0.0.1:9/chat", TimeoutSeconds = 3 });
+        var before = System.Globalization.CultureInfo.CurrentUICulture;
+        try
+        {
+            System.Globalization.CultureInfo.CurrentUICulture = System.Globalization.CultureInfo.GetCultureInfo("en-GB");
+            var main = new FakeChatClient().Reply("OK").Reply("Hello, I'm here."); // main model, then the built-in assistant target
+            var judge = new FakeChatClient().Fail("401 invalid api key");
+            await using var host = await TestHost.CreateAsync(main,
+                ai => ai.Profiles["judge"] = new AiProfile { Model = "judge-model" },
+                profiles: new Dictionary<string, IChatClient> { ["judge"] = judge },
+                targets: t => t["down"] = new TargetOptions { Kind = "Http", Endpoint = "http://127.0.0.1:9/chat", TimeoutSeconds = 3 });
 
-        var results = await host.Get<ConnectionCheck>().RunAsync();
+            var results = await host.Get<ConnectionCheck>().RunAsync();
 
-        Assert.True(results.Single(r => r.Name == "main model").Ok);
-        var profile = results.Single(r => r.Name.Contains("judge"));
-        Assert.False(profile.Ok);
-        Assert.Contains("401", profile.Detail);
-        Assert.False(results.Single(r => r.Name.Contains("down")).Ok);
-        Assert.Contains(results, r => r.Kind == "target" && r.Name.Contains("Built-in assistant"));
+            Assert.True(results.Single(r => r.Name == "main model").Ok);
+            var profile = results.Single(r => r.Name.Contains("judge"));
+            Assert.False(profile.Ok);
+            Assert.Contains("401", profile.Detail);
+            Assert.False(results.Single(r => r.Name.Contains("down")).Ok);
+            Assert.Contains(results, r => r.Kind == "target" && r.Name.Contains("Built-in assistant"));
+        }
+        finally { System.Globalization.CultureInfo.CurrentUICulture = before; }
     }
 
     [Fact]

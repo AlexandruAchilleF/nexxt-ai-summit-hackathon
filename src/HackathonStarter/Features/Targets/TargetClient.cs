@@ -104,7 +104,11 @@ public class TargetClient(
         }
         catch (Exception ex) when (!ct.IsCancellationRequested)
         {
-            var error = ex is OperationCanceledException ? $"no answer within {target.TimeoutSeconds}s" : ex.Message;
+            // A SOAP transport exception may echo the request just as a fault body can. Sanitize before both the log and reply.
+            var error = ex is OperationCanceledException ? $"no answer within {target.TimeoutSeconds}s"
+                : IsSoap(target)
+                    ? ex is HttpRequestException { StatusCode: { } status } ? $"HTTP {(int)status}" : "SOAP transport failed"
+                    : ex.Message;
             logger.LogWarning("Target {Target} failed: {Error}", name, error);
             return recordings.Find(name, conversation) is { } recorded
                 ? new TargetReply(recorded, TargetSource.Replay, watch.ElapsedMilliseconds, error)
@@ -148,9 +152,23 @@ public class TargetClient(
         using var response = await http.CreateClient("targets").SendAsync(request, ct);
         var text = await response.Content.ReadAsStringAsync(ct);
         if (!response.IsSuccessStatusCode)
-            throw new HttpRequestException($"HTTP {(int)response.StatusCode}: {text[..Math.Min(text.Length, 200)]}");
+        {
+            // SOAP faults can echo identifiers from the request. Keep them out of diagnostics and logs.
+            var message = IsSoapMediaType(contentType.MediaType)
+                ? $"HTTP {(int)response.StatusCode}"
+                : $"HTTP {(int)response.StatusCode}: {text[..Math.Min(text.Length, 200)]}";
+            throw new HttpRequestException(message, null, response.StatusCode);
+        }
         return ReadPath(text, t.ResponsePath);
     }
+
+    private static bool IsSoap(TargetOptions target) =>
+        string.Equals(target.Kind, "Http", StringComparison.OrdinalIgnoreCase)
+        && MediaTypeHeaderValue.TryParse(target.ContentType, out var type) && IsSoapMediaType(type.MediaType);
+
+    private static bool IsSoapMediaType(string? mediaType) =>
+        string.Equals(mediaType, "text/xml", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(mediaType, "application/soap+xml", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Runs an agent of this app as the target, in its own scope (no HTTP, works with zero configuration).</summary>
     private async Task<string> SendAgentAsync(TargetOptions t, IReadOnlyList<ChatTurn> conversation, CancellationToken ct)

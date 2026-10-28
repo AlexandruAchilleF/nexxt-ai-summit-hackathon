@@ -1,7 +1,10 @@
 using System.Diagnostics;
+using System.Xml;
+using System.Xml.Linq;
 using HackathonStarter.Agents;
 using HackathonStarter.Config;
 using HackathonStarter.Features.Targets;
+using HackathonStarter.Features.Tin;
 using Microsoft.Extensions.AI;
 
 namespace HackathonStarter.Services;
@@ -20,12 +23,12 @@ public class ConnectionCheck(ChatClientProvider ai, TargetClient targets, Curren
         var results = new List<Result>();
 
         // One after the other: easier to read in order, and a slow target doesn't distort the others' timings.
-        if (ai.IsConfigured) results.Add(await ModelAsync("main model", null, ct));
+        if (ai.IsConfigured) results.Add(await ModelAsync(Lang.T("main model"), null, ct));
         foreach (var profile in ai.Options.Profiles.Keys)
         {
             results.Add(ai.ClientFor(profile) == ai.Client
-                ? new Result($"profile “{profile}”", "model", false, 0, "not usable: missing or invalid settings, the main model is used instead")
-                : await ModelAsync($"profile “{profile}”", profile, ct));
+                ? new Result(Lang.T("profile “{0}”", profile), "model", false, 0, Lang.T("not usable: missing or invalid settings, the main model is used instead"))
+                : await ModelAsync(Lang.T("profile “{0}”", profile), profile, ct));
         }
         foreach (var target in targets.List()) results.Add(await TargetAsync(target, ct));
 
@@ -52,16 +55,56 @@ public class ConnectionCheck(ChatClientProvider ai, TargetClient targets, Curren
 
     private async Task<Result> TargetAsync(TargetInfo target, CancellationToken ct)
     {
-        var reply = await targets.SendAsync(target.Name, [new ChatTurn("user", "Hello, are you there?")], ct);
+        var isTin = target.Name.Equals(TinOnEuropaClient.Target, StringComparison.OrdinalIgnoreCase);
+        // An intentionally incorrect check digit from the synthetic TIN fixtures. This checks connectivity, not validity.
+        IReadOnlyList<ChatTurn> conversation = isTin
+            ? TinOnEuropaClient.Conversation("DE", "86095174224")
+            : [new ChatTurn("user", "Hello, are you there?")];
+        var reply = await targets.SendAsync(target.Name, conversation, ct);
+        var ok = reply.Source == TargetSource.Live && (!isTin || IsTinSoapReply(reply.Text));
+        // Never display the probe's TIN or raw SOAP response/error in Settings.
+        var error = isTin
+            ? Lang.T(reply.Source == TargetSource.Live ? "unexpected SOAP response" : "live SOAP check failed")
+            : Short(reply.Error);
+        var host = target.Kind.Equals("Agent", StringComparison.OrdinalIgnoreCase) ? Lang.T("this app") : target.Host;
         var detail = reply.Source switch
         {
-            TargetSource.Live => $"{target.Kind} · {target.Host}: “{Short(reply.Text)}”",
-            TargetSource.Replay => $"down ({Short(reply.Error)}), but a recorded answer exists",
-            _ => $"down: {Short(reply.Error)}",
+            TargetSource.Live when ok => isTin
+                ? $"{target.Kind} · {host}: {Lang.T("SOAP checkTin response received (connectivity only)")}"
+                : $"{target.Kind} · {host}: “{Short(reply.Text)}”",
+            TargetSource.Replay => Lang.T("down ({0}), but a recorded answer exists", error),
+            _ => Lang.T("down: {0}", error),
         };
-        return new Result($"target “{target.Label}”", "target", reply.Source == TargetSource.Live, reply.ElapsedMs, detail);
+        return new Result(Lang.T("target “{0}”", target.Label), "target", ok, reply.ElapsedMs, detail);
+    }
+
+    private static bool IsTinSoapReply(string xml)
+    {
+        try
+        {
+            using var reader = XmlReader.Create(new StringReader(xml), new XmlReaderSettings
+            {
+                DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null, MaxCharactersInDocument = 1_000_000,
+            });
+            var root = XDocument.Load(reader).Root;
+            XNamespace soap = "http://schemas.xmlsoap.org/soap/envelope/";
+            XNamespace tin = "urn:ec.europa.eu:taxud:tin:services:checkTin:types";
+            if (root is null || root.Name != soap + "Envelope") return false;
+            var children = root.Elements().ToArray();
+            if (children.Length is < 1 or > 2 || children[^1].Name != soap + "Body"
+                || (children.Length == 2 && children[0].Name != soap + "Header")) return false;
+            var body = children[^1];
+            var payloads = body.Elements().ToArray();
+            if (payloads.Length != 1 || payloads[0].Name != tin + "checkTinResponse"
+                || root.Descendants(soap + "Fault").Any()) return false;
+            if (root.Nodes().OfType<XText>().Concat(body.Nodes().OfType<XText>()).Any(t => !string.IsNullOrWhiteSpace(t.Value)))
+                return false;
+            // Parse only the direct operation payload, not a matching element inside a header or fault.
+            return TinOnEuropaClient.Parse(payloads[0].ToString(SaveOptions.DisableFormatting)) is not null;
+        }
+        catch (XmlException) { return false; }
     }
 
     private static string Short(string? text) =>
-        string.IsNullOrWhiteSpace(text) ? "(empty)" : text.Length <= 120 ? text.Trim() : text[..120].Trim() + "…";
+        string.IsNullOrWhiteSpace(text) ? Lang.T("(empty)") : text.Length <= 120 ? text.Trim() : text[..120].Trim() + "…";
 }
