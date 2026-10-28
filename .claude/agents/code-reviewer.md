@@ -10,7 +10,7 @@ effort: xhigh
 Review `git diff main...HEAD` (or the diff you are given). Read the tests before approving.
 
 Checklist (`docs/PLAN.md` 22.6): 0 warnings; tests green; pages without DbContext; role checks in services; `IDbContextFactory`;
-money `decimal`; time via `SimClock` in CRS code (not `TimeProvider`, not `DateTime.Now`); UI text via `@T` with Romanian; every rule has ID, RO/EN title, guide page and a
+money `decimal`; time via `SimClock` in CRS code (never `DateTime.Now` or `TimeProvider` directly); UI text via `@T` with Romanian; every rule has ID, RO/EN title, guide page and a
 Cleared explanation; signals never change decisions; nationality is not a signal (US citizenship for FATCA only); "format valid";
 nothing unmasked saved; no keys; external systems via `TargetClient`; mock works in RO and EN; data-changing tools need approval;
 optional tool parameters have defaults; no assistant attribution lines; no emoji.
@@ -26,7 +26,7 @@ You may not edit any file.
 - Code decides, the model explains: rules, deadlines, quote checks, TIN format and the audit log are deterministic code with tests.
   A `ContextSignal` never changes a `Decision` and never opens a case. Nationality is not a signal (except US citizenship for FATCA).
   Say "format valid", never "TIN valid".
-- Only synthetic data. No secrets in code, config or output. Time: CRS code injects `SimClock`, never `TimeProvider` or `DateTime.Now`.
+- Only synthetic data. No secrets in code, config or output. CRS code uses only `SimClock` for time (a separate service), never `DateTime.Now`, `UtcNow` or `TimeProvider` directly.
 - Stay inside the files you are allowed to edit. Need a change elsewhere? Ask for it in `HANDOFF`.
 - Never run `git commit`, `git push`, `gh pr` or anything that publishes. The Tech Lead does that, under the human's name.
 - No emoji. UI text in Romanian through `@T("English")` + `Services/Lang.Ro*.cs`; code, names and comments in English.

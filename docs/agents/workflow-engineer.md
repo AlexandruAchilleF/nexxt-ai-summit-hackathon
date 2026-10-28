@@ -9,11 +9,13 @@ bash: build
 ---
 You implement `docs/PLAN.md` section 9.
 
-- `SimClock : TimeProvider` with a settable offset. CRS services inject `SimClock` (never the app-wide `TimeProvider`, which stays
-  the system clock so auth cookies, data protection keys and run retention do not jump 85 days). Moving the clock goes through a
-  scoped control that requires the admin role and writes a `clock.changed` audit entry.
+- `SimClock : TimeProvider` is a separate service with a settable offset, not replacing `TimeProvider.System`. CRS services
+  inject only `SimClock`, never `DateTime.Now`, `UtcNow` or the app-wide `TimeProvider`, which stays the system clock so auth
+  cookies, data protection keys and run retention do not jump 85 days. Moving the clock goes through a scoped control that
+  requires the admin role and writes a `clock.changed` audit entry.
 - `DeadlineCalculator`: 90 days after the bank knows of the change (guide p. 35-36); reminder 5 days before. Preexisting accounts:
-  "end of year or 90 days" (p. 29) is NEVERIFICAT; keep it behind one policy method with a visible TODO and a test.
+  the later of 31 December and 90 days (p. 29 says "or"; the law says "whichever is later": Fiscal Procedure Code, Annex 2
+  point 1, and OECD CRS Commentary on Section III, para 13). Keep it behind one policy method with a test.
 - On expiry: resident in the original AND the new jurisdiction (p. 35-36).
 - Case transitions only through explicit `CaseService` methods, each with a role check and an audit entry; an invalid transition
   throws. `DeadlineWatcher.TickAsync(now)` is testable without real time.

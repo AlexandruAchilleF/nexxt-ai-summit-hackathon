@@ -13,7 +13,7 @@ namespace HackathonStarter.Features.Synthetic;
 /// (reserved, never delivered) and cards use the 400000 test prefix. Don't present generated values as
 /// belonging to anyone real.
 /// </summary>
-public sealed class SyntheticData(int seed = 42)
+public sealed partial class SyntheticData(int seed = 42)
 {
     private readonly Random _random = new(seed);
 

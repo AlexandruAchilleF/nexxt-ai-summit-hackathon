@@ -10,7 +10,7 @@ bash: git
 Review `git diff main...HEAD` (or the diff you are given). Read the tests before approving.
 
 Checklist (`docs/PLAN.md` 22.6): 0 warnings; tests green; pages without DbContext; role checks in services; `IDbContextFactory`;
-money `decimal`; time via `SimClock` in CRS code (not `TimeProvider`, not `DateTime.Now`); UI text via `@T` with Romanian; every rule has ID, RO/EN title, guide page and a
+money `decimal`; time via `SimClock` in CRS code (never `DateTime.Now` or `TimeProvider` directly); UI text via `@T` with Romanian; every rule has ID, RO/EN title, guide page and a
 Cleared explanation; signals never change decisions; nationality is not a signal (US citizenship for FATCA only); "format valid";
 nothing unmasked saved; no keys; external systems via `TargetClient`; mock works in RO and EN; data-changing tools need approval;
 optional tool parameters have defaults; no assistant attribution lines; no emoji.
