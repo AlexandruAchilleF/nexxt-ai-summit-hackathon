@@ -158,8 +158,9 @@ internal static class SelfCertRules
                 $"Adresa de rezidență din autocertificare e în {Place(formCountry)}, dar {Place(formCountry)} nu e declarată ca jurisdicție de rezidență: testul de rezonabilitate nu trece (ghid p. 37, exemplul 2).",
                 $"The residence address on the self-certification is in {Place(formCountry, true)}, but {Place(formCountry, true)} is not declared as a jurisdiction of residence: the reasonableness test fails (guide p. 37, example 2).");
 
+        // A c/o address is a mailing address on file too (GOLDEN-CASES Î10; guide p. 29 lit. b, 48).
         var onFile = client.Addresses
-            .Where(a => a.IsCurrent && a.Kind is AddressKind.Residence or AddressKind.Mailing)
+            .Where(a => a.IsCurrent && a.Kind is AddressKind.Residence or AddressKind.Mailing or AddressKind.InCareOf)
             .Select(a => Jurisdictions.Normalize(a.Country))
             .Where(c => Jurisdictions.IsCrsReportable(c) && !declared.Contains(c) && c != formCountry)
             .Distinct();

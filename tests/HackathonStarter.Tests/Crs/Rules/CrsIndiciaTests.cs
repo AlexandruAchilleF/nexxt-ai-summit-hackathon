@@ -197,19 +197,73 @@ public class CrsIndiciaTests
         Assert.Contains("cont nedocumentat", hit.ExplanationRo);
     }
 
+    // lit. f) does not apply next to another address (p. 29), but the c/o address is still a current mailing address in a
+    // reportable jurisdiction (lit. b; GOLDEN-CASES Î10), so a case opens on the usual route, not the c/o one (p. 31).
     [Fact]
-    public void In_care_of_next_to_another_current_address_is_cleared()
+    public void In_care_of_next_to_another_current_address_is_not_lit_f_but_is_a_mailing_indicium()
     {
         var o = Run(RoResident().WithAddress(AddressKind.InCareOf, "IT"));
-        Assert.Equal(Decision.NoCase, o.Decision);
+        Assert.Equal(Decision.Clarification, o.Decision);
         Assert.Contains("altă adresă actuală", ClearedOf(o, RuleIds.CrsInCareOf).ExplanationRo);
+        var mail = HitOf(o, RuleIds.CrsMailing);
+        Assert.Equal(("IT", "Addresses/InCareOf"), (mail.Jurisdiction, mail.SourceField));
+        Assert.DoesNotContain("aceeași adresă ca la CRS-IND-CO", mail.ExplanationRo);
+        Assert.DoesNotContain("cont nedocumentat", o.ExplanationRo);
+    }
+
+    // Î10: c/o is not a residence (p. 48) but is a mailing address (p. 29 lit. b): our reading, so Interpretation.
+    [Fact]
+    public void In_care_of_is_a_mailing_indicium_but_never_a_residence_indicium()
+    {
+        var o = Run(RoResident().WithOnlyAddress(AddressKind.InCareOf, "IT"));
+        Assert.DoesNotContain(o.Indicia, h => h.RuleId == RuleIds.CrsAddress);
+        var mail = HitOf(o, RuleIds.CrsMailing);
+        Assert.Equal(("IT", "Addresses/InCareOf", RuleBasis.Interpretation), (mail.Jurisdiction, mail.SourceField, mail.Basis));
+        Assert.Contains("Î10", mail.ExplanationRo);
+        Assert.Contains("aceeași adresă ca la CRS-IND-CO", mail.ExplanationRo);
+        Assert.Contains("same address as CRS-IND-CO", mail.Explanation);
     }
 
     [Fact]
-    public void In_care_of_is_not_a_residence_or_mailing_indicium()
+    public void In_care_of_outside_the_reportable_jurisdictions_is_cleared_as_mailing_too()
     {
-        var o = Run(RoResident().WithOnlyAddress(AddressKind.InCareOf, "IT"));
-        Assert.DoesNotContain(o.Indicia, h => h.RuleId is RuleIds.CrsAddress or RuleIds.CrsMailing);
+        var o = Run(RoResident().WithAddress(AddressKind.InCareOf, "AE"));
+        Assert.Equal(Decision.NoCase, o.Decision);
+        Assert.Contains("nu fac obiectul raportării", ClearedOf(o, RuleIds.CrsMailing).ExplanationRo);
+    }
+
+    // Î10 decides c/o only; a hold-mail instruction stays a lit. f) matter.
+    [Fact]
+    public void Hold_mail_is_not_a_mailing_indicium()
+    {
+        var o = Run(RoResident().WithOnlyAddress(AddressKind.HoldMail, "IT"));
+        HitOf(o, RuleIds.CrsInCareOf);
+        Assert.DoesNotContain(o.Indicia, h => h.RuleId == RuleIds.CrsMailing);
+    }
+
+    // p. 31: the c/o route (paper search, else undocumented) holds while the c/o address is the only indicium; its own
+    // CRS-IND-MAIL hit is the same address, but any other indicium switches to the usual preexisting route (pct. 19).
+    [Fact]
+    public void In_care_of_route_holds_with_its_own_mailing_hit_and_not_with_another_indicium()
+    {
+        var preexisting = RoResident().WithAccounts(Account(AccountType.Depository, Preexisting));
+        var alone = Run(preexisting.WithOnlyAddress(AddressKind.InCareOf, "IT"));
+        Assert.Equal(2, alone.Uncovered.Count());
+        Assert.Contains("cont nedocumentat", alone.ExplanationRo);
+        Assert.Contains("undocumented account", alone.Explanation);
+
+        var withPhone = Run(preexisting.WithOnlyAddress(AddressKind.InCareOf, "IT").ReplacePhone("+4915144201187", "DE"));
+        Assert.Equal(3, withPhone.Uncovered.Count());
+        Assert.DoesNotContain("cont nedocumentat", withPhone.ExplanationRo);
+        Assert.Contains("Sec. III.B pct. 19", withPhone.ExplanationRo);
+    }
+
+    [Fact]
+    public void A_move_to_the_united_kingdom_written_uk_is_an_indicium_for_gb()
+    {
+        var o = Run(RoResident().MovedTo("UK", "221B Baker Street, London"));
+        Assert.Equal(Decision.Clarification, o.Decision);
+        Assert.Equal("GB", HitOf(o, RuleIds.CrsAddress).Jurisdiction);
     }
 
     // Romania and the US

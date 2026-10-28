@@ -57,7 +57,7 @@ public static class RuleCatalog
     [
         Rule(RuleIds.Domestic, Regime.Both, "Schimbare în România",
             "Datele din lista închisă de indicii rămân în România: nicio regulă nu se aplică, deci nu se deschide caz.",
-            "29-31", "Change within Romania",
+            NotVerified, "Change within Romania",
             "CPF Anexa 1, Sec. III.B pct. 12 (listă închisă); Sec. VII.A pct. 5 lit. c)", RuleBasis.Interpretation,
             "Everything on the closed list of indicia stays in Romania: no rule applies, so no case is opened."),
 
@@ -223,12 +223,15 @@ public static class RuleCatalog
             "status for at most 90 days, until a new self-certification or an explanation."),
 
         Rule(RuleIds.DeadlinePreexistingYear, Regime.Crs, "Cont preexistent: sfârșitul anului sau 90 de zile",
-            "Ultima zi a anului calendaristic relevant sau 90 de zile de la notificare / descoperire, cea mai târzie. Ghidul " +
-            "spune „sau”; textul „oricare dintre acestea este mai recentă” e scris pentru testul adresei de rezidență, iar " +
-            "aplicarea lui generală e decizia echipei.",
-            "29", "Preexisting account: year end or 90 days", "CPF Anexa 2 pct. 1; ghid p. 29", RuleBasis.Interpretation,
-            "The last day of the relevant calendar year or 90 days after notice / discovery, whichever is later. The guide says " +
-            "\"or\"; the \"whichever is later\" text is written for the residence address test, and applying it generally is the team's decision."),
+            "Ultima zi a anului calendaristic relevant sau 90 de zile de la notificare / descoperire, cea mai târzie. Pe ruta " +
+            "indiciilor legea spune doar „ori” (Anexa 1, Sec. III.B pct. 16), Comentariul OCDE „the later of” (Sec. III pct. 16); " +
+            "ghidul spune „sau”. „Cea mai târzie” e interpretarea noastră (GOLDEN-CASES N1).",
+            "29", "Preexisting account: year end or 90 days",
+            "CPF Anexa 1, Sec. III.B pct. 16 (ruta indiciilor: „ori”); Comentariul OCDE, Sec. III pct. 16 („the later of”)",
+            RuleBasis.Interpretation,
+            "The last day of the relevant calendar year or 90 days after notice / discovery, whichever is later. On the indicia " +
+            "route the law says only \"or\" (Anexa 1, III.B(16)), the OECD Commentary \"the later of\" (Section III, para. 16); " +
+            "the guide says \"or\". \"Whichever is later\" is our interpretation (GOLDEN-CASES N1)."),
 
         Rule(RuleIds.DeadlineExpiredNew, Regime.Crs, "Expirare, cont nou",
             "Fără autocertificare nouă: titularul e rezident și în jurisdicția inițială, și în cea nouă.",

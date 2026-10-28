@@ -68,6 +68,20 @@ internal static class FatcaIndicia
                 "Effective power of attorney to a person with a US address: FATCA indicium (f).");
 
         InCareOf(s, scope, f);
+        BirthPlaceRead(s, f);
+    }
+
+    // lit. b) as a Cleared entry (golden case 7, guide p. 31): only when FATCA is in play, i.e. another US indicium hit, so
+    // whoever reviews the FATCA alert sees the place of birth was read too (a US one would need the documents of II.B.4 lit. a). Without a US hit
+    // nothing is added, so a change that stays in Romania still ends in GEN-DOMESTIC (cases 1, 8, 15). An unknown place
+    // of birth proves nothing, so it gives no entry.
+    private static void BirthPlaceRead(RuleSubject s, Findings f)
+    {
+        var country = Jurisdictions.Normalize(s.BirthCountry);
+        if (country.Length == 0 || Jurisdictions.IsUnitedStates(country) || !f.Hits.Any(h => h.Regime == Regime.Fatca)) return;
+        f.Clear(RuleIds.FatcaBirthPlace, Us, "BirthCountry",
+            $"Locul nașterii la dosar e {Place(country)}, nu SUA: nu e indiciu FATCA (lit. b).",
+            $"The place of birth on file is {Place(country, true)}, not the US: not a FATCA indicium (b).");
     }
 
     // lit. g): in-care-of or hold-mail as the only address, in any country. On a preexisting lower value account a non-US

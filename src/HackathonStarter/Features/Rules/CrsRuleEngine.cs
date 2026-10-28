@@ -1,3 +1,4 @@
+using HackathonStarter.Features.Clients;
 using HackathonStarter.Features.Tin;
 
 namespace HackathonStarter.Features.Rules;
@@ -10,7 +11,7 @@ namespace HackathonStarter.Features.Rules;
 /// </summary>
 public sealed partial class CrsRuleEngine(ITinFormat? tinFormat = null) : ICrsRuleEngine
 {
-    public const string Version = "crs-rules/1.0";
+    public const string Version = "crs-rules/1.1";
 
     private readonly ITinFormat tins = tinFormat ?? new TinFormatNotChecked();
 
@@ -240,7 +241,11 @@ public sealed partial class CrsRuleEngine(ITinFormat? tinFormat = null) : ICrsRu
         var reportableRo = reportable.Count > 0 ? $" Raportabil pentru: {string.Join(", ", reportable)}." : "";
         var reportableEn = reportable.Count > 0 ? $" Reportable for: {string.Join(", ", reportable)}." : "";
 
-        var onlyInCareOf = openCrs.Count > 0 && openCrs.All(h => h.RuleId == RuleIds.CrsInCareOf);
+        // p. 31: c/o as the only indicium leads to paper search / undocumented account. The CRS-IND-MAIL hit of that same c/o
+        // address (Î10) is not another indicium, so it keeps the route (golden case 12).
+        var onlyInCareOf = openCrs.Any(h => h.RuleId == RuleIds.CrsInCareOf) && openCrs.All(h => h.RuleId == RuleIds.CrsInCareOf
+            || (h.RuleId == RuleIds.CrsMailing && h.SourceField == $"Addresses/{AddressKind.InCareOf}"
+                && openCrs.Any(c => c.RuleId == RuleIds.CrsInCareOf && c.Jurisdiction == h.Jurisdiction && c.SourceField == h.SourceField)));
         var (crsRouteRo, crsRouteEn) = (scope.CrsPreexisting, onlyInCareOf) switch
         {
             (true, true) => (
