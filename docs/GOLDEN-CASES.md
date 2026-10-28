@@ -1,6 +1,6 @@
 # Cazurile-etalon (specificația)
 
-Datele exacte pentru cele 20 de cazuri din [`PLAN.md` §16.1](PLAN.md#161-cazurile-etalon-specificația): intrarea
+Datele exacte pentru cele 21 de cazuri din [`PLAN.md` §16.1](PLAN.md#161-cazurile-etalon-specificația): intrarea
 (snapshot înainte / după, schimbarea), rezultatul așteptat și pagina din
 [Ghidul ANAF DAC2/CRS/FATCA, 29.12.2025](ghid/). Se transcriu în `Features/Evaluation/GoldenCases.cs` după
 Faza 0, ca `GoldenCase(Id, Title, Before, After, Change, Expected, ExpectedHits, ExpectedCleared)`.

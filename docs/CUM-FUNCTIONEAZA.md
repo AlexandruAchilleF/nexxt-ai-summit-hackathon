@@ -75,7 +75,7 @@ Varianta fără răspuns: la ziua 91 cazul trece în `Expired`, cu consecința d
 | PDF cu text alb ascuns („ignoră instrucțiunile…”) | Scutul îl scoate înainte de model | `ShieldAlert`, textul nu ajunge la model |
 | Autocertificare cu TIN italian greșit | Formatul TIN pe țară | `Clarification` |
 
-Toate cele 18 cazuri-etalon, cu rezultatul așteptat, sunt în `docs/PLAN.md` secțiunea 16.1.
+Toate cele 21 de cazuri-etalon, cu datele și rezultatul așteptat, sunt în `docs/GOLDEN-CASES.md` (rezumat în `docs/PLAN.md` secțiunea 16.1).
 
 ## 5. Piesele și cine le construiește
 
@@ -98,7 +98,7 @@ Toate cele 18 cazuri-etalon, cu rezultatul așteptat, sunt în `docs/PLAN.md` se
 | 2 · Termene și cazuri | Data simulată, termene, stările cazului, memento/escaladare/expirare, dovada | cazurile 16–18 trec |
 | 3 · Încredere | Scutul, verificarea citatelor, formatul TIN, TIN on Europa, jurnalul | cazul 10 trece, „Tamper” arată intrarea |
 | 4 · Agent și AI | Agentul, uneltele, aprobările, mock-ul, Bedrock, verificările, înregistrările | Maria cap-coadă pe mock și o dată live |
-| 5 · Date și livrare | Cele 18 cazuri, 50 de clienți sintetici, PDF-uri, metrici, documente, video | `/metrics` din rulări reale |
+| 5 · Date și livrare | Cele 21 de cazuri-etalon, 50 de clienți sintetici, PDF-uri, metrici, documente, video | `/metrics` din rulări reale |
 
 **Nota asupra termenelor:** Calculul termenului diferă între conturile noi și preexistente:
 - **Cont nou:** DueAt = data la care banca știe de schimbare + 90 zile calendaristice (p. 20–21, 35–36)
