@@ -111,6 +111,26 @@ public class ShieldTests
     }
 
     [Fact]
+    public void Quote_of_masked_hidden_text_is_still_rejected_as_hidden()
+    {
+        var result = _shield.Scan(TestPdf.Build(new TestPage(
+            new TestText("Angajator: Muller Logistik GmbH"),
+            new TestText("Telefon: +49 89 4521 7730", R: 255, G: 255, B: 255, Y: 700))));
+
+        var check = new EvidenceVerifier().Verify("Telefon: +49 89 4521 7730", result, 1);
+
+        Assert.False(check.Verified);
+        Assert.True(check.FoundOnlyInHiddenText);
+        Assert.Equal(1, check.Page);
+        // What the UI, storage and the model can see stays masked.
+        var hidden = Assert.Single(result.Hidden);
+        Assert.Contains("[PHONE-1]", hidden.Text);
+        Assert.DoesNotContain("4521", hidden.ToString());
+        Assert.DoesNotContain("4521", System.Text.Json.JsonSerializer.Serialize(result));
+        Assert.DoesNotContain("4521", result.ModelText());
+    }
+
+    [Fact]
     public void Unreadable_file_throws_a_clear_error()
     {
         var error = Assert.Throws<InvalidDataException>(() => _shield.Scan("not a pdf"u8.ToArray()));

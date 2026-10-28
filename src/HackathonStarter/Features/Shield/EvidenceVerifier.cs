@@ -30,7 +30,7 @@ public sealed class EvidenceVerifier : IEvidenceVerifier
                 ? "Quote found in the visible text."
                 : $"Quote found in the visible text of page {other.Number}, not page {page}.");
 
-        return document.Hidden.FirstOrDefault(h => Contains(h.Text, q)) is { } hidden
+        return document.Hidden.FirstOrDefault(h => Contains(h.Original ?? h.Text, q)) is { } hidden
             ? new(false, hidden.Page, "Quote found only in hidden text: not verified, red flag.", FoundOnlyInHiddenText: true)
             : new(false, null, "Quote not found in the visible text.");
     }

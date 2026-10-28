@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using HackathonStarter.Features.Clients;
 
 namespace HackathonStarter.Features.Shield;
@@ -12,7 +13,14 @@ public enum HiddenReason { None = 0, WhiteText = 1, TinyFont = 2, OffPage = 4, I
 public record ShieldedPage(int Number, string VisibleText);
 
 /// <summary>Text a person would not see (white, microscopic, off-page, invisible). Never sent to a model; shown masked in the UI.</summary>
-public record HiddenFragment(int Page, string Text, string Reason);
+public record HiddenFragment(int Page, string Text, string Reason)
+{
+    /// <summary>
+    /// The unmasked text, in memory only, so <see cref="EvidenceVerifier"/> can match a quote against it. Internal and
+    /// not serialized: never shown, saved or sent to a model.
+    /// </summary>
+    [JsonIgnore] internal string? Original { get; init; }
+}
 
 /// <param name="Pages">Visible text only: the only part a model may receive.</param>
 /// <param name="Hidden">Never sent to a model (readDocument returns <see cref="Pages"/> only).</param>

@@ -126,8 +126,8 @@ public sealed record VerifierBench(SourceNote Source, QuoteTally True, QuoteTall
     public const string NameRo = "Banca de test a verificatorului";
 }
 
-/// <param name="FoundOnlyInHiddenText">Rejected with the red flag. Hidden text is masked (PiiVault), so a hidden quote with
-/// personal data can come back "not found" instead: still rejected.</param>
+/// <param name="FoundOnlyInHiddenText">Rejected with the red flag. The verifier matches the unmasked hidden text (in memory
+/// only), so a hidden quote with personal data is flagged too.</param>
 public sealed record QuoteTally(int Quotes, int Verified, int FoundOnlyInHiddenText)
 {
     public int Rejected => Quotes - Verified;

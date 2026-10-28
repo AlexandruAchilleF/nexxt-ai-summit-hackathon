@@ -33,7 +33,11 @@ public sealed class HiddenTextShield : IHiddenTextShield
             hidden.AddRange(marked
                 .Where(m => m.Reasons != HiddenReason.None)
                 .GroupBy(m => m.Reasons)
-                .Select(g => new HiddenFragment(number, PiiVault.ForStorage().Mask(Words(g.Select(m => m.Letter))), g.Key.ToString())));
+                .Select(g =>
+                {
+                    var text = Words(g.Select(m => m.Letter));
+                    return new HiddenFragment(number, PiiVault.ForStorage().Mask(text), g.Key.ToString()) { Original = text };
+                }));
         }
         return new ShieldResult(hidden.Count > 0 ? ShieldVerdict.HiddenTextRemoved : ShieldVerdict.Clean, pages, hidden);
     }
