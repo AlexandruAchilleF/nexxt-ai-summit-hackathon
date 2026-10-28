@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using HackathonStarter.Features.Synthetic;
 using HackathonStarter.Services;
 using UglyToad.PdfPig;
@@ -9,7 +10,8 @@ namespace HackathonStarter.Tests.Crs;
 
 public class SyntheticPdfTests
 {
-    // Copied by hand from docs/GOLDEN-CASES.md §4, never from the generator, so a typo on either side fails a test.
+    // Quotes copied by hand from docs/GOLDEN-CASES.md §4, never from the generator, so a typo on either side fails a test.
+    // GOLDEN gives the page only for Maria's payslip and Victor's statement; the other documents have one page.
     // "A … B" in a golden quote is two fragments on the same page.
     private static readonly (string File, int Page, string Quote)[] Golden =
     [
@@ -95,7 +97,8 @@ public class SyntheticPdfTests
     {
         var file = await DocumentText.ExtractAsync(new MemoryStream(SyntheticPdfs.Get(fileName).Bytes), fileName);
 
-        Assert.Contains(text, file.Text, StringComparison.Ordinal);
+        // Whole value, not a prefix: DBRCST90A41Z129 must not pass inside a longer TIN.
+        Assert.Matches($@"(?<![\p{{L}}\p{{N}}]){Regex.Escape(text)}(?![\p{{L}}\p{{N}}])", file.Text);
     }
 
     [Theory]
