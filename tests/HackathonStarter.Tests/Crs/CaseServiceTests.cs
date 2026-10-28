@@ -238,6 +238,51 @@ public class CaseServiceTests
         Assert.Equal(3, (await cases.QueueAsync()).Count);
     }
 
+    [Theory]
+    [InlineData("SC-TIN-FORMAT:IT", "2020-06-15", "SC-TIN-FORMAT")]                    // golden case 2: no deadline (I1)
+    [InlineData("FATCA-TIN:US", "2020-06-15", "FATCA-TIN")]                            // the US TIN on the form (p. 38)
+    [InlineData("FATCA-IND-CIT:US", "2020-06-15", "FATCA-SC")]                         // FATCA: no deadline (p. 38)
+    [InlineData("CRS-IND-ADDR:ES", "2020-06-15", "DL-NEW-90")]
+    [InlineData("GEN-CHANGE-CIRC:DE", "2020-06-15", "DL-NEW-90")]                      // a change of circumstances (p. 30, 35-36)
+    [InlineData("SC-TIN-FORMAT:IT GEN-CHANGE-CIRC:DE", "2020-06-15", "DL-NEW-90")]
+    [InlineData("GEN-CHANGE-CIRC:DE", "2012-09-03", "DL-PRE-YEAR")]
+    public async Task Only_a_change_of_circumstances_starts_a_deadline_never_a_self_certification_check(string hits, string openedOn, string rule)
+    {
+        await using var host = await CreateAsync();
+        var account = DateOnly.Parse(openedOn, CultureInfo.InvariantCulture);
+        await host.SeedClientAsync("CL-0030", account);
+        var uncovered = hits.Split(' ').Select(h => h.Split(':')).Select(p => Hit(p[0], p[1])).ToList();
+        host.Engine.OnEvaluate = (_, _, _) => Outcome(uncovered);
+
+        var change = await host.MoveAsync("CL-0030", "ES");
+
+        var item = (await host.As(Viewer).Cases.GetAsync(change.CaseCode!))!;
+        var due = rule.StartsWith("DL-", StringComparison.Ordinal)
+            ? host.Root.GetRequiredService<IDeadlineCalculator>().Compute(new DeadlineInput(change.Change.ReceivedAt, Regime.Crs, account)).DueAt
+            : null;
+        Assert.Equal((rule, due, due is not null), (item.DeadlineRuleId, item.DueAt, item.RemindAt is not null));
+        if (rule == "DL-NEW-90") Assert.Equal(Base.AddDays(90), item.DueAt);
+    }
+
+    [Fact]
+    public async Task A_change_of_circumstances_finding_starts_the_crs_deadline_of_a_case_on_a_self_certification_check()
+    {
+        await using var host = await CreateAsync();
+        await host.SeedClientAsync("CL-0002", NewAccount);
+        host.Engine.OnEvaluate = (_, _, _) => Outcome([Hit("SC-TIN-FORMAT", "IT")]);
+        var check = (await host.MoveAsync("CL-0002", "ES")).CaseCode!;
+        Assert.Null((await host.As(Viewer).Cases.GetAsync(check))!.DueAt);
+        host.AdvanceDays(3);
+        host.Engine.OnEvaluate = (_, _, _) => Outcome([Hit("GEN-CHANGE-CIRC", "DE")]);
+
+        var change = await host.MoveAsync("CL-0002", "DE");
+
+        var item = (await host.As(Viewer).Cases.GetAsync(check))!;
+        Assert.Equal(check, change.CaseCode);
+        Assert.Equal((Base.AddDays(93), "DL-NEW-90"), (item.DueAt, item.DeadlineRuleId));
+        Assert.Contains("\"deadlineStarted\":true", Assert.Single(host.Audit.OfKind(AuditKinds.CaseIndiciumAdded)).PayloadJson);
+    }
+
     [Fact]
     public async Task Several_accounts_give_the_earliest_deadline()
     {
@@ -417,6 +462,164 @@ public class CaseServiceTests
 
         Assert.Equal(new DeadlineTick(0, 0, 0), await cases.TickAsync(expiry.AddDays(400)));
         Assert.Equal(CaseStatus.Open, (await cases.GetAsync(followUp.Code))!.Status);
+    }
+
+    [Theory]
+    [InlineData("2020-06-15", false, "DL-EXPIRED-NEW", "ES")]
+    [InlineData("2020-06-15", true, "DL-EXPIRED-NEW", "ES IT")]
+    [InlineData("2012-09-03", false, "DL-EXPIRED-PRE", "ES")]
+    [InlineData("2012-09-03", true, "DL-EXPIRED-PRE", "ES")]
+    public async Task Expiry_reports_the_indicia_and_original_jurisdictions_never_those_of_a_self_certification_check(
+        string openedOn, bool originalDeclaresIt, string rule, string reportable)
+    {
+        // New account (p. 36): resident in the jurisdiction of the original self-certification and in the one of the change
+        // of circumstances. Preexisting (p. 30): in every jurisdiction with an indicium. A finding on a form (SC-*) is neither.
+        await using var host = await CreateAsync();
+        var client = await host.SeedClientAsync("CL-0031", DateOnly.Parse(openedOn, CultureInfo.InvariantCulture));
+        if (originalDeclaresIt)
+        {
+            await using var db = await host.DbAsync();
+            var original = await db.SelfCertifications.SingleAsync(s => s.ClientId == client.Id);
+            original.Residences.Add(new TaxResidence { Country = "IT", Tin = "DBRCST90A41Z129" });
+            await db.SaveChangesAsync();
+        }
+        host.Engine.OnEvaluate = (_, _, _) => Outcome([Hit("CRS-IND-ADDR", "ES"), Hit("SC-TIN-FORMAT", "ES"), Hit("SC-TIN-FORMAT", "IT"), Hit("SC-TIN-MISSING", "FR")]);
+        var code = await host.AwaitingClientAsync("CL-0031", "ES");
+        var cases = host.As(Viewer).Cases;
+        var due = (await cases.GetAsync(code))!.DueAt!.Value;
+
+        Assert.Equal(new DeadlineTick(0, 0, 1), await cases.TickAsync(due.AddSeconds(1)));
+
+        var item = (await cases.GetAsync(code))!;
+        Assert.Equal((CaseStatus.Expired, rule), (item.Status, item.OutcomeRuleId));
+        Assert.Equal(reportable.Split(' '), item.ReportableFor);
+        Assert.Contains(" in ES (", item.Outcome);
+        Assert.Contains(" în ES (", item.OutcomeRo);
+        Assert.DoesNotContain("FR", item.Outcome);
+        Assert.Contains($"\"reportableFor\":[{string.Join(",", reportable.Split(' ').Select(j => $"\"{j}\""))}]",
+            Assert.Single(host.Audit.OfKind(AuditKinds.CaseExpired)).PayloadJson);
+    }
+
+    [Fact]
+    public async Task A_both_case_whose_fatca_indicium_is_covered_now_expires_without_a_fatca_follow_up()
+    {
+        await using var host = await CreateAsync();
+        var client = await host.SeedClientAsync("CL-0007", NewAccount);
+        var code = await host.AwaitingClientAsync("CL-0007", "ES");
+        await host.As(Member).Changes.RecordAsync(new ChangeRequest("CL-0007", ChangeKind.PersonalDataChanged, "branch", Citizenships: ["RO", "US"]));
+        // The client then declares US status with the US TIN (p. 38): the FATCA indicium is covered, the CRS one is not.
+        host.AdvanceDays(5);
+        await host.As(Member).Changes.RecordAsync(new ChangeRequest("CL-0007", ChangeKind.SelfCertSubmitted, "online",
+            SelfCertification: new SelfCertificationSnapshot(host.Clock.UtcNow, [new("RO", client.Cnp), new("US", "521374829")], DeclaresUsPerson: true)));
+        var cases = host.As(Viewer).Cases;
+
+        Assert.Equal(new DeadlineTick(0, 0, 1), await cases.TickAsync(Utc("2027-01-26T07:00:00")));
+
+        var expired = (await cases.GetAsync(code))!;
+        Assert.Equal((CaseStatus.Expired, "DL-EXPIRED-NEW"), (expired.Status, expired.OutcomeRuleId));
+        Assert.Equal(["ES"], expired.ReportableFor);
+        Assert.DoesNotContain("FATCA indicia continue", expired.Outcome);
+        Assert.Empty(await cases.QueueAsync());
+        Assert.Contains($"\"code\":\"{code}\"", Assert.Single(host.Audit.OfKind(AuditKinds.CaseOpened)).PayloadJson); // no follow-up
+        Assert.Contains("\"fatcaFollowUp\":null", Assert.Single(host.Audit.OfKind(AuditKinds.CaseExpired)).PayloadJson);
+        Assert.Equal("CL-0007", Assert.Single(host.Engine.CurrentCalls).Code);
+    }
+
+    [Fact]
+    public async Task Only_the_fatca_indicia_still_uncovered_at_expiry_continue_in_the_follow_up()
+    {
+        await using var host = await CreateAsync();
+        await host.SeedClientAsync("CL-0007", NewAccount);
+        host.Engine.OnEvaluate = (_, _, _) => Outcome([Hit("CRS-IND-ADDR", "ES"), Hit("FATCA-IND-CIT", "US"), Hit("FATCA-IND-PHONE", "US")]);
+        var code = await host.AwaitingClientAsync("CL-0007", "ES");
+        // Now a "not a US person" self-certification covers the US phone of a new account (III.B.2), never the citizenship (VI.A).
+        host.Engine.OnEvaluateCurrent = _ => Outcome([Hit("CRS-IND-ADDR", "ES"), Hit("FATCA-IND-CIT", "US"), Hit("FATCA-IND-PHONE", "US", Coverage.SelfCertification)]);
+        var cases = host.As(Viewer).Cases;
+
+        Assert.Equal(new DeadlineTick(0, 0, 1), await cases.TickAsync(Utc("2027-01-26T07:00:00")));
+
+        var followUp = Assert.Single(await cases.QueueAsync());
+        Assert.Equal((Regime.Fatca, (DateTime?)null, "FATCA-SC"), (followUp.Regime, followUp.DueAt, followUp.DeadlineRuleId));
+        Assert.Equal(["FATCA-IND-CIT:US"], followUp.Indicia.Select(i => $"{i.RuleId}:{i.Jurisdiction}"));
+        var expired = (await cases.GetAsync(code))!;
+        Assert.Equal(["ES"], expired.ReportableFor);
+        Assert.Contains($"continue in case {followUp.Code}", expired.Outcome);
+        var opened = host.Audit.OfKind(AuditKinds.CaseOpened).Last();
+        Assert.Equal(followUp.Id, opened.CaseId);
+        Assert.Contains("FATCA-IND-CIT:US", opened.PayloadJson);
+        Assert.DoesNotContain("FATCA-IND-PHONE", opened.PayloadJson);
+    }
+
+    [Fact]
+    public async Task Two_both_cases_expiring_in_one_tick_get_distinct_follow_ups_and_a_second_tick_adds_nothing()
+    {
+        await using var host = await CreateAsync();
+        var codes = new List<string>();
+        foreach (var client in new[] { "CL-0007", "CL-0008" })
+        {
+            await host.SeedClientAsync(client, NewAccount);
+            codes.Add(await host.AwaitingClientAsync(client, "ES"));
+            await host.As(Member).Changes.RecordAsync(new ChangeRequest(client, ChangeKind.PersonalDataChanged, "branch", Citizenships: ["RO", "US"]));
+        }
+        var cases = host.As(Viewer).Cases;
+        var expiry = Utc("2027-01-26T07:00:00");
+
+        Assert.Equal(new DeadlineTick(0, 0, 2), await cases.TickAsync(expiry));
+
+        var followUps = await cases.QueueAsync();
+        Assert.Equal(["CRS-2027-0001", "CRS-2027-0002"], followUps.Select(c => c.Code)); // numbered per year of the tick
+        Assert.Equal(["CL-0007", "CL-0008"], followUps.Select(c => c.ClientCode));
+        Assert.All(followUps, f => Assert.Equal(["FATCA-IND-CIT:US"], f.Indicia.Select(i => $"{i.RuleId}:{i.Jurisdiction}")));
+        foreach (var (code, followUp) in codes.Zip(followUps))
+            Assert.Contains($"continue in case {followUp.Code}", (await cases.GetAsync(code))!.Outcome);
+        var openedFollowUps = host.Audit.OfKind(AuditKinds.CaseOpened).Where(e => e.PayloadJson.Contains("fatca follow-up")).ToList();
+        Assert.Equal(followUps.Select(f => (int?)f.Id), openedFollowUps.Select(e => e.CaseId));
+        var entries = host.Audit.Entries.Count;
+
+        Assert.Equal(new DeadlineTick(0, 0, 0), await cases.TickAsync(expiry));
+        Assert.Equal(new DeadlineTick(0, 0, 0), await cases.TickAsync(expiry.AddDays(400)));
+
+        Assert.Equal(entries, host.Audit.Entries.Count);
+        Assert.Equal(2, host.Audit.OfKind(AuditKinds.CaseExpired).Count());
+        await using var db = await host.DbAsync();
+        Assert.Equal(4, await db.Cases.CountAsync());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task With_the_real_engine_a_not_us_person_form_signed_after_the_change_leaves_no_fatca_follow_up(bool answered)
+    {
+        // New account (III.B.2): a "not a US person" self-certification signed on or after the day the bank learned of the US
+        // phone covers it; the follow-up re-evaluates with that day (EvaluateCurrent(client, changeKnownAt), Features/Rules README).
+        await using var host = await CreateAsync(s => s.AddRules());
+        var client = await host.SeedClientAsync("CL-0007", NewAccount);
+        var code = await host.AwaitingClientAsync("CL-0007", "ES");
+        await host.As(Member).Changes.RecordAsync(new ChangeRequest("CL-0007", ChangeKind.PhoneAdded, "call center", Phone: new PhoneSnapshot("+12025550143", "US")));
+        var cases = host.As(Viewer).Cases;
+        var both = (await cases.GetAsync(code))!;
+        Assert.Equal(Regime.Both, both.Regime);
+        Assert.Contains(both.Indicia, i => i.RuleId == "FATCA-IND-PHONE");
+        if (answered)
+        {
+            host.AdvanceDays(2);
+            await host.As(Member).Changes.RecordAsync(new ChangeRequest("CL-0007", ChangeKind.SelfCertSubmitted, "online",
+                SelfCertification: new SelfCertificationSnapshot(host.Clock.UtcNow, [new("RO", client.Cnp)], DeclaresUsPerson: false)));
+        }
+        var due = (await cases.GetAsync(code))!.DueAt!.Value;
+
+        Assert.Equal(new DeadlineTick(0, 0, 1), await cases.TickAsync(due.AddSeconds(1)));
+
+        var expired = (await cases.GetAsync(code))!;
+        Assert.Equal("DL-EXPIRED-NEW", expired.OutcomeRuleId);
+        Assert.Equal(["ES"], expired.ReportableFor);
+        var queue = await cases.QueueAsync();
+        if (answered)
+        {
+            Assert.Empty(queue);
+            Assert.DoesNotContain("FATCA indicia continue", expired.Outcome);
+        }
+        else Assert.Equal(["FATCA-IND-PHONE:US"], Assert.Single(queue).Indicia.Select(i => $"{i.RuleId}:{i.Jurisdiction}"));
     }
 
     [Fact]
