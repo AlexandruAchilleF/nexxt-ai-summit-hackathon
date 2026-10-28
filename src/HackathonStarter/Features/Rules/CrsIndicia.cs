@@ -39,22 +39,28 @@ internal static class CrsIndicia
     }
 
     // lit. b) + pct. 13: current residence / mailing addresses; a service provider's address is ignored when there are others.
+    // An in-care-of address is not a residence (guide p. 48) but is a mailing address, so it is also CRS-IND-MAIL (GOLDEN-CASES
+    // Î10; p. 29 lit. b, f; 31): our reading, labelled Interpretation. Hold-mail is not covered by Î10 and stays lit. f only.
     private static void Addresses(RuleSubject s, AccountScope scope, Findings f)
     {
         var current = s.Addresses
-            .Where(a => a.IsCurrent && a.Kind is AddressKind.Residence or AddressKind.Mailing).ToList();
+            .Where(a => a.IsCurrent && a.Kind is AddressKind.Residence or AddressKind.Mailing or AddressKind.InCareOf).ToList();
 
         foreach (var address in current)
         {
             var country = Jurisdictions.Normalize(address.Country);
             if (Jurisdictions.IsRomania(country)) continue;
 
-            var mailing = address.Kind == AddressKind.Mailing;
+            var inCareOf = address.Kind == AddressKind.InCareOf;
+            var mailing = inCareOf || address.Kind == AddressKind.Mailing;
             var ruleId = mailing ? RuleIds.CrsMailing : RuleIds.CrsAddress;
-            var field = mailing ? "Addresses/Mailing" : "Addresses/Residence";
-            var (whatRo, whatEn) = mailing
-                ? ("Adresă de corespondență actuală", "Current mailing address")
-                : ("Adresă de reședință actuală", "Current residence address");
+            var field = $"Addresses/{address.Kind}";
+            var (whatRo, whatEn) = (inCareOf, mailing) switch
+            {
+                (true, _) => ("Adresă «în atenția» actuală, folosită pentru corespondență,", "Current in-care-of address, used for mail,"),
+                (_, true) => ("Adresă de corespondență actuală", "Current mailing address"),
+                _ => ("Adresă de reședință actuală", "Current residence address"),
+            };
 
             if (!Jurisdictions.IsCrsReportable(country))
             {
@@ -70,11 +76,37 @@ internal static class CrsIndicia
                 continue;
             }
 
+            if (inCareOf)
+            {
+                InCareOfAsMailing(s, scope, f, country);
+                continue;
+            }
+
             var (ro, en) = WithBasis(
                 $"{whatRo} în {Place(country)}: indiciu CRS (pct. 12 lit. b).",
                 $"{whatEn} in {Place(country, true)}: CRS indicium (12(b)).", scope.CrsBasis);
             f.Hit(ruleId, country, field, ro, en, scope.CrsBasis);
         }
+    }
+
+    // Î10: the c/o address is also a current mailing address (p. 29 lit. b). When it is the only current address, the same
+    // address is the lit. f indicium too: it is not "another indicium" (p. 31), so the undocumented-account route stays.
+    private static void InCareOfAsMailing(RuleSubject s, AccountScope scope, Findings f, string country)
+    {
+        var onlyAddress = s.Addresses.Count(a => a.IsCurrent) == 1; // the lit. f condition, as in InCareOf below
+        var ro = $"Adresă «în atenția» actuală în {Place(country)}: nu e adresă de reședință (ghid p. 48), dar e o adresă de corespondență, deci indiciu CRS (pct. 12 lit. b; lectura noastră, GOLDEN-CASES Î10).";
+        var en = $"Current in-care-of address in {Place(country, true)}: not a residence address (guide p. 48), but a mailing address, so a CRS indicium (12(b); our reading, GOLDEN-CASES Î10).";
+        if (onlyAddress)
+        {
+            ro += " E aceeași adresă ca la CRS-IND-CO, nu un alt indiciu.";
+            en += " It is the same address as CRS-IND-CO, not another indicium.";
+            // The pct. 17 route exists only for a preexisting account with no other indicium (p. 31), so it is said only there.
+            if (scope.CrsPreexisting)
+                (ro, en) = (ro + " Fără alte indicii, ruta rămâne cea din pct. 17 (ghid p. 31).",
+                    en + " With no other indicia, the route stays the one of 17 (guide p. 31).");
+        }
+        if (!scope.CrsPreexisting) (ro, en) = (ro + NewAccountRo, en + NewAccountEn);
+        f.Hit(RuleIds.CrsMailing, country, $"Addresses/{AddressKind.InCareOf}", ro, en, RuleBasis.Interpretation);
     }
 
     // lit. c) + pct. 13: current phones only; a foreign phone counts only when there is no Romanian phone.
@@ -216,20 +248,6 @@ internal static class CrsIndicia
                 }
                 if (!scope.CrsPreexisting) (ro, en) = (ro + NewAccountRo, en + NewAccountEn);
                 f.Hit(RuleIds.CrsInCareOf, country, field, ro, en, basis);
-
-                // Decision Î10 (golden case 12): the only current c/o address is where the bank's mail goes, so it is also the
-                // current mailing address of lit. b). Not in the guide's text: our reading, said as such. Hold-mail and a c/o
-                // address next to another one are not read this way.
-                if (address.Kind == AddressKind.InCareOf)
-                {
-                    var mailRo = $"Adresa «în atenția» din {Place(country)} e singura adresă actuală, deci și adresa de corespondență actuală: indiciu CRS (pct. 12 lit. b; GOLDEN-CASES Î10, interpretare de design).";
-                    var mailEn = $"The in-care-of address in {Place(country, true)} is the only current address, so also the current mailing address: CRS indicium (12(b); GOLDEN-CASES Q10, design interpretation).";
-                    (mailRo, mailEn) = scope.CrsPreexisting
-                        ? (mailRo + " Nu schimbă ruta adresei «în atenția»: fără alte indicii, căutare în registrul pe hârtie sau autocertificare / documente, altfel cont nedocumentat (pct. 17).",
-                           mailEn + " It does not change the in-care-of route: with no other indicia, paper record search or self-certification / documents, otherwise an undocumented account (17).")
-                        : (mailRo + NewAccountRo, mailEn + NewAccountEn);
-                    f.Hit(RuleIds.CrsMailing, country, field, mailRo, mailEn, RuleBasis.Interpretation);
-                }
             }
         }
     }

@@ -20,7 +20,8 @@ public class Case
     /// self-certification AND new documentary evidence (p. 29); new: self-certification OR explanation (p. 35).</summary>
     public bool IsPreexisting { get; set; }
     public DateTime OpenedAt { get; set; }
-    /// <summary>Null when the guide gives no deadline (FATCA, p. 38): shown as "no deadline in the guide", NEVERIFICAT.</summary>
+    /// <summary>Null when the guide gives no deadline (FATCA, p. 38; a case opened only on self-certification checks, SC-*):
+    /// shown as "no deadline in the guide", NEVERIFICAT.</summary>
     public DateTime? DueAt { get; set; }
     public DateTime? RemindAt { get; set; }
     public DateTime? RemindedAt { get; set; }

@@ -239,7 +239,8 @@ public class SelfCertRulesTests
         Assert.All(codes.Where(c => Jurisdictions.IsCrsReportable(c) || Jurisdictions.IsAnafNotReported(c) || Jurisdictions.IsRomania(c)
                                     || Jurisdictions.IsUnitedStates(c)), c => Assert.True(Jurisdictions.IsKnown(c), c));
         Assert.True(Jurisdictions.IsKnown(" el "));
-        Assert.False(Jurisdictions.IsKnown("UK")); // not ISO: the operator matches it to the ID document (p. 36)
+        Assert.True(Jurisdictions.IsKnown("UK")); // normalized to GB
+        Assert.False(Jurisdictions.IsKnown("GER")); // not ISO: the operator matches it to the ID document (p. 36)
     }
 
     [Fact]
@@ -332,6 +333,15 @@ public class SelfCertRulesTests
         var client = RoResident().WithAddress(AddressKind.Mailing, "AT");
         var hit = Assert.Single(Run(Form(new SubjectTaxResidence("RO", "1900101400004")), client).Indicia);
         Assert.Equal((RuleIds.SelfCertConsistent, "AT"), (hit.RuleId, hit.Jurisdiction));
+    }
+
+    // A c/o address on file is a mailing address too (GOLDEN-CASES Î10; guide p. 29 lit. b, 48).
+    [Fact]
+    public void Reportable_in_care_of_address_on_file_that_is_not_declared_fails_reasonableness()
+    {
+        var client = RoResident().WithAddress(AddressKind.InCareOf, "IT");
+        var hit = Assert.Single(Run(Form(new SubjectTaxResidence("RO", "1900101400004")), client).Indicia);
+        Assert.Equal((RuleIds.SelfCertConsistent, "IT"), (hit.RuleId, hit.Jurisdiction));
     }
 
     [Fact]

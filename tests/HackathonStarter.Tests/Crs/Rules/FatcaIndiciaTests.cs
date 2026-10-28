@@ -29,6 +29,34 @@ public class FatcaIndiciaTests
         Assert.DoesNotContain(o.Indicia, h => h.RuleId == RuleIds.FatcaBirthPlace);
     }
 
+    // Golden case 7: with FATCA in play (another US indicium hit), the place of birth is listed as read and not applied.
+    [Fact]
+    public void Place_of_birth_outside_the_us_is_cleared_when_another_us_indicium_hit()
+    {
+        var o = Run(RoResident().WithCitizenships("RO", "US"));
+        var pob = Assert.Single(o.Cleared, c => c.RuleId == RuleIds.FatcaBirthPlace);
+        Assert.Equal(("US", Regime.Fatca, "BirthCountry", "31"), (pob.Jurisdiction, pob.Regime, pob.SourceField, pob.GuidePage));
+        Assert.Contains("România (RO), nu SUA", pob.ExplanationRo);
+        Assert.Contains("Romania (RO), not the US", pob.Explanation);
+    }
+
+    // The narrow condition: no US indicium, no entry, so a change that stays in Romania ends in GEN-DOMESTIC (cases 1, 8, 15).
+    [Fact]
+    public void Place_of_birth_is_not_listed_without_a_us_indicium()
+    {
+        var o = Run(RoResident().ReplacePhone("+40733902614", "RO"));
+        Assert.DoesNotContain(o.Cleared, c => c.RuleId == RuleIds.FatcaBirthPlace);
+        Assert.Equal(RuleIds.Domestic, Assert.Single(o.Cleared).RuleId);
+    }
+
+    [Fact]
+    public void An_unknown_place_of_birth_is_not_listed_as_cleared()
+    {
+        var o = Run(RoResident().BornIn(null).WithCitizenships("RO", "US"));
+        Assert.DoesNotContain(o.Cleared, c => c.RuleId == RuleIds.FatcaBirthPlace);
+        Assert.DoesNotContain(o.Indicia, c => c.RuleId == RuleIds.FatcaBirthPlace);
+    }
+
     [Fact]
     public void Us_tax_residence_on_file_is_an_indicium()
     {

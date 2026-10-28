@@ -52,9 +52,17 @@ public static class CaseTexts
                     $"Închis: autocertificare FATCA nouă primită; raportabil pentru {List(reportableFor, "nicio jurisdicție")} (FATCA-SC, p. {Page("FATCA-SC")}).");
         var fatcaEn = regime == Regime.Both ? $" It also answers the FATCA indicia (FATCA-SC, p. {Page("FATCA-SC")})." : "";
         var fatcaRo = regime == Regime.Both ? $" Răspunde și indiciilor FATCA (FATCA-SC, p. {Page("FATCA-SC")})." : "";
-        return ($"Closed: the new self-certification covers every indicium; reportable for {List(reportableFor, "no jurisdiction")} (SC-CONSISTENT, p. {Page("SC-CONSISTENT")}).{fatcaEn}",
-                $"Închis: autocertificarea nouă acoperă toate indiciile; raportabil pentru {List(reportableFor, "nicio jurisdicție")} (SC-CONSISTENT, p. {Page("SC-CONSISTENT")}).{fatcaRo}");
+        return ($"Closed: the new self-certification is valid and covers every indicium; reportable for {List(reportableFor, "no jurisdiction")} (SC-VALID, p. {Page("SC-VALID")}).{fatcaEn}",
+                $"Închis: autocertificarea nouă este validă și acoperă toate indiciile; raportabil pentru {List(reportableFor, "nicio jurisdicție")} (SC-VALID, p. {Page("SC-VALID")}).{fatcaRo}");
     }
+
+    /// <summary>
+    /// The deadline of a case opened only on self-certification checks (SC-*): none. The 90 days follow a change of
+    /// circumstances with indicia (p. 29, 35-36); the guide gives none for checking a declaration (GOLDEN-CASES I1, as for FATCA).
+    /// </summary>
+    public static (string En, string Ro) NoDeadlineForSelfCertificationCheck =>
+        ("No deadline in the guide for a self-certification check (NEVERIFICAT).",
+         "Fără termen legal în ghid pentru verificarea autocertificării (NEVERIFICAT).");
 
     /// <summary>The reminder the watcher drafts (Romanian, the default language of the bank's letters). An operator approves it.</summary>
     public static string ReminderBodyRo(DateTime dueAt, IReadOnlyList<string> documents)

@@ -58,9 +58,12 @@ var forAgent = outcome.Summarize(en: Lang.IsEn);                       // R4: un
 - **R3:** motorul folosește `ITinFormat` din `AddTin()`. `Source = NotChecked` = „format neverificat”, niciodată „format
   greșit”. `IssuesTinToAllResidents` are prioritate față de tabelul nostru OCDE (`Jurisdictions`), folosit doar când R3 dă null.
 - **R4:** `Summarize()` dă maximum 10 elemente pe listă, cu `LegalBasis` și pagina. Modelul explică, nu schimbă decizia.
-- **R5:** `GoldenEngineTests` rulează `GoldenCases.Ready(GoldenLayer.Engine)` prin `ICrsRuleEngine` cablat ca în
-  `Program.cs`: datele canonice sunt așteptarea. `tests/.../Crs/Rules/EngineCases.cs` sunt fixturile R1 pe calea
-  `RuleSubject`; un test verifică să nu contrazică niciodată cazurile canonice (decizie, indicii, regim).
+- **R5:** datele cazurilor-etalon sunt ale R5, în `Features/Evaluation/GoldenCases.cs` (după `docs/GOLDEN-CASES.md`).
+  `GoldenDataEngineTests` trece fiecare caz din `GoldenCases.Ready(GoldenLayer.Engine)` prin `AddRules().AddTin()` și
+  comparația din `EvaluationService` (indicii exact, `Cleared` ca submulțime); `GoldenEngineTests` le compară și pe
+  câmpuri, regim și răspunsurile cazurilor 4 și 18. `tests/.../Crs/Rules/EngineCases.cs` e copia R1 a specificației, pe
+  `RuleSubject`, cu verificări în plus (câmpuri, texte); un test verifică să nu contrazică niciodată cazurile canonice
+  (decizie, indicii, regim). `SnapshotPathTests` o trece prin entități, `ClientSnapshot.From` și `ICrsRuleEngine`.
 
 ## FATCA: când închide o autocertificare „nu sunt persoană SUA”
 
@@ -84,18 +87,18 @@ Când toate indiciile FATCA sunt acoperite, `Cleared` are `FATCA-SC` („contul 
 | ID / situație | De ce | Cine confirmă |
 | --- | --- | --- |
 | `GEN-NEW-ACCOUNT` | Lista de indicii e procedura conturilor preexistente; pe conturile noi o folosim ca «motive să știe». VII.A pct. 5 lit. d) (RO: lit. b-d; OCDE: c-e) spune că unele indicii singure nu fac autocertificarea incorectă. Afectează 4, 5b, 11, 14, 6, 7. | specialistul de domeniu |
-| `GEN-DOMESTIC` | Nicio regulă nu se aplică; analogie cu VII.A pct. 5 lit. c) | specialistul de domeniu |
+| `GEN-DOMESTIC` | Nicio regulă nu se aplică; analogie cu VII.A pct. 5 lit. c). Fără pagină în ghid: `NEVERIFICAT` (PLAN 8.2) | specialistul de domeniu |
 | `CRS-IND-CO`, `FATCA-IND-CO` cu adrese vechi la dosar | „Nicio altă adresă” = nicio altă adresă **actuală** (Î6) | specialistul de domeniu |
-| `CRS-IND-MAIL` din adresa «în atenția» | Singura adresă actuală c/o e și adresa de corespondență (lit. b; Î10, cazul 12); ruta rămâne cea c/o (p. 31). Nu și la «post-restant» sau la c/o lângă altă adresă | specialistul de domeniu |
-| Explicație acceptată, client cu cont preexistent CRS | Nu acoperă: ghidul cere autocertificare și document justificativ (p. 29-30); explicația e o rută a conturilor noi (p. 35, 37; Î11). Testul e pe client (orice cont preexistent), nu pe cont | specialistul de domeniu |
-| `FATCA-IND-POB` în `Cleared` | „Născut în X, nu în SUA” se spune doar când clientul are un indiciu FATCA și țara e un cod real (cazul 7); pe cont nou e `Interpretation` | banca |
+| `CRS-IND-MAIL` pe o adresă «în atenția» | Adresa c/o nu e de reședință (p. 48), dar e de corespondență (p. 29 lit. b). Singura adresă: aceeași adresă, nu alt indiciu, ruta rămâne „cont nedocumentat” (p. 31). «Post-restant» nu intră aici | decis de echipă ([`docs/GOLDEN-CASES.md`](../../../../docs/GOLDEN-CASES.md), Î10) |
+| Explicație acceptată, client cu cont preexistent CRS | Nu acoperă: explicația e o rută a conturilor noi (p. 35, 37); contul preexistent cere autocertificare și document justificativ (p. 29-30). Testul e pe client (orice cont preexistent), nu pe cont | decis de echipă (Î11); clientul cu conturi mixte: specialistul de domeniu |
+| `FATCA-IND-POB` în `Cleared` | Apare doar când un alt indiciu FATCA s-a aplicat (cazul 7), ca operatorul să vadă că locul nașterii a fost citit; altfel schimbarea în România rămâne `GEN-DOMESTIC`. Doar pentru un cod de țară real; pe cont FATCA nou e `Interpretation` | R1 (alegere de prezentare) |
 | Jurisdicții neraportabile, „SUA nu e jurisdicție CRS” (`Cleared`) | Listele ANAF nu sunt în sursele din repo (NEVERIFICAT) | R5 / specialistul de domeniu |
 | `SC-TIN-MISSING`, motiv C | Clientul declară legea altei țări (p. 53); motorul nu o cunoaște. Nu bate p. 37 (țara emite TIN tuturor) | operatorul |
 | FATCA: autocertificare „nu sunt persoană SUA” pe cont nou | III.B.2 cere doar o autocertificare validă; că indiciul nu o face nesigură e lectura noastră | specialistul de domeniu |
 | `CRS-IND-PHONE` cu telefon RO vechi | Telefonul RO care nu mai e actual nu anulează indiciul (Maria) | specialistul de domeniu |
-| `DL-PRE-YEAR` (R2) | Cea mai târzie dintre 31.12 și 90 de zile: ghidul spune „sau”; Anexa 2 pct. 1 spune „mai recentă” pentru testul adresei de rezidență | decis de echipă (`docs/decizii-domeniu`) |
+| `DL-PRE-YEAR` (R2) | Cea mai târzie dintre 31.12 și 90 de zile: pe ruta indiciilor legea spune doar „ori” (Anexa 1, Sec. III.B pct. 16), Comentariul OCDE „the later of” (Sec. III pct. 16), ghidul „sau”; Anexa 2 pct. 1 spune „mai recentă” doar pentru testul adresei de rezidență | decis de echipă ([`docs/GOLDEN-CASES.md`](../../../../docs/GOLDEN-CASES.md), N1) |
 | `SC-TIN-FORMAT`, `FATCA-TIN` cu TIN SUA în format greșit | Politică: formatul greșit duce la clarificare | banca |
-| `SC-VALID`, jurisdicția | Lipsa jurisdicției e `Verified` (p. 34, 36). Un cod care nu e ISO 3166-1 (plus `XK`) e `Policy`: p. 36 lasă banca să accepte o abreviere potrivită cu actul de identitate, pe care motorul nu-l vede. Un rând gol lângă unul completat se ignoră (politică); un rând cu TIN, dar fără țară, e `Interpretation`. În aplicație, `ChangeService` respinge azi țara goală înainte de motor, deci aceste două rute sunt doar ale motorului | operatorul |
+| `SC-VALID`, jurisdicția | Lipsa jurisdicției e `Verified` (p. 34, 36). Un cod care nu e ISO 3166-1 (plus `XK`; `EL` și `UK` se normalizează la `GR`, `GB`) e `Policy`: p. 36 lasă banca să accepte o abreviere potrivită cu actul de identitate, pe care motorul nu-l vede. Un rând gol lângă unul completat se ignoră (politică); un rând cu TIN, dar fără țară, e `Interpretation`. În aplicație, `ChangeService` respinge azi țara goală înainte de motor, deci aceste două rute sunt doar ale motorului | operatorul |
 | `FATCA-SCOPE-ALL` | Politică: nu aplicăm pragurile de 50.000 USD | banca |
 | Valoarea mică FATCA | Sold curent, curs fix maxim (`AccountStatus`), nu soldul la 30.06.2014 / 31.12 | banca |
 | `SC-TIN-MISSING` AT, motiv A sau B (Î8) | Acceptăm oricare, cu explicație la B | specialistul de domeniu |

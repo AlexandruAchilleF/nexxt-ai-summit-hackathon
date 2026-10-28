@@ -55,7 +55,8 @@ public class CaseWorkflowEngineTests
         await host.As(Member).Cases.RegisterResponseAsync(code, Answer(selfCertId));
         var closed = await host.As(Admin).Cases.CloseAsync(code, ConfirmationChannel.Online);
 
-        Assert.Equal((CaseStatus.Closed, "SC-CONSISTENT"), (closed.Status, closed.OutcomeRuleId));
+        // Closing on a new self-certification cites SC-VALID (p. 34; human decision 28.10, golden case 4).
+        Assert.Equal((CaseStatus.Closed, "SC-VALID"), (closed.Status, closed.OutcomeRuleId));
         Assert.Equal(["DE"], closed.ReportableFor);
     }
 
@@ -95,7 +96,9 @@ public class CaseWorkflowEngineTests
         Assert.Equal((Decision.FatcaAlert, Regime.Fatca), (change.Outcome.Decision, change.Outcome.Regime));
         await using var db = await host.DbAsync();
         var item = await db.Cases.Include(c => c.Indicia).SingleAsync(c => c.Code == change.CaseCode);
-        Assert.Equal((Regime.Fatca, "FATCA-SC", (DateTime?)null), (item.Regime, item.DeadlineRuleId, item.DueAt));
+        // FATCA, and a finding on the form: no deadline in the guide (p. 38; GOLDEN-CASES Î1), never the CRS 90 days.
+        Assert.Equal((Regime.Fatca, (DateTime?)null), (item.Regime, item.DueAt));
+        Assert.DoesNotContain("DL-", item.DeadlineRuleId);
         Assert.Equal((RuleIds.FatcaTin, "US"), (Assert.Single(item.Indicia).RuleId, Assert.Single(item.Indicia).Jurisdiction));
     }
 

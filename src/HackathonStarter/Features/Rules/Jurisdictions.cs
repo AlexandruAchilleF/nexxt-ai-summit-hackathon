@@ -77,11 +77,16 @@ public static class Jurisdictions
         return Names.TryGetValue(code, out var name) ? $"{(en ? name.En : name.Ro)} ({code})" : code;
     }
 
-    /// <summary>"de", " DE " → "DE"; the EU code "EL" (Greece) → "GR"; null → "".</summary>
+    /// <summary>"de", " DE " → "DE"; the EU code "EL" (Greece) → "GR" and the common "UK" → "GB" (ISO 3166); null → "".</summary>
     public static string Normalize(string? country)
     {
         var code = (country ?? "").Trim().ToUpperInvariant();
-        return code == "EL" ? "GR" : code;
+        return code switch
+        {
+            "EL" => "GR",
+            "UK" => "GB",
+            _ => code,
+        };
     }
 
     /// <summary>A real country or territory code after <see cref="Normalize"/> ("de", "EL", "XK" yes; "", "XX", "UK" no).</summary>

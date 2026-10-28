@@ -291,16 +291,15 @@ public class GoldenEngineTests
     {
         var outcome = Run(GoldenCases.Get("12"));
 
-        var co = Assert.Single(outcome.Indicia, h => h.RuleId == RuleIds.CrsInCareOf);
-        Assert.Contains("cont nedocumentat", co.ExplanationRo);
-        Assert.Equal(RuleBasis.Interpretation, co.Basis); // the old Cluj address is on file, but not current (Q6)
-        // Decision Î10: a c/o address is also the current mailing address (p. 29 lit. b): our reading, said as such.
+        var hit = Assert.Single(outcome.Indicia, h => h.RuleId == RuleIds.CrsInCareOf);
+        Assert.Contains("cont nedocumentat", hit.ExplanationRo);
+        Assert.Equal(RuleBasis.Interpretation, hit.Basis); // the old Cluj address is on file, but not current (Q6)
+        // Î10: the same c/o address is also CRS-IND-MAIL; it is not another indicium, so the undocumented-account route stays.
         var mail = Assert.Single(outcome.Indicia, h => h.RuleId == RuleIds.CrsMailing);
         Assert.Equal(("IT", "Addresses/InCareOf", RuleBasis.Interpretation), (mail.Jurisdiction, mail.SourceField, mail.Basis));
-        Assert.Contains("Î10", mail.ExplanationRo);
-        // The c/o route of p. 31 (paper search or self-certification, otherwise undocumented), not III.B pct. 19.
         Assert.Contains("registrul pe hârtie", outcome.ExplanationRo);
-        Assert.DoesNotContain("pct. 19", outcome.ExplanationRo);
+        Assert.Contains("cont nedocumentat", outcome.ExplanationRo);
+        Assert.DoesNotContain("pct. 19", outcome.ExplanationRo); // the c/o route of p. 31, not III.B pct. 19
         Assert.Contains("valoare mică", Assert.Single(outcome.Cleared, x => x.RuleId == RuleIds.FatcaInCareOf).ExplanationRo);
     }
 
