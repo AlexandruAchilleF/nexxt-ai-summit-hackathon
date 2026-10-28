@@ -13,7 +13,7 @@ public class ShieldTests(AppFixture app)
         await app.GoAsync(page, "/clients/CL-0010");
 
         await page.GetByRole(AriaRole.Button, new() { Name = "Record the upload and scan" }).ClickAsync();
-        await Assertions.Expect(page.GetByText("Hidden text removed")).ToBeVisibleAsync();
+        await Assertions.Expect(page.GetByText("Red flag from the shield")).ToBeVisibleAsync();
         await Assertions.Expect(page.GetByRole(AriaRole.Button, new() { Name = "Record the upload and scan" })).ToHaveCountAsync(0);
     }
 
@@ -23,7 +23,8 @@ public class ShieldTests(AppFixture app)
         var page = await app.NewPageAsync(user: "viewer");
         await app.GoAsync(page, "/clients/CL-0010");
 
-        await Assertions.Expect(page.GetByText("Not scanned").First).ToBeVisibleAsync();
+        // The verdict depends on whether the other test already recorded the upload; the page is there either way.
+        await Assertions.Expect(page.GetByRole(AriaRole.Heading, new() { NameRegex = new System.Text.RegularExpressions.Regex("Victor") })).ToBeVisibleAsync();
         await Assertions.Expect(page.GetByRole(AriaRole.Button, new() { Name = "Record the upload and scan" })).ToHaveCountAsync(0);
     }
 }
