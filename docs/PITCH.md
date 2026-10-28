@@ -9,9 +9,9 @@
 
 ## 1. Scenariul pe scurt
 
-Traseul e cel din `PLAN.md` §6.3 și §25: Maria cap-coadă, 3 capcane, scutul, jurnalul cu „Tamper”, metricile. Clienții și
+Traseul e cel din `PLAN.md` §6.3 și §25: Maria cap-coadă, 3 capcane, scutul, jurnalul cu „Falsifică” („Tamper”), metricile. Clienții și
 cazurile sunt cele din [`GOLDEN-CASES.md`](GOLDEN-CASES.md). Utilizatorul din demo e Ana (operator, admin): doar ea poate
-muta data simulată și folosi „Tamper”.
+muta data simulată și folosi „Falsifică” („Tamper”).
 
 | # | Timp | Parte | Cuvinte scrise | Cuvinte rostite | Durata estimată | Mod |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -269,12 +269,12 @@ aprobare (`PLAN.md` §6.3); deciziile `NoCase` și `Compliant` merg direct în j
 ## 4. Checklist de filmare
 
 - [ ] **Baza resetată:** `Database:RecreateOnStartup = true` (implicit în `appsettings.Development.json`) și repornirea
-      aplicației; repornirea pune și data simulată pe offset 0 (offset-ul din `SimClock` e doar în memorie). Setări →
-      „Resetează datele demo” (admin) nu ajunge azi: șterge doar rulările, exporturile și Items (`DemoData.ResetAsync`),
-      nu clienții și cazurile CRS. Nu reporniți între propunere și aprobare: rularea cu aprobarea în așteptare dispare
-      (`PLAN.md` §6.3).
-- [ ] **Data simulată resetată** (offset 0): butonul „Resetează” din bara datei simulate (după R2; „Reset” = „Resetează” în
-      `Lang.Ro.cs`). Bara arată data reală, fără „(+N zile)”.
+      aplicației; repornirea pune și data simulată pe offset 0 (offset-ul din `SimClock` e doar în memorie). Fără
+      repornire: Setări → „Resetează datele demo” (admin) readuce clienții, cazurile, istoricul din seed, jurnalul (de la
+      GENESIS) și data simulată (offset 0) la starea de la pornire (`DemoData.ResetAsync`, #43). Nu reporniți între
+      propunere și aprobare: rularea cu aprobarea în așteptare dispare (`PLAN.md` §6.3).
+- [ ] **Data simulată resetată** (offset 0): o fac repornirea și „Resetează datele demo”; butonul „Resetează” din bara
+      datei simulate vine după R2 („Reset” = „Resetează” în `Lang.Ro.cs`). Bara arată data reală, fără „(+N zile)”.
 - [ ] **După o eroare, dubla se reia de la baza și data simulată resetate**, pentru că uneltele rulate deja au salvat dovezi
       și au schimbat starea cazului.
 - [ ] **`AI:AgentMode`** (Setări îl arată pe rândul „Mod agent”): niciodată `Replay`.

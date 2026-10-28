@@ -319,7 +319,7 @@ warnings, testele unitare 1236 din 1236, E2E 23 din 23.
 
 | Pagina | Ce arată |
 | --- | --- |
-| `/audit` | Lanțul de hash-uri, „Verifică” și „Falsifică” („Tamper” în EN, admin). La pornire are intrările istoricului din seed (#39) |
+| `/audit` | Lanțul de hash-uri, „Verifică” (toți) și „Falsifică” („Tamper” în EN, doar admin). La pornire are intrările istoricului din seed (#39) |
 | `/metrics` | Cele trei feluri de cifre din `EvaluationService`, cu „Rulează din nou”, caz cu caz (§8) |
 | `/privacy` | Textul actualizat (#26) |
 | `/cases`, `/cases/{code}`, `/changes/new`, `/clients/{code}` | Doar titlul și „Vine în faza următoare” (pagina clientului e în PR #45, deschis) |

@@ -18,7 +18,7 @@ de mai jos sunt cei din `PITCH.md` §1, calculați pe cuvintele rostite (377, cu
 | 0:00–0:32 | **Problema** | S1 | Titlul, apoi `/dashboard`: termenele care expiră |
 | 0:32–1:24 | **Maria, cap-coadă** | S2–S4 | `/changes/new` → `/cases/{code}`: Maria Popescu (`CL-0001`) se mută la München → caz deschis, termen de 90 de zile → dovadă cu citat verificat, salariul german ca semnal, fără alertă → cererea aprobată de operator → data simulată +85 de zile: memento și escaladare → autocertificare nouă, format valid → caz închis cu dovada confirmării |
 | 1:24–1:58 | **Capcane și scut** | S5–S6 | `/changes/new`: Andrei Pop (`CL-0013`), Radu Ionescu (`CL-0005`, cazul 5a lângă 5c), Ioana Mureșan (`CL-0015`); `/clients/CL-0010`: Victor Neagu, textul alb ascuns oprit de scut |
-| 1:58–2:20 | **Arhitectura** | S7 | `/architecture`, apoi `/audit` cu „Tamper” |
+| 1:58–2:20 | **Arhitectura** | S7 | `/architecture`, apoi `/audit` cu „Falsifică” („Tamper”) |
 | 2:20–2:46 | **Testabil** | S8 | `/metrics`: cazurile-etalon, așteptat vs. obținut |
 | 2:46–3:00 | **Fraza de final** | S9 | Logo + URL |
 
@@ -50,7 +50,7 @@ Sfaturi:
 - [ ] Mock-ul parcurge tot traseul, cu uneltele reale; înregistrările (`src/HackathonStarter/Recordings/*.json` în repo)
       doar pentru întrebările care nu modifică date
 - [ ] Data simulată resetată și datele demo resetate înainte de filmare (repornire cu `Database:RecreateOnStartup = true`;
-      Setări → „Resetează datele demo” nu reface încă datele CRS; checklist-ul complet în `PITCH.md` §4)
+      sau, fără repornire, Setări → „Resetează datele demo”, care readuce și datele CRS, jurnalul și data simulată, #43; checklist-ul complet în `PITCH.md` §4)
 - [ ] `/metrics` complet verde pe cazurile-etalon, pe aceeași versiune care e pe Render
 - [ ] Paginile care nu țin de CRS ascunse din `SiteConfig.Nav` (Arena, Scenarii, Calculatoare)
 - [ ] Nicio dată reală: clienți, documente și TIN-uri sintetice
