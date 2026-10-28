@@ -584,8 +584,8 @@ venitul din străinătate nu e indiciu; un telefon străin (non-SUA) alături de
 
 ### 9.1 Data simulată
 
-`SimClock` (în `Features/Deadlines`) e un **serviciu separat** (singleton, `SimClock : TimeProvider`, cu `UtcNow`),
-construit peste `TimeProvider` și cu un decalaj (`Offset`) față de ora reală, setabil din UI (doar admin) și prin API:
+`ISimClock` (în `Features/Deadlines`, implementat de `SimClock`) e un **serviciu separat** (singleton, cu `UtcNow`,
+`Offset`, `Advance`, `Reset`, `Changed`; **nu** e un `TimeProvider`), construit peste `TimeProvider` și cu un decalaj (`Offset`) față de ora reală, setabil din UI (doar admin) și prin API:
 „+85 zile”, „resetează”. **Nu înlocuim `TimeProvider.System` din `Program.cs`**: restul aplicației îl ia din DI și s-ar
 strica la „+85 zile”:
 
@@ -594,18 +594,22 @@ strica la „+85 zile”:
 - cheile Data Protection și `AgentRateLimiter` (rulările pe minut) folosesc același ceas.
 
 Codul CRS (Rules, Deadlines, Cases, Changes, Shield, Tin, Audit, Sentinel, Evaluation, Clients) injectează doar
-`SimClock`, **niciodată** `DateTime.Now` / `UtcNow` sau `TimeProvider` direct. `ClockTests` verifică asta: niciun
-constructor CRS nu primește `TimeProvider`, nicio sursă CRS nu conține `DateTime.Now` (codul vechi din template nu intră
-în verificare).
+`ISimClock`, **niciodată** `DateTime.Now` / `UtcNow` sau `TimeProvider` direct. `ClockTests` verifică asta: niciun
+constructor CRS nu primește `TimeProvider` (în afară de `SimClock`), nicio sursă CRS nu conține `DateTime.Now` sau
+`TimeProvider.System` (singura excepție: linia din `AddDeadlines` care construiește `SimClock`; codul vechi din template nu
+intră în verificare).
 
 ### 9.2 Calculul termenului
 
 ```csharp
 public interface IDeadlineCalculator
 {
-    DeadlineResult Compute(Regime regime, DateOnly accountOpenedOn, DateTime changeKnownAt);
+    DeadlineResult Compute(DeadlineInput input);
 }
-public record DeadlineResult(DateTime DueAt, DateTime RemindAt, bool Preexisting, string RuleId, string GuidePage, string Explanation);
+public record DeadlineInput(DateTime KnownAt, Regime Regime, DateOnly AccountOpenedOn);
+// DueAt / RemindAt null = ghidul nu dă termen (FATCA, p. 38). DesignChoice = o parte e alegerea noastră (memento, „cea mai târzie”).
+public record DeadlineResult(DateTime? DueAt, DateTime? RemindAt, bool Preexisting, string RuleId, string GuidePage,
+                             string Explanation, string ExplanationRo, bool DesignChoice);
 ```
 
 - Ziua de start: `changeKnownAt` = data la care banca știe sau are motive să știe de schimbare (data primirii
@@ -628,10 +632,9 @@ public record DeadlineResult(DateTime DueAt, DateTime RemindAt, bool Preexisting
   pentru a clarifica aceste situații” (p. 30).
 - NEVERIFICAT: ce se întâmplă la mai multe schimbări pe același caz (propunere: termenul nu se mută, indiciile
   noi se adaugă la caz). Până atunci, testul are `// TODO(ghid p.?)` vizibil.
-- **Starea din Faza 0:** codul are `Compute(DeadlineInput(KnownAt, Regime, IsPreexisting))`, o singură regulă,
-  `DL-CHANGE-90` (90 de zile pentru orice cont), și `DesignChoice` în rezultat. R2 îl aduce la regulile de mai sus
-  (`DL-NEW-90`, `DL-PRE-YEAR`, `DL-EXPIRED-NEW`, `DL-EXPIRED-PRE`); semnătura poate rămâne `DeadlineInput`, dar
-  preexistentul se calculează pe regim (7.1).
+- **Starea codului:** `DeadlineCalculator` aplică deja `DL-NEW-90`, `DL-PRE-YEAR` (31 dec. la 23:59:59 ora României) și
+  `FATCA-SC` fără termen, cu teste (`Crs/DeadlineCalculatorTests.cs`). Consecința la expirare (`DL-EXPIRED-NEW`,
+  `DL-EXPIRED-PRE`) o aplică `CaseService` (R2).
 
 ### 9.3 State machine-ul cazului
 

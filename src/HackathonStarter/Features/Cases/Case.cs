@@ -1,3 +1,4 @@
+using HackathonStarter.Features.Clients;
 using HackathonStarter.Features.Rules;
 
 namespace HackathonStarter.Features.Cases;
@@ -15,11 +16,13 @@ public class Case
     public int TriggerChangeId { get; set; }
     public Regime Regime { get; set; }
     public CaseStatus Status { get; set; } = CaseStatus.Open;
-    /// <summary>CRS preexisting account (guide p. 20): needs a self-certification AND new documentary evidence (p. 29).</summary>
+    /// <summary>Computed when the case opens (Preexisting.For on the account, guide p. 20). CRS preexisting needs a
+    /// self-certification AND new documentary evidence (p. 29); new: self-certification OR explanation (p. 35).</summary>
     public bool IsPreexisting { get; set; }
     public DateTime OpenedAt { get; set; }
-    public DateTime DueAt { get; set; }
-    public DateTime RemindAt { get; set; }
+    /// <summary>Null when the guide gives no deadline (FATCA, p. 38): shown as "no deadline in the guide", NEVERIFICAT.</summary>
+    public DateTime? DueAt { get; set; }
+    public DateTime? RemindAt { get; set; }
     public DateTime? RemindedAt { get; set; }
     public DateTime? EscalatedAt { get; set; }
     public DateTime? ClosedAt { get; set; }
@@ -28,6 +31,8 @@ public class Case
     public string? Outcome { get; set; }
     public string? OutcomeRo { get; set; }
     public string? OutcomeRuleId { get; set; }
+    /// <summary>Jurisdictions the account is treated as resident in after closing or expiry (17a: RO and ES; 17b: at least ES).</summary>
+    public List<string> ReportableFor { get; set; } = [];
     public string AssignedTo { get; set; } = "";
     public string DeadlineRuleId { get; set; } = "";
     public string DeadlineGuidePage { get; set; } = "";
@@ -117,9 +122,6 @@ public class ClientRequest
 }
 
 public enum ResponseKind { NewSelfCertification, ReasonableExplanation, Other }
-
-/// <summary>Reasonable explanations listed by the guide (p. 37, non-exhaustive: "Other" stays possible).</summary>
-public enum ExplanationCategory { None, Student, TeacherOrTrainee, Diplomat, EuOfficial, Other }
 
 public class ClientResponse
 {

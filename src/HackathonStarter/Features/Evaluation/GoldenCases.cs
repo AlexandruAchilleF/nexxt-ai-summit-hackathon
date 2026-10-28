@@ -2,46 +2,52 @@ using HackathonStarter.Features.Rules;
 
 namespace HackathonStarter.Features.Evaluation;
 
-/// <summary>Who owns the golden case in the tests: R1 (rule decision), R2 (deadline / lifecycle), R3 (shield).</summary>
+/// <summary>Who owns the golden case in the tests (docs/GOLDEN-CASES.md, column "Strat"): R1 engine, R2 workflow, R3 shield.</summary>
 public enum GoldenOwner { R1, R2, R3 }
 
 /// <summary>
-/// One golden case: the expected result written BEFORE the code (docs/PLAN.md 16.1). Owner of the data: R5; R1 and R2
-/// read it in tests and ask R5 for corrections. Phase 0: id, title and expectation only; R5 adds the input data
-/// (client snapshot before/after, change, documents) as new properties.
+/// One golden case: the expected result written BEFORE the code (docs/GOLDEN-CASES.md, docs/PLAN.md 16.1). Owner of the
+/// data: R5; R1 and R2 read it in tests and ask R5 for corrections. Phase 0: id, client, expectation only; R5 adds the input
+/// data (Before / After snapshots, the change, documents) as new properties.
 /// </summary>
+/// <param name="ExpectedHits">Compared exactly as RuleId:Jurisdiction (with coverage in R5's full data).</param>
+/// <param name="ExpectedCleared">Compared as a subset: the trap rule whose explanation matters.</param>
 public record GoldenCase(
     string Id,
     string Title,
+    string ClientCode,
     GoldenOwner Owner,
-    Decision? ExpectedDecision,
-    string[] ExpectedIndicia,
+    Decision ExpectedDecision,
+    string[] ExpectedHits,
     string[] ExpectedCleared,
+    string? ExpectedDeadlineRule,
     string ExpectedOutcome);
 
 public static class GoldenCases
 {
     public static readonly IReadOnlyList<GoldenCase> All =
     [
-        new("1", "RO resident, all data in Romania", GoldenOwner.R1, Decision.Compliant, [], [], "Compliant"),
-        new("2", "Italian TIN in the wrong format", GoldenOwner.R1, Decision.Clarification, ["SC-TIN-FORMAT"], [], "Clarification: TIN format invalid"),
-        new("3", "Missing TIN for Austria, with a valid reason", GoldenOwner.R1, Decision.Compliant, [], ["SC-TIN-MISSING"], "Compliant, reason recorded"),
-        new("4", "Move to Munich, German phone, no RO phone (Maria)", GoldenOwner.R1, Decision.Clarification, ["CRS-IND-ADDR", "CRS-IND-PHONE"], [], "Case opened, deadline started, clarification"),
-        new("5a", "Standing order to a German IBAN from a current account", GoldenOwner.R1, Decision.Compliant, [], ["CRS-IND-SO"], "Compliant: not an indicium on depository accounts (p. 29)"),
-        new("5b", "Same standing order from a custodial account", GoldenOwner.R1, Decision.Clarification, ["CRS-IND-SO"], [], "Clarification: indicium"),
-        new("6", "Passport with place of birth in the US", GoldenOwner.R1, Decision.FatcaAlert, ["FATCA-IND-POB"], [], "FATCA alert"),
-        new("7", "US citizenship in the passport", GoldenOwner.R1, Decision.FatcaAlert, ["FATCA-IND-CIT"], [], "FATCA alert"),
-        new("8", "Trap: RO resident with a salary from a German company (Andrei)", GoldenOwner.R1, Decision.Compliant, [], [], "Compliant; weak signal, explained"),
-        new("9", "Dual residence RO + DE, declared correctly", GoldenOwner.R1, Decision.Compliant, [], ["SC-CONSISTENT"], "Compliant; reportable for DE"),
-        new("10", "PDF with hidden white text", GoldenOwner.R3, Decision.ShieldAlert, [], [], "Red signal from the shield; the text never reaches the model"),
-        new("11", "Power of attorney for a person with an address in Austria", GoldenOwner.R1, Decision.Clarification, ["CRS-IND-POA"], [], "Clarification: indicium"),
-        new("12", "In-care-of address in a reportable jurisdiction, the only address", GoldenOwner.R1, Decision.Clarification, ["CRS-IND-CO"], [], "Clarification: indicium"),
-        new("13", "Trap: foreign (non-US) phone and a RO phone", GoldenOwner.R1, Decision.Compliant, [], ["CRS-IND-PHONE"], "Compliant"),
-        new("14", "US phone, even with a RO phone", GoldenOwner.R1, Decision.FatcaAlert, ["FATCA-IND-PHONE"], [], "FATCA alert"),
-        new("15", "Trap: move from Cluj to Iasi", GoldenOwner.R1, Decision.NoCase, [], ["GEN-DOMESTIC"], "No case, with an explanation"),
-        new("16", "Move to Spain, no answer, a few days before the deadline", GoldenOwner.R2, Decision.Clarification, ["CRS-IND-ADDR"], [], "Reminder and escalation"),
-        new("17", "Same case after the deadline", GoldenOwner.R2, Decision.Clarification, ["CRS-IND-ADDR"], [], "Expired: the exact consequence from the guide, per account age"),
-        new("18", "Answer in time with a reasonable explanation (student)", GoldenOwner.R2, Decision.Clarification, ["CRS-IND-ADDR"], [], "Closed with channel, moment and proof"),
+        new("1", "RO phone replaced by another RO phone", "CL-0015", GoldenOwner.R1, Decision.NoCase, [], ["GEN-DOMESTIC"], null, "No case"),
+        new("2", "Self-certification with an Italian TIN in the wrong format", "CL-0002", GoldenOwner.R1, Decision.Clarification, ["SC-TIN-FORMAT:IT"], [], null, "Clarification: TIN format invalid"),
+        new("3", "Self-certification without a TIN for Austria, with a reason", "CL-0003", GoldenOwner.R1, Decision.Compliant, ["SC-TIN-MISSING:AT"], [], null, "Compliant, reason recorded"),
+        new("4", "Maria: Munich, German phone, no RO phone, new account", "CL-0001", GoldenOwner.R1, Decision.Clarification, ["CRS-IND-ADDR:DE", "CRS-IND-PHONE:DE"], [], "DL-NEW-90", "Case opened, 90-day deadline, then closed"),
+        new("5a", "Standing order to Germany from a current account", "CL-0005", GoldenOwner.R1, Decision.NoCase, [], ["CRS-IND-SO"], null, "No case: not an indicium on depository accounts (p. 29)"),
+        new("5b", "Same standing order from a custodial account", "CL-0005", GoldenOwner.R1, Decision.Clarification, ["CRS-IND-SO:DE"], [], "DL-NEW-90", "Clarification: indicium"),
+        new("5c", "Standing order to the US from a current account", "CL-0005", GoldenOwner.R1, Decision.FatcaAlert, ["FATCA-IND-SO:US"], ["CRS-IND-SO"], null, "FATCA alert, no deadline in the guide"),
+        new("6", "Passport with place of birth in the US", "CL-0006", GoldenOwner.R1, Decision.FatcaAlert, ["FATCA-IND-POB:US"], [], null, "FATCA alert"),
+        new("7", "US citizenship (second passport)", "CL-0007", GoldenOwner.R1, Decision.FatcaAlert, ["FATCA-IND-CIT:US"], [], null, "FATCA alert"),
+        new("8", "Andrei: salary from a German company", "CL-0013", GoldenOwner.R1, Decision.NoCase, [], ["GEN-DOMESTIC"], null, "No case; one weak signal, explained"),
+        new("9", "Dual residence RO + DE declared, address in DE", "CL-0009", GoldenOwner.R1, Decision.Compliant, ["CRS-IND-ADDR:DE"], [], null, "Compliant, reportable for DE"),
+        new("10", "PDF with hidden white text", "CL-0010", GoldenOwner.R3, Decision.ShieldAlert, [], [], null, "Red signal from the shield; the text never reaches the model"),
+        new("11", "Power of attorney for a person with an address in Austria", "CL-0011", GoldenOwner.R1, Decision.Clarification, ["CRS-IND-POA:AT"], [], "DL-NEW-90", "Clarification: indicium"),
+        new("12", "In-care-of address in Italy, the only address (preexisting, low value)", "CL-0012", GoldenOwner.R1, Decision.Clarification, ["CRS-IND-CO:IT"], ["FATCA-IND-CO"], "DL-PRE-YEAR", "Clarification: indicium"),
+        new("13", "Andrei: German phone next to the RO phone", "CL-0013", GoldenOwner.R1, Decision.NoCase, [], ["CRS-IND-PHONE"], null, "No case"),
+        new("14", "US phone next to the RO phone", "CL-0014", GoldenOwner.R1, Decision.FatcaAlert, ["FATCA-IND-PHONE:US"], ["CRS-IND-PHONE"], null, "FATCA alert"),
+        new("15", "Cluj to Iasi", "CL-0015", GoldenOwner.R1, Decision.NoCase, [], ["GEN-DOMESTIC"], null, "No case, with an explanation"),
+        new("16", "Move to Spain, new account, no answer, day 85", "CL-0016", GoldenOwner.R2, Decision.Clarification, ["CRS-IND-ADDR:ES"], [], "DL-NEW-90", "Reminded, then escalated"),
+        new("17a", "Same case after the deadline", "CL-0016", GoldenOwner.R2, Decision.Clarification, ["CRS-IND-ADDR:ES"], [], "DL-EXPIRED-NEW", "Expired: resident in RO and ES"),
+        new("17b", "Move to Spain in March, preexisting account", "CL-0017", GoldenOwner.R2, Decision.Clarification, ["CRS-IND-ADDR:ES"], [], "DL-PRE-YEAR", "Deadline 31 Dec; on expiry resident at least in ES (DL-EXPIRED-PRE)"),
+        new("18", "Answer in time: student", "CL-0018", GoldenOwner.R2, Decision.Clarification, ["CRS-IND-ADDR:DE"], [], "DL-NEW-90", "Compliant on re-evaluation, closed with proof; not reportable for DE"),
     ];
 }
 

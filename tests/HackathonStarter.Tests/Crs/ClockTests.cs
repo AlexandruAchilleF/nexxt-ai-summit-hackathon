@@ -7,7 +7,7 @@ using HackathonStarter.Features.Rules;
 namespace HackathonStarter.Tests.Crs;
 
 /// <summary>
-/// CRS code reads time from <see cref="SimClock"/> only (docs/PLAN.md 9.1, 16.2): the demo moves "+85 days" and every
+/// CRS code reads time from <see cref="ISimClock"/> only (docs/PLAN.md 9.1, 16.2): the demo moves "+85 days" and every
 /// deadline, case transition and audit entry must move with it. The app-wide TimeProvider stays the system clock.
 /// </summary>
 public class ClockTests
@@ -17,6 +17,15 @@ public class ClockTests
         ["Clients", "Changes", "Rules", "Deadlines", "Cases", "Shield", "Tin", "Audit", "Evaluation", "Sentinel"];
 
     private static readonly Regex SystemClock = new(@"\bDateTime(Offset)?\.(Now|UtcNow|Today)\b");
+
+    /// <summary>Taking the app-wide clock without a constructor parameter: resolving it from DI, or the static system clock.</summary>
+    private static readonly Regex DirectTimeProvider = new(
+        @"\bGet(Required)?Service<\s*(global::)?(System\.)?TimeProvider\s*>" +
+        @"|\bGet(Required)?Service\(\s*typeof\(\s*(global::)?(System\.)?TimeProvider\s*\)\s*\)" +
+        @"|\bTimeProvider\.System\b");
+
+    /// <summary>The one line allowed to touch TimeProvider: AddDeadlines builds SimClock over the app's clock (fallback: the system clock).</summary>
+    private const string SimClockWiringFile = "src/HackathonStarter/Features/Deadlines/DeadlineCalculator.cs";
 
     [Fact]
     public void Crs_types_never_take_TimeProvider()
@@ -33,7 +42,7 @@ public class ClockTests
 
         var offenders = TimeProviderParameters(crsTypes);
         Assert.True(offenders.Count == 0,
-            "CRS code must inject SimClock, not TimeProvider (docs/PLAN.md 9.1):\n" + string.Join("\n", offenders));
+            "CRS code must inject ISimClock, not TimeProvider (docs/PLAN.md 9.1):\n" + string.Join("\n", offenders));
     }
 
     [Fact]
@@ -58,15 +67,16 @@ public class ClockTests
                          && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}")));
         }
         Assert.NotEmpty(files);
+        Assert.Contains(SimClockWiringFile, files.Select(f => RelativePath(root, f))); // keeps the exception pointing at a real file
 
         var offenders = files
-            .SelectMany(f => File.ReadLines(f).Select((line, i) => (File: f, Line: i + 1, Text: line)))
-            .Where(x => ReadsSystemClock(x.Text))
-            .Select(x => $"{Path.GetRelativePath(root, x.File)}:{x.Line}: {x.Text.Trim()}")
+            .SelectMany(f => File.ReadLines(f).Select((line, i) => (File: RelativePath(root, f), Line: i + 1, Text: line)))
+            .Where(x => ReadsSystemClock(x.File, x.Text))
+            .Select(x => $"{x.File}:{x.Line}: {x.Text.Trim()}")
             .ToList();
 
         Assert.True(offenders.Count == 0,
-            "CRS code reads time from SimClock (inject it; use clock.UtcNow), never the system clock:\n" + string.Join("\n", offenders));
+            "CRS code reads time from ISimClock (inject it; use clock.UtcNow), never the system clock or TimeProvider:\n" + string.Join("\n", offenders));
     }
 
     [Theory]
@@ -75,21 +85,44 @@ public class ClockTests
     [InlineData("var today = DateOnly.FromDateTime(DateTime.Today);", true)]
     [InlineData("var at = DateTimeOffset.UtcNow;", true)]
     [InlineData("var at = DateTimeOffset.Now.UtcDateTime;", true)]
+    [InlineData("var clock = sp.GetRequiredService<TimeProvider>();", true)]
+    [InlineData("var clock = sp.GetService<TimeProvider>() ?? fallback;", true)]
+    [InlineData("var clock = sp.GetRequiredService<System.TimeProvider>();", true)]
+    [InlineData("var clock = (TimeProvider)sp.GetRequiredService(typeof(TimeProvider));", true)]
+    [InlineData("var now = TimeProvider.System.GetUtcNow();", true)]
     [InlineData("var now = clock.UtcNow;", false)]
     [InlineData("var now = clock.GetUtcNow();", false)]
+    [InlineData("var clock = sp.GetRequiredService<ISimClock>();", false)]
     [InlineData("    // never DateTime.Now here", false)]
     [InlineData("    /// <summary>Not DateTime.UtcNow.</summary>", false)]
+    [InlineData("    /// <summary>Over the app's <see cref=\"TimeProvider\"/>, never GetService<TimeProvider>.</summary>", false)]
     [InlineData("var kind = DateTimeKind.Utc;", false)]
     public void The_source_check_flags_system_clock_reads_outside_comments(string line, bool flagged)
     {
-        Assert.Equal(flagged, ReadsSystemClock(line));
+        Assert.Equal(flagged, ReadsSystemClock("src/HackathonStarter/Features/Cases/CaseService.cs", line));
     }
 
-    private static bool ReadsSystemClock(string line)
+    [Theory]
+    [InlineData(SimClockWiringFile, "services.AddSingleton<ISimClock>(sp => new SimClock(sp.GetService<TimeProvider>() ?? TimeProvider.System));", false)]
+    [InlineData("src/HackathonStarter/Features/Cases/CaseService.cs", "services.AddSingleton<ISimClock>(sp => new SimClock(sp.GetService<TimeProvider>() ?? TimeProvider.System));", true)]
+    [InlineData(SimClockWiringFile, "var real = sp.GetRequiredService<TimeProvider>();", true)]
+    [InlineData(SimClockWiringFile, "var now = TimeProvider.System.GetUtcNow();", true)]
+    [InlineData(SimClockWiringFile, "var clock = new SimClock(TimeProvider.System); var now = DateTime.UtcNow;", true)] // the exception never covers DateTime
+    public void Only_the_SimClock_wiring_in_AddDeadlines_may_touch_TimeProvider(string file, string line, bool flagged)
     {
-        var trimmed = line.TrimStart();
-        return !trimmed.StartsWith("//", StringComparison.Ordinal) && SystemClock.IsMatch(line);
+        Assert.Equal(flagged, ReadsSystemClock(file, line));
     }
+
+    /// <param name="file">Path relative to the repository root, with '/'.</param>
+    private static bool ReadsSystemClock(string file, string line)
+    {
+        if (line.TrimStart().StartsWith("//", StringComparison.Ordinal)) return false;
+        if (SystemClock.IsMatch(line)) return true;
+        if (!DirectTimeProvider.IsMatch(line)) return false;
+        return !(file == SimClockWiringFile && line.Contains("new SimClock(", StringComparison.Ordinal));
+    }
+
+    private static string RelativePath(string root, string file) => Path.GetRelativePath(root, file).Replace('\\', '/');
 
     private static bool InNamespace(Type type, string ns) =>
         type.Namespace is { } n && (n == ns || n.StartsWith(ns + ".", StringComparison.Ordinal));
@@ -114,7 +147,7 @@ public class ClockTests
         public DateTimeOffset Now => clock.GetUtcNow();
     }
 
-    private sealed class TakesSimClock(SimClock clock)
+    private sealed class TakesSimClock(ISimClock clock)
     {
         public DateTime Now => clock.UtcNow;
     }

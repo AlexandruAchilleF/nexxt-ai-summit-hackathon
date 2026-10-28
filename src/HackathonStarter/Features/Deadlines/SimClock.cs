@@ -1,28 +1,31 @@
 namespace HackathonStarter.Features.Deadlines;
 
 /// <summary>
-/// The demo clock: real time plus an offset ("+85 days"), so a 90-day deadline can be shown in a 3-minute video.
-/// Time keeps flowing (events stay ordered); only "now" moves. Offset 0 = real time.
-/// Inject <see cref="SimClock"/> in the CRS services (cases, deadlines, changes, audit). The app-wide
-/// <see cref="TimeProvider"/> stays the system clock on purpose: auth cookies, data protection keys and run retention
-/// must not jump 85 days ahead.
+/// The business date of CRS code: real time plus an offset ("+85 days"), so a 90-day deadline can be shown in a 3-minute
+/// video. Time keeps flowing (events stay ordered); only "now" moves. Offset 0 = real time.
+/// A separate service on purpose: the app-wide TimeProvider stays the system clock, because auth cookies, data protection
+/// keys, run retention and rate limits must not jump 85 days (docs/PLAN.md 9.1). CRS code injects ISimClock only;
+/// tests/.../Crs/ClockTests.cs enforces it.
 /// </summary>
-public sealed class SimClock(TimeProvider real) : TimeProvider
+public interface ISimClock
+{
+    DateTime UtcNow { get; }
+    TimeSpan Offset { get; }
+    /// <summary>Raised after every change of the offset (DeadlineWatcher re-checks deadlines at once, the UI refreshes).</summary>
+    event Action? Changed;
+    /// <summary>Moves the date forward. Callers check the admin role and write a clock.changed audit entry.</summary>
+    void Advance(TimeSpan by);
+    void Reset();
+}
+
+/// <summary>Singleton over the real <see cref="TimeProvider"/> (the only CRS type allowed to take one).</summary>
+public sealed class SimClock(TimeProvider real) : ISimClock
 {
     private long _offsetTicks;
 
     public TimeSpan Offset => TimeSpan.FromTicks(Interlocked.Read(ref _offsetTicks));
-
-    /// <summary>Raised after every change of the offset (DeadlineWatcher re-checks deadlines at once, the UI refreshes).</summary>
+    public DateTime UtcNow => (real.GetUtcNow() + Offset).UtcDateTime;
     public event Action? Changed;
-
-    public override DateTimeOffset GetUtcNow() => real.GetUtcNow() + Offset;
-    public override TimeZoneInfo LocalTimeZone => real.LocalTimeZone;
-    // Timers and stopwatches measure real elapsed time; only the date moves.
-    public override long GetTimestamp() => real.GetTimestamp();
-    public override long TimestampFrequency => real.TimestampFrequency;
-
-    public DateTime UtcNow => GetUtcNow().UtcDateTime;
 
     public void Advance(TimeSpan by)
     {

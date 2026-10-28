@@ -65,7 +65,8 @@ public class ClientService(IDbContextFactory<AppDbContext> dbFactory) : IClientS
         .Include(c => c.Phones)
         .Include(c => c.Accounts).ThenInclude(a => a.StandingOrders)
         .Include(c => c.PowersOfAttorney)
-        .Include(c => c.SelfCertifications);
+        .Include(c => c.SelfCertifications)
+        .Include(c => c.AcceptedExplanations);
 }
 
 public static class ClientsSetup

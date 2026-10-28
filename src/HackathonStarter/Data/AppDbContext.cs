@@ -32,6 +32,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<PowerOfAttorney> PowersOfAttorney => Set<PowerOfAttorney>();
     public DbSet<SelfCertification> SelfCertifications => Set<SelfCertification>();
     public DbSet<ClientDocument> ClientDocuments => Set<ClientDocument>();
+    public DbSet<AcceptedExplanation> AcceptedExplanations => Set<AcceptedExplanation>();
     public DbSet<ChangeEvent> ChangeEvents => Set<ChangeEvent>();
     public DbSet<RuleEvaluation> RuleEvaluations => Set<RuleEvaluation>();
     public DbSet<Case> Cases => Set<Case>();
@@ -118,7 +119,7 @@ public static class DatabaseSetup
         }
         if (!await db.Clients.AnyAsync())
         {
-            db.Clients.AddRange(ClientSeed.Create(app.Services.GetRequiredService<Features.Deadlines.SimClock>().UtcNow));
+            db.Clients.AddRange(ClientSeed.Create(app.Services.GetRequiredService<Features.Deadlines.ISimClock>().UtcNow));
             await db.SaveChangesAsync();
         }
         // @gen:seed (the feature generator inserts new seeds above this line)

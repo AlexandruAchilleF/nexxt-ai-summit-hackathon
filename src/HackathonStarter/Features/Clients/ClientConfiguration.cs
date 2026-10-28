@@ -17,7 +17,13 @@ public class ClientConfiguration : IEntityTypeConfiguration<Client>
         e.HasMany(c => c.PowersOfAttorney).WithOne().HasForeignKey(p => p.ClientId).OnDelete(DeleteBehavior.Cascade);
         e.HasMany(c => c.SelfCertifications).WithOne().HasForeignKey(s => s.ClientId).OnDelete(DeleteBehavior.Cascade);
         e.HasMany(c => c.Documents).WithOne().HasForeignKey(d => d.ClientId).OnDelete(DeleteBehavior.Cascade);
+        e.HasMany(c => c.AcceptedExplanations).WithOne().HasForeignKey(x => x.ClientId).OnDelete(DeleteBehavior.Cascade);
     }
+}
+
+public class AcceptedExplanationConfiguration : IEntityTypeConfiguration<AcceptedExplanation>
+{
+    public void Configure(EntityTypeBuilder<AcceptedExplanation> e) => e.Property(x => x.Category).HasConversion<string>();
 }
 
 public class AddressConfiguration : IEntityTypeConfiguration<Address>
