@@ -1,3 +1,27 @@
+# CRS Sentinel
+
+Every change to a customer's data can start a legal deadline. When someone moves abroad, adds a foreign phone or sets up
+a standing order, the bank has to find out again where they pay tax, or it reports them wrongly to ANAF (CRS/FATCA),
+account by account. CRS Sentinel catches the change, applies the rules of the ANAF DAC2/CRS/FATCA guide **in code**
+(each rule with its ID and page), starts the deadline, gathers the evidence, drafts the request to the customer and
+tracks the reply until the case closes with proof of confirmation. **The model reads and writes, code decides, a person
+approves.**
+
+Raiffeisen Bank challenge "AI for Operational Efficiency", NEXXT AI Hackathon (VibeHack), 28–29 October 2026.
+
+> **Status:** in progress. Plan, test cases and scope: [`docs/PLAYBOOK.md`](docs/PLAYBOOK.md) · facts and guide pages:
+> [`docs/RESEARCH-CRS.md`](docs/RESEARCH-CRS.md) · video and submission: [`docs/SUBMISSION.md`](docs/SUBMISSION.md) (in Romanian).
+
+- **MVP scope:** individuals and changes of circumstances; new accounts as a secondary case.
+- **Out of scope:** entity accounts and their controlling persons, the F3000 file, W-8BEN forms, sending real messages to customers.
+- **Design interpretation:** a data change that adds a legal indicium means the bank "knows or has reason to know" that
+  the self-certification may be unreliable (guide, p. 30 and p. 35).
+
+Built on the team's .NET hackathon template, written before the hackathon (see the git history). Everything below
+describes that template.
+
+---
+
 # Hackathon Starter (.NET)
 
 A generic app skeleton for AI-agent hackathons, in **C# only**: .NET 10 · Blazor Server · MudBlazor ·
@@ -37,7 +61,7 @@ Try **Assistant** (tools, approvals, PDF upload, loan maths), **Agent Arena** (m
 5. **Deploy** in the first hour ([`docs/DEPLOY.md`](docs/DEPLOY.md)): then every push to `main` is live.
 
 Then follow [`docs/SUBMISSION.md`](docs/SUBMISSION.md): timeline, 3-minute video structure, checklists.
-Adapting the template to the challenge you get: [`docs/PLAYBOOK.md`](docs/PLAYBOOK.md) (what exists, what to build, time per challenge).
+The plan for this challenge: [`docs/PLAYBOOK.md`](docs/PLAYBOOK.md) (what we build, test cases, timeline).
 AI coding assistants: conventions are in [`AGENTS.md`](AGENTS.md).
 
 ## Architecture
