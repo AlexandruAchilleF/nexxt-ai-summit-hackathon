@@ -6,9 +6,19 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  # A new push to a PR cancels its older run. Every push to main gets its own group (run_id), so main runs in parallel
+  # and is never cancelled: Render deploys a main commit only after its checks pass.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -16,16 +26,36 @@ jobs:
           global-json-file: global.json
       - run: dotnet build -warnaserror
       - name: Unit tests (agent runtime with a fake model, finance, PII, search)
-        run: dotnet test tests/HackathonStarter.Tests --no-build
+        run: >-
+          dotnet test tests/HackathonStarter.Tests --no-build
+          --logger "trx;LogFileName=unit.trx"
+          --results-directory "${{ github.workspace }}/TestResults/unit"
       - name: Install Playwright Chromium
         run: pwsh tests/HackathonStarter.E2E/bin/Debug/net10.0/playwright.ps1 install --with-deps chromium
       - name: End-to-end tests (real app + browser, no AI key)
-        run: dotnet test tests/HackathonStarter.E2E --no-build
+        run: >-
+          dotnet test tests/HackathonStarter.E2E --no-build
+          --logger "trx;LogFileName=e2e.trx"
+          --blame-hang-timeout 5m --blame-hang-dump-type none
+          --results-directory "${{ github.workspace }}/TestResults/e2e"
+      - name: Upload test reports
+        if: always()
+        # A storage hiccup must not turn green tests red (Render would skip the commit).
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            TestResults/unit/*.trx
+            TestResults/e2e/*.trx
+          retention-days: 5
+          if-no-files-found: ignore
 
   docker:
     # The production image (what Render runs): Production environment, published output. The E2E tests run in
     # Development, so they can't catch a missing static file such as _framework/blazor.web.js.
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - name: Build the production image
@@ -33,9 +63,23 @@ jobs:
       - name: Start it and check the pages and the Blazor script
         run: |
           docker run -d --name app -p 8080:8080 app
-          for i in $(seq 1 30); do curl -fsS http://localhost:8080/health && break; sleep 2; done
-          curl -fsS -o /dev/null -w "page %{http_code}\n" http://localhost:8080/calculators
-          curl -fsS -o /dev/null -w "blazor.web.js %{http_code}\n" http://localhost:8080/_framework/blazor.web.js
+          ready=false
+          for i in $(seq 1 30); do
+            if curl -fsS --connect-timeout 2 --max-time 5 -o /dev/null http://localhost:8080/health; then
+              ready=true
+              break
+            fi
+            if [ "$i" -lt 30 ]; then sleep 2; fi
+          done
+          if [ "$ready" != true ]; then
+            echo "Container /health did not become ready after 30 attempts" >&2
+            exit 1
+          fi
+          curl -fsS --connect-timeout 5 --max-time 15 -o /dev/null -w "page %{http_code}\n" http://localhost:8080/calculators
+          curl -fsS --connect-timeout 5 --max-time 15 -o /dev/null -w "blazor.web.js %{http_code}\n" http://localhost:8080/_framework/blazor.web.js
       - name: Container logs
         if: always()
         run: docker logs app || true
+      - name: Remove the container
+        if: always()
+        run: docker rm -f app || true

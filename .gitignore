@@ -12,3 +12,5 @@ appsettings.Local.json
 .screenshots/
 .claude/settings.local.json
 .claude/worktrees/
+# Test reports written by the CI test commands
+TestResults/
