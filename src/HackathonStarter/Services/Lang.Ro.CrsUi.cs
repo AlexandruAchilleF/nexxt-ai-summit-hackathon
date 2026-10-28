@@ -23,8 +23,6 @@ public static partial class Lang
         ro["Audit log"] = "Jurnal";
         ro["Back to today's real date"] = "Înapoi la data reală de azi";
         ro["Bank policy"] = "Politica băncii";
-        ro["Case"] = "Caz";
-        ro["Case closed"] = "Caz închis";
         ro["Case {0}"] = "Cazul {0}";
         ro["Case {0} was not found"] = "Cazul {0} nu a fost găsit";
         ro["Cases"] = "Cazuri";
@@ -95,8 +93,6 @@ public static partial class Lang
         ro["Our reading where the guide is silent or ambiguous."] = "Interpretarea noastră, acolo unde ghidul tace sau e ambiguu.";
         ro["page {0}"] = "pagina {0}";
         ro["preexisting account"] = "cont preexistent";
-        ro["Quote not found"] = "Citat negăsit";
-        ro["Quote verified"] = "Citat verificat";
         ro["Quotes saved on the case that are not tied to an indicium or a signal."] = "Citate salvate pe caz care nu țin de un indiciu sau de un semnal.";
         ro["Received on {0}, day {1}"] = "Primit pe {0}, ziua {1}";
         ro["Regime"] = "Regim";

@@ -10,6 +10,9 @@ public static partial class Lang
         ro["(+{0} days)"] = "(+{0} zile)";
         ro["{0} overdue"] = "Depășit cu {0}";
         ro["Account holder"] = "Titularul contului";
+        ro["A new FATCA self-certification"] = "O autocertificare FATCA nouă";
+        ro["A new self-certification"] = "O autocertificare nouă";
+        ro["A new self-certification, or a reasonable explanation with supporting documents (if applicable)"] = "O autocertificare nouă sau o explicație rezonabilă și documentele aferente (dacă este cazul)";
         ro["Approved, not sent yet"] = "Aprobată, netrimisă încă";
         ro["Awaiting client"] = "Așteaptă clientul";
         ro["Case closed"] = "Caz închis";
@@ -43,6 +46,7 @@ public static partial class Lang
         ro["In person"] = "Față în față";
         ro["Legal deadline"] = "Termenul legal";
         ro["Moderate signal"] = "Semnal moderat";
+        ro["New documentary evidence of residence"] = "Un document justificativ nou privind rezidența";
         ro["New self-certification"] = "Autocertificare nouă";
         ro["No case"] = "Fără caz";
         ro["No deadline"] = "Fără termen";
@@ -57,6 +61,7 @@ public static partial class Lang
         ro["Other answer"] = "Alt răspuns";
         ro["p. {0}"] = "p. {0}";
         ro["past the deadline"] = "peste termen";
+        ro["Proof of the new address"] = "Dovada noii adrese";
         ro["Reasonable explanation"] = "Explicație rezonabilă";
         ro["Rejected by the operator"] = "Respinsă de operator";
         ro["Remote"] = "La distanță";

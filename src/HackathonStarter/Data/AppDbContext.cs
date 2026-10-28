@@ -5,6 +5,7 @@ using HackathonStarter.Features.Changes;
 using HackathonStarter.Features.Clients;
 using HackathonStarter.Features.Exports;
 using HackathonStarter.Features.Items;
+using HackathonStarter.Features.Sentinel.Interim;
 using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
@@ -122,6 +123,10 @@ public static class DatabaseSetup
             db.Clients.AddRange(ClientSeed.Create(app.Services.GetRequiredService<Features.Deadlines.ISimClock>().UtcNow));
             await db.SaveChangesAsync();
         }
+
+        // Ensure Maria is seeded (interim: ADR 0001, stops mattering once R5's ClientSeed adds CL-0001)
+        var clock = app.Services.GetRequiredService<Features.Deadlines.ISimClock>();
+        await MariaSeed.EnsureAsync(factory, clock);
         // @gen:seed (the feature generator inserts new seeds above this line)
     }
 }

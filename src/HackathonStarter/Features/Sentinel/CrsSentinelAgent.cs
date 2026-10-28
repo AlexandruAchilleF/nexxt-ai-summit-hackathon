@@ -42,5 +42,5 @@ public static class SentinelSetup
         services
             .AddSingleton<AgentDefinition, CrsSentinelAgent>()
             .AddScoped<IDemoScenarios, DemoScenarios>()
-            .AddSingleton<IDemoClock, SimClockAdapter>();
+            .AddScoped<IDemoClock, SimClockAdapter>();
 }

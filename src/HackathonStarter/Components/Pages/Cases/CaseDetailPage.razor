@@ -247,8 +247,8 @@ else
         if (chat is null) return;
         var messageMap = new Dictionary<string, string>
         {
-            { "AnalyzeDossier", T("Analizează dosarul") },
-            { "VerifyResponse", T("Verifică răspunsul") }
+            { "AnalyzeDossier", T("Analyze the dossier") },
+            { "VerifyResponse", T("Check the response") }
         };
         if (messageMap.TryGetValue(actionId, out var message))
             await chat.SendWithAction(message, actionId);
