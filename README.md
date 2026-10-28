@@ -76,8 +76,9 @@ cu toți participanții: [`docs/PLAN.md` §6.3](docs/PLAN.md#63-fluxul-mariei-tr
 
 Acesta e traseul-țintă. Pe `main`, pașii 1–3 și 6 sunt cod cu teste (`ChangeService`, `CrsRuleEngine`, `CaseService`,
 `DeadlineWatcher`), iar serviciile pentru dovezi, cerere, aprobare și închidere există în `CaseService`. Uneltele agentului
-de la pașii 4, 5, 7 și 8 sunt pe `main` (#44), cu mock-ul care le cheamă; paginile de caz sunt încă doar schelete
-(„Vine în faza următoare”); starea exactă e în [§11](#11-stare).
+de la pașii 4, 5, 7 și 8 sunt pe `main` (#44, #47), cu mock-ul care le cheamă; o rulare pornește azi doar prin API, iar
+aprobarea se dă pe `/runs/{id}`. Paginile cazului și ale schimbării noi sunt încă doar schelete pe `main` (cele reale sunt
+în PR #49); starea exactă e în [§11](#11-stare).
 
 ### Capcanele (fără alarme false)
 
@@ -297,22 +298,25 @@ IAM), niciodată din repo. În `appsettings.Local.json` (ignorat de git): `"AI":
 
 Lucrăm în paralel, pe module; fiecare PR intră doar cu CI verde (build cu 0 warnings, teste unitare și E2E).
 
-Starea de pe `main` la commit-ul `eaea3f3`, verificată în cod pe 28.10.2026, la 22:15: `dotnet build -warnaserror` fără
-warnings, testele unitare 1236 din 1236, E2E 23 din 23.
+Starea de pe `main` la commit-ul `29bcd47`, verificată în cod pe 28.10.2026, la 22:50: `dotnet build -warnaserror` fără
+warnings, testele unitare 1254 din 1254, E2E 30 din 30 (CI-ul de pe `main`).
 
 | Modul | Rol | Pe `main` | În lucru | Lipsește |
 | --- | --- | --- | --- | --- |
 | Documentația: planul, regulile verificate, paginile ghidului, cazurile-etalon, sursele, scenariul video, textul `/privacy` | toți | da (#1–#4, #6, #7, #10, #12, #14, #15, #19, #30, #33, #34) | | |
 | Contractele și entitățile (Faza 0), `SimClock` | integrator | da (#13, #18) | | |
 | `CrsRuleEngine`, `RuleCatalog`, `GoldenEngineTests` | R1 | da (#16, #37, #41) | | |
-| `ChangeService`, `CaseService` (stările cazului), `DeadlineCalculator`, `DeadlineWatcher`, `SimClockControl`, cazurile de flux cap-coadă, resetarea demo-ului | R2 | da (#28, #40, #43) | | butoanele datei simulate în bara de sus |
-| `HiddenTextShield`, `EvidenceVerifier`, `TinFormat` + TIN on Europa, `AuditLog` | R3 | da (#23) | | |
+| `ChangeService`, `CaseService` (stările cazului), `DeadlineCalculator`, `DeadlineWatcher`, `SimClockControl`, cazurile de flux cap-coadă, resetarea demo-ului | R2 | da (#28, #40, #43) | butoanele datei simulate (meniul „Demo”, în #49) | |
+| `HiddenTextShield`, `EvidenceVerifier`, `TinFormat` + TIN on Europa, `AuditLog`; scanarea unui document nescanat din pagina clientului | R3 | da (#23, #48) | | |
 | Pagina `/privacy` (jurnal, TIN on Europa, Bedrock, retenție, temeiul legal) | R3 | da (#26) | | |
 | Provider Bedrock | R4 | da (#5) | | |
 | Runtime-ul agentului (aprobarea oprește rularea), verificările CRS pe răspuns, mascarea telefoanelor străine | R4 | da (#20, #35) | | |
-| `CrsSentinelAgent`: cele 14 unelte, system prompt-ul, mock RO/EN (Maria cap-coadă), verificările active | R4 | da (#44) | #47 (mock-ul scrie doar la cele două acțiuni ale cazului, texte libere salvate mascate) | înregistrarea `Recordings/crs-sentinel.json`; legarea agentului de pagina cazului |
+| `CrsSentinelAgent`: cele 14 unelte, system prompt-ul, mock RO/EN (Maria cap-coadă), verificările active; mock-ul scrie doar la cele două acțiuni ale cazului (mesajele fixe din `SentinelActions`) | R4 | da (#44, #47) | | înregistrarea `Recordings/crs-sentinel.json`; butoanele „Analizează dosarul” și „Verifică răspunsul” pe pagina cazului (nu sunt nici în #49); pasul din UI care pune autocertificarea Mariei în dosar |
 | Datele: 50 de clienți sintetici, PDF-urile cazurilor-etalon, cazurile-etalon transcrise, seed-ul | R5 | da (#8, #9, #11, #17, #21, #22, #25, #27, #31, #36, #39) | | |
 | `EvaluationService` (cele trei feluri de cifre) și pagina `/metrics` | R5 | da (#29, #38, #42) | | |
+| Pagina clientului `/clients`, `/clients/{code}` (adrese, conturi, ordine permanente, autocertificări, documente, cazuri) | R5 | da (#45) | | |
+| Paginile CRS: `/dashboard`, `/cases`, `/cases/{code}` (ceasul termenului, cererea, răspunsul, închiderea cu aprobare), `/changes/new`, meniul „Demo” | UI | | #49 (`ui/crs-pages`, cu conflict cu `main`) | |
+| README-ul și pitch-ul la zi cu `main` | R5 | | #46 | |
 | Landing-ul și subsolurile | R5 | da (#24, #32) | | |
 
 **Paginile CRS, așa cum sunt acum pe `main`:**
@@ -322,9 +326,11 @@ warnings, testele unitare 1236 din 1236, E2E 23 din 23.
 | `/audit` | Lanțul de hash-uri, „Verifică” (toți) și „Falsifică” („Tamper” în EN, doar admin). La pornire are intrările istoricului din seed (#39) |
 | `/metrics` | Cele trei feluri de cifre din `EvaluationService`, cu „Rulează din nou”, caz cu caz (§8) |
 | `/privacy` | Textul actualizat (#26) |
-| `/cases`, `/cases/{code}`, `/changes/new`, `/clients/{code}` | Doar titlul și „Vine în faza următoare” (pagina clientului e în PR #45, deschis) |
+| `/clients`, `/clients/{code}` | Lista clienților și fișa clientului (#45). Documentele nescanate au „Înregistrează încărcarea și scanează” (admin, member): extrasul lui Victor ridică semnalul roșu al scutului, cu fragmentul scos (#48) |
+| `/cases`, `/cases/{code}`, `/changes/new` | Doar titlul și „Vine în faza următoare” (paginile reale sunt în PR #49, deschis) |
+| `/runs`, `/runs/{id}` | Rulările agenților, cu pașii și „Aprobă” / „Respinge”; aici se aprobă azi rulările `crs-sentinel` pornite prin API |
 | `/settings` | „Resetează datele demo” (admin) readuce datele CRS, jurnalul și data simulată la starea de la pornire (#43) |
-| `/dashboard` | Încă dashboard-ul template-ului (elemente demo), nu cazurile CRS |
+| `/dashboard` | Încă dashboard-ul template-ului (elemente demo), nu cazurile CRS (cel CRS e în #49) |
 
 ## 12. Documentația
 

@@ -24,7 +24,7 @@ de mai jos sunt cei din `PITCH.md` §1, calculați pe cuvintele rostite (377, cu
 
 Sfaturi:
 - **Filmăm live (Bedrock) sau pe mock, niciodată în `AgentMode = Replay` pe pașii care modifică date.** Replay-ul nu
-  rulează uneltele: în chat apar pașii, dar nu se salvează nicio dovadă și cazul nu își schimbă starea; o aprobare reluată,
+  rulează uneltele: în rulare apar pașii, dar nu se salvează nicio dovadă și cazul nu își schimbă starea; o aprobare reluată,
   dacă e aprobată, chiar rulează, cu argumentele mascate din înregistrare (PLAN §14). Modelul real se
   testează înainte (Setări → Conexiuni → „Testează conexiunile”, pe calculatorul de filmare); dacă nu e disponibil, filmăm
   pe mock, care cheamă uneltele reale (eticheta „Simulare” rămâne vizibilă). Înregistrările (`AI:Record = true`) sunt doar
