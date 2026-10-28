@@ -728,6 +728,12 @@ prin API (`/api-docs`). Cerințe: MudBlazor, stări loading / empty / error, RO 
 | Arhitectura | `/architecture` (existent) | Fluxul + agenții + uneltele (pentru video) | toți |
 | Confidențialitate | `/privacy` (existent) | Actualizat: TIN on Europa, Bedrock, retenție, temei legal | toți |
 
+**Direcția vizuală (decisă):** păstrăm MudBlazor și shell-ul template-ului (stări, RO/EN, mobil, teste E2E deja verzi) și
+punem efortul de design într-un singur loc: **ceasul termenului** din pagina cazului (cele 90 de zile, evenimentele pe zile,
+cursorul datei simulate) plus separarea vizibilă între „indicii din lege” (linie plină, cu regula și pagina) și „semnale de
+context” (chenar punctat, „semnal, fără alertă”). Macheta: `docs/ui/macheta-caz.html`. Ceasul e o componentă proprie
+(`Components/Cases/DeadlineClock.razor`, CSS în același folder), restul paginilor rămân MudBlazor simplu.
+
 **Utilizatori demo** (`SiteConfig.Users`): Ana (operator, admin), Mihai (departamentul fiscal, member),
 Vera (viewer).
 
@@ -857,6 +863,14 @@ Fiecare rol **are folderele lui** și nu scrie în ale altora (PR anunțat pe ch
 | `Config/SiteConfig.cs` | Faza 0 | Nav-ul final din start; textele landing la R5 |
 | `Services/Lang.Ro.cs` | toți | Împărțit pe fișiere: `Lang.Ro.Cases.cs`, `Lang.Ro.Rules.cs`… (Faza 0 face îmbinarea) |
 | Seed-ul | R5 | |
+| `HackathonStarter.csproj` | Faza 0 | Toate pachetele noi intră în PR-ul de contracte (inclusiv `AWSSDK.Extensions.Bedrock.MEAI` 4.0.101.8). După aceea, un pachet nou se cere pe chat și îl adaugă o singură persoană |
+| `appsettings*.json` | pe secțiuni | `AI` = R4, `Targets` = R3, `Database` = Faza 0. Fiecare editează doar secțiunea lui |
+| `Features/Evaluation/GoldenCases.cs` | R5 | R1 și R2 îl citesc în teste, nu îl modifică; corecturile se cer lui R5 |
+| Testele | fiecare rol | Un fișier per modul: `tests/HackathonStarter.Tests/Crs/<Modul>Tests.cs`; nimeni nu editează fișierul altuia |
+
+**Anti-conflict, pe scurt:** un rol = foldere proprii; fișierele comune au proprietarul de mai sus; PR-uri mici (2–3 ore);
+`git pull --rebase origin main` înainte de fiecare PR; dacă îți trebuie o schimbare în folderul altcuiva, o ceri (HANDOFF sau chat),
+nu o faci tu.
 
 **Git:**
 - Branch: `r1/rule-engine`, `r2/case-workflow`… PR-uri mici (2–3 ore de muncă), squash merge, **doar cu CI
