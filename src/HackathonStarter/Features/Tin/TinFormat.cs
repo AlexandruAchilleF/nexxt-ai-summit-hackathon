@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 using HackathonStarter.Services;
 
@@ -17,7 +18,7 @@ public sealed partial class TinFormat : ITinFormat
         ["ES"] = ("OECD TIN sheet ES · DNI/NIE", Spain),
         ["FR"] = ("OECD TIN sheet FR · numero fiscal", France),
         ["IT"] = ("OECD TIN sheet IT · codice fiscale", Italy),
-        ["RO"] = ("OECD TIN sheet RO · CNP", PiiVault.IsValidCnp),
+        ["RO"] = ("OECD TIN sheet RO · CNP", t => AllDigits(t, 13) && PiiVault.IsValidCnp(t)),
         ["US"] = ("IRS/SSA · SSN or ITIN (US is not covered by TIN on Europa)", UnitedStates),
     };
 
@@ -74,7 +75,7 @@ public sealed partial class TinFormat : ITinFormat
         var sum = 0;
         for (var i = 0; i < 15; i++)
         {
-            var k = char.IsDigit(t[i]) ? t[i] - '0' : t[i] - 'A';
+            var k = char.IsAsciiDigit(t[i]) ? t[i] - '0' : t[i] - 'A';
             sum += i % 2 == 0 ? ItalyOdd[k] : k;
         }
         return t[15] == (char)('A' + sum % 26);
@@ -99,12 +100,15 @@ public sealed partial class TinFormat : ITinFormat
     {
         if (!SpainPattern().IsMatch(t)) return false;
         var digits = t[0] is 'X' or 'Y' or 'Z' ? "XYZ".IndexOf(t[0]) + t[1..8] : t[..8];
-        return t[8] == "TRWAGMYFPDXBNJZSQVHLCKE"[int.Parse(digits) % 23];
+        return int.TryParse(digits, NumberStyles.None, CultureInfo.InvariantCulture, out var n) && t[8] == "TRWAGMYFPDXBNJZSQVHLCKE"[n % 23];
     }
 
     /// <summary>13 digits, the first 0-3; the last 3 are the first 10 mod 511.</summary>
     private static bool France(string t) =>
-        FrancePattern().IsMatch(t) && long.Parse(t[..10]) % 511 == int.Parse(t[10..]);
+        FrancePattern().IsMatch(t)
+        && long.TryParse(t[..10], NumberStyles.None, CultureInfo.InvariantCulture, out var number)
+        && int.TryParse(t[10..], NumberStyles.None, CultureInfo.InvariantCulture, out var check)
+        && number % 511 == check;
 
     /// <summary>SSN (area not 000, 666 or 9xx; group not 00; serial not 0000) or ITIN (9xx, digits 4-5 in the IRS ranges).</summary>
     private static bool UnitedStates(string t)
@@ -120,9 +124,9 @@ public sealed partial class TinFormat : ITinFormat
     [GeneratedRegex("^[A-Z]{6}[0-9LMNPQRSTUV]{2}[ABCDEHLMPRST][0-9LMNPQRSTUV]{2}[A-Z][0-9LMNPQRSTUV]{3}[A-Z]$")]
     private static partial Regex ItalyPattern();
 
-    [GeneratedRegex(@"^(\d{8}|[XYZ]\d{7})[A-Z]$")]
+    [GeneratedRegex("^([0-9]{8}|[XYZ][0-9]{7})[A-Z]$")]
     private static partial Regex SpainPattern();
 
-    [GeneratedRegex(@"^[0-3]\d{12}$")]
+    [GeneratedRegex("^[0-3][0-9]{12}$")]
     private static partial Regex FrancePattern();
 }

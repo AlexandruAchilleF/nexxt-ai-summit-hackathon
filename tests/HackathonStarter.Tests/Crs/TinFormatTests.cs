@@ -43,6 +43,19 @@ public class TinFormatTests
     public void Invalid_formats(string country, string tin) =>
         Assert.Equal(TinFormatStatus.Invalid, Format.Check(country, tin).Status);
 
+    // Regex \d and char.IsDigit accept non-ASCII digits (Arabic-Indic, full-width); parsing them used to throw.
+    [Theory]
+    [InlineData("AT", "12345678\u0662")]
+    [InlineData("DE", "8609517422\u0663")]
+    [InlineData("ES", "\u0661\u0662\u0663\u0664\u0665\u0666\u0667\u0668Z")]
+    [InlineData("ES", "X\u06F1234567L")]
+    [InlineData("FR", "3\u066023217600053")]
+    [InlineData("IT", "DBRCST9\u0660A41Z129T")]
+    [InlineData("RO", "\u0662910608400319")] // the CNP checksum alone accepts it
+    [InlineData("US", "521-48-390\uFF17")]
+    public void Unicode_digits_are_invalid_never_an_exception(string country, string tin) =>
+        Assert.Equal(TinFormatStatus.Invalid, Format.Check(country, tin).Status);
+
     [Fact]
     public void Golden_case_2_italian_tin_without_check_character_is_invalid() =>
         Assert.Equal(TinFormatStatus.Invalid, Format.Check("IT", "DBRCST90A41Z129").Status);
