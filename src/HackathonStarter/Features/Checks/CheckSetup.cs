@@ -16,6 +16,11 @@ public static class CheckSetup
         services.AddSingleton<ICheck, ExpectedNumberCheck>();
         services.AddSingleton<ICheck>(new PromptLeakCheck(configuration?.GetSection("Checks:Canaries").Get<List<string>>() ?? []));
         foreach (var rule in PhraseRuleCheck.Defaults) services.AddSingleton<ICheck>(new PhraseRuleCheck(rule));
+        // CRS agent verdicts (docs/PLAN.md 13.4).
+        services.AddSingleton<ICheck, NoTinValidClaimCheck>();
+        services.AddSingleton<ICheck, SignalsNeverAlertCheck>();
+        services.AddSingleton<ICheck, RuleCitedCheck>();
+        services.AddSingleton<ICheck, EvidenceQuotedCheck>();
 
         var configured = configuration?.GetSection("Checks:PhraseRules").Get<List<PhraseRule>>() ?? [];
         foreach (var rule in configured.Where(r => !string.IsNullOrWhiteSpace(r.Id) && r.Phrases.Count > 0))

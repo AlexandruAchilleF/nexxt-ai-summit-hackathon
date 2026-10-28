@@ -64,7 +64,7 @@ public class Recordings(IHostEnvironment env, IOptions<AiOptions> options, IOpti
             list.Insert(0, new Recording(input, clean, DateTime.UtcNow));
             File.WriteAllText(Path.Combine(Dir, $"{agent}.json"),
                 JsonSerializer.Serialize(list.Take(20), new JsonSerializerOptions(RunStore.Json) { WriteIndented = true }));
-            logger.LogInformation("🎙️ Recorded \"{Input}\" → Recordings/{Agent}.json", input, agent);
+            logger.LogInformation("Recorded \"{Input}\" in Recordings/{Agent}.json", input, agent);
         }
         catch (Exception ex)
         {
