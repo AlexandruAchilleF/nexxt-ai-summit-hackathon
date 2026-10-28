@@ -25,6 +25,8 @@ jobs:
         with:
           global-json-file: global.json
       - run: dotnet build -warnaserror
+      - name: Developer setup script (mocked Linux and macOS platforms)
+        run: bash tests/tools/setup-dev-tests.sh
       - name: Unit tests (agent runtime with a fake model, finance, PII, search)
         run: >-
           dotnet test tests/HackathonStarter.Tests --no-build
