@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "attribution": {
+    "commit": "",
+    "pr": "",
+    "sessionUrl": false
+  },
+  "permissions": {
+    "allow": [
+      "Bash(dotnet build*)",
+      "Bash(dotnet test*)",
+      "Bash(dotnet run*)",
+      "Bash(dotnet restore*)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git show*)",
+      "Bash(python3 tools/agents/sync.py)",
+      "Bash(tools/setup-dev.sh)",
+      "Bash(git fetch)",
+      "Bash(git fetch origin)",
+      "Bash(git branch)",
+      "Bash(git branch -a)",
+      "Bash(git branch --list*)"
+    ],
+    "deny": [
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git push origin main*)",
+      "Bash(git *--ou*)",
+      "Bash(git *--ext*)",
+      "Bash(git -c *)",
+      "Bash(git *--upload-pack*)",
+      "Bash(git *--exec*)",
+      "Bash(git branch -D*)",
+      "Bash(git branch -d*)",
+      "Bash(git branch -f*)",
+      "Bash(git branch -m*)",
+      "Bash(git branch -M*)"
+    ]
+  },
+  "env": {
+    "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
+    "DOTNET_NOLOGO": "1"
+  }
+}

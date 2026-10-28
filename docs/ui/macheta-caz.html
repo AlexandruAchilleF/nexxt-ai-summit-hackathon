@@ -1,0 +1,121 @@
+<!doctype html><html lang="ro"><head><meta charset="utf-8"><title>Macheta paginii cazului</title><style>
+:root{--background:#f7f8fa;--foreground:#1e2a38;--muted-foreground:#5b6675;--card:#fff;--secondary:#eef1f5;--border:#d5dbe3;--ring:#2563eb;--primary:#1e3a5f;--primary-foreground:#fff;--success:#0f766e;--warning:#b7791f;--warning-surface:#fdf3e1;--chart-2:#3b82a0;--radius:10px;--font-sans:Inter,system-ui,sans-serif}body{background:var(--background);padding:24px;max-width:900px;margin:auto}
+:root{--law:var(--success);--sig:var(--muted-foreground);--due:var(--warning);}
+*{box-sizing:border-box}
+body{margin:0;font-family:var(--font-sans);font-size:14px;line-height:1.45}
+.wrap{display:grid;gap:18px}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
+.head h1{margin:0;font-size:24px;font-weight:650;letter-spacing:-.01em}
+.head p{margin:2px 0 0;color:var(--muted-foreground)}
+.state{font-size:13px;padding:4px 10px;border-radius:999px;background:var(--warning-surface);border:1px solid var(--due)}
+.clock{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+.clock-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px;gap:12px;flex-wrap:wrap}
+.left{font-size:34px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.left small{font-size:14px;font-weight:500;color:var(--muted-foreground);margin-left:6px}
+.today{color:var(--muted-foreground);font-size:13px;text-align:right}
+.today b{color:var(--foreground);font-weight:600}
+.ruler{position:relative;height:44px;margin:0 6px}
+.track{position:absolute;left:0;right:0;top:8px;height:10px;border-radius:5px;background:var(--secondary);overflow:hidden}
+.used{position:absolute;left:0;top:0;bottom:0;width:94.4%;background:linear-gradient(90deg,var(--chart-2),var(--due))}
+.ticks{position:absolute;left:0;right:0;top:22px;height:5px;background:repeating-linear-gradient(90deg,var(--border) 0 1px,transparent 1px calc(100%/18))}
+.dot{position:absolute;top:6px;width:14px;height:14px;margin-left:-7px;border-radius:50%;background:var(--card);border:3px solid var(--foreground)}
+.dot.due{border-color:var(--due)}
+.cursor{position:absolute;top:0;left:94.4%;width:4px;height:26px;margin-left:-2px;border-radius:2px;background:var(--foreground)}
+.days{position:absolute;top:28px;left:0;right:0;display:flex;justify-content:space-between;font-size:11px;color:var(--muted-foreground);font-variant-numeric:tabular-nums}
+.events{list-style:none;margin:12px 0 0;padding:0;display:grid;grid-template-columns:repeat(4,1fr);gap:10px;font-size:12.5px;color:var(--muted-foreground)}
+@media (max-width:560px){.events{grid-template-columns:1fr 1fr}}
+.events b{display:block;color:var(--foreground);font-weight:600;font-variant-numeric:tabular-nums}
+.events .now{color:var(--foreground)}
+.events .now b{color:var(--due)}
+.sim{display:flex;gap:6px;margin-top:14px;flex-wrap:wrap}
+.btn{font:inherit;font-size:13px;padding:6px 12px;border-radius:calc(var(--radius) - 2px);border:1px solid var(--border);background:transparent;color:var(--foreground);cursor:pointer}
+.btn:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+.btn.primary{background:var(--primary);color:var(--primary-foreground);border-color:var(--primary)}
+.cols{display:grid;grid-template-columns:1.25fr 1fr;gap:16px}
+@media (max-width:560px){.cols{grid-template-columns:1fr}}
+h2{font-size:15px;margin:0 0 8px;font-weight:650}
+.hint{font-size:12.5px;color:var(--muted-foreground);margin:-4px 0 10px}
+.ind{border-left:3px solid var(--law);padding:2px 0 2px 12px;margin-bottom:14px}
+.ind .rule{font-weight:600}
+.ind .rule span{font-weight:400;color:var(--muted-foreground)}
+.quote{margin:6px 0 0;padding:8px 10px;background:var(--secondary);border-radius:calc(var(--radius) - 2px);font-size:13px}
+.quote q{quotes:"„" "”"}
+.ok{display:inline-block;margin-top:4px;font-size:12px;color:var(--law)}
+.signal{border:1px dashed var(--border);border-radius:var(--radius);padding:12px}
+.signal .tag{font-size:12px;color:var(--sig)}
+.cleared{display:grid;gap:6px;margin-top:14px}
+.cleared div{font-size:13px;color:var(--muted-foreground);padding-left:12px;border-left:3px solid var(--border)}
+.cleared b{color:var(--foreground);font-weight:600}
+.letter{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+.letter p{margin:0 0 8px}
+.letter ul{margin:0 0 10px;padding-left:18px}
+.actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.actions .note{font-size:12.5px;color:var(--muted-foreground)}
+</style></head><body>
+<div class="wrap">
+<div class="head">
+  <div><h1>Cazul CRS-2026-0001</h1><p>Maria Popescu, client CL-0001. Schimbare: adresă nouă în München, Germania</p></div>
+  <span class="state">Memento trimis, escaladat la fiscal</span>
+</div>
+<section class="clock" aria-label="Termenul legal">
+  <div class="clock-top">
+    <div class="left">5 zile<small>până la termen, 12 ian. 2027</small></div>
+    <div class="today">Azi, în data simulată: <b>7 ian. 2027</b> (+85 zile)<br>Termen de 90 de zile, Ghid ANAF p. 35–36</div>
+  </div>
+  <div class="ruler">
+    <div class="track"><div class="used"></div></div>
+    <div class="ticks"></div>
+    <span class="dot" style="left:0%" title="Schimbare primită"></span>
+    <span class="dot" style="left:2.2%" title="Cerere aprobată"></span>
+    <span class="dot due" style="left:100%" title="Termen"></span>
+    <div class="cursor" title="Azi, ziua 85: memento"></div>
+    <div class="days"><span>0</span><span>15</span><span>30</span><span>45</span><span>60</span><span>75</span><span>90</span></div>
+  </div>
+  <ol class="events">
+    <li><b>Ziua 0</b> Schimbare primită, caz deschis</li>
+    <li><b>Ziua 2</b> Cerere aprobată de Ana și trimisă pe email</li>
+    <li class="now"><b>Ziua 85</b> Memento către client, escaladare la Mihai (fiscal)</li>
+    <li><b>Ziua 90</b> Termen. Fără răspuns: rezidentă în RO și în DE</li>
+  </ol>
+  <div class="sim"><button class="btn">+1 zi</button><button class="btn">+30 zile</button><button class="btn">Resetează data</button></div>
+</section>
+<div class="cols">
+  <section>
+    <h2>Indicii din lege</h2>
+    <p class="hint">Găsite de cod. Doar acestea pot porni un termen.</p>
+    <div class="ind">
+      <div class="rule">CRS-IND-ADDR <span>Ghid p. 29, lit. b</span></div>
+      Adresă de reședință curentă în Germania, jurisdicție raportabilă.
+      <div class="quote">Din datele băncii: <q>Leopoldstraße 12, 80802 München, DE</q></div>
+    </div>
+    <div class="ind">
+      <div class="rule">CRS-IND-PHONE <span>Ghid p. 29, lit. c</span></div>
+      Telefon din Germania și niciun telefon din România.
+      <div class="quote"><q>Telefon: +49 89 4521 7730</q>, fluturaș de salariu, pagina 1</div>
+      <span class="ok">Citat verificat în textul vizibil al documentului</span>
+    </div>
+    <div class="cleared">
+      <div><b>Ordin permanent către IBAN DE</b>: nu e indiciu, pleacă din cont curent (cont de depozit, p. 29 lit. d).</div>
+      <div><b>Cetățenie română</b>: naționalitatea nu e indiciu CRS.</div>
+    </div>
+  </section>
+  <section>
+    <h2>Semnale de context</h2>
+    <p class="hint">Găsite de AI, cu dovadă. Nu pornesc nicio alertă.</p>
+    <div class="signal">
+      <div class="tag">Semnal, fără alertă</div>
+      Salariu plătit de Müller Logistik GmbH, München.
+      <div class="quote"><q>Angajator: Müller Logistik GmbH</q>, pagina 1</div>
+      <span class="ok">Citat verificat</span>
+    </div>
+  </section>
+</div>
+<section class="letter" aria-label="Cererea către client">
+  <h2>Cererea către client</h2>
+  <p class="hint">Lista de documente vine din indicii; textul e scris de AI. Se trimite doar după aprobare.</p>
+  <p>Bună ziua, doamnă Popescu. Am observat că adresa și telefonul dumneavoastră s-au schimbat în Germania. Ca să vă raportăm corect, vă rugăm să ne trimiteți până pe 12 ianuarie 2027:</p>
+  <ul><li>o declarație nouă de rezidență fiscală, cu codul fiscal german (Steuer-ID), sau</li><li>o explicație, dacă locuiți temporar acolo (de exemplu, studii).</li></ul>
+  <div class="actions"><button class="btn primary">Aprobă și trimite</button><button class="btn">Editează textul</button><span class="note">Aprobarea intră în jurnal, cu numele tău și ora.</span></div>
+</section>
+</div>
+</body></html>

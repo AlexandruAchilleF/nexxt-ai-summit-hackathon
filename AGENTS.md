@@ -29,6 +29,23 @@ EF Core 10 (SQLite default, PostgreSQL optional) · Microsoft.Extensions.AI 10 (
    the Romanian to `Services/Lang.Ro.cs` (`LangTests` fails otherwise). SiteConfig copy and long texts: `Lang.Pick(ro, en)`.
 9. Keep comments sparse and useful; match the surrounding style. `dotnet build` must have **0 warnings**; `dotnet test` must pass.
 
+## CRS Sentinel (this project)
+
+The product, its rules and the team plan are in `docs/PLAN.md`; read section 1 and the section of your role.
+
+- **Code decides, AI explains, the human approves.** Rules (with ID and guide page), deadlines, quote checks, TIN format and the
+  audit log are deterministic code with tests. The model reads documents, extracts quotes, finds context signals and writes the
+  client letter. It never decides an indicium, a deadline or an alert.
+- A `ContextSignal` never changes a `Decision` and never opens a case. Nationality is not a signal (US citizenship counts only for FATCA).
+- Domain truth: `docs/ghid/pagini/p-XXX.md` (ANAF guide, 29.12.2025) and `docs/reguli-verificate.md`. A rule without a page is
+  marked `NEVERIFICAT` in code and README; never guess a page.
+- Say "format valid", never "TIN valid". Only synthetic data; generated identity documents show "SPECIMEN".
+- Time only through `TimeProvider` (the demo uses a simulated clock). No emoji anywhere.
+- Bedrock runs in `us-west-2` (`eu-central-1` is denied on the workshop account); credentials come from the AWS default chain only.
+- Subagents: single source in `docs/agents/` and `docs/commands/`; run `python3 tools/agents/sync.py` to regenerate
+  `.claude/` and `.opencode/`. Subagents end with the `HANDOFF` block and never commit or push; the Tech Lead routes and commits.
+- First-time setup on a machine: `tools/setup-dev.sh`.
+
 ## Commits and pull requests
 
 - **The author is the human, never the assistant.** Before the first commit: `git config user.name` / `user.email` with your
