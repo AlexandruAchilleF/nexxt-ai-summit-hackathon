@@ -177,8 +177,8 @@ Săgețile agentului sunt ținta din [`docs/PLAN.md` §13](docs/PLAN.md#13-agent
 | `EvidenceVerifier` | Un citat există în textul vizibil al paginii indicate. Un citat inventat sau luat din textul ascuns apare „citat negăsit” |
 | `TinFormat` + TIN on Europa | Formatul TIN pe țară (DE, IT, AT, ES, FR, US, RO); pentru statele UE, verificare la serviciul Comisiei Europene, care confirmă tot doar structura și sintaxa. Spunem „format valid”, niciodată „TIN valid” |
 | `AuditLog` | Fiecare pas e o intrare cu `Hash = SHA-256(hash-ul anterior + conținut)`; „Verifică” găsește exact intrarea modificată |
-| `PiiVault` | CNP, IBAN, card, e-mail și telefonul românesc sunt mascate înainte de model; uneltele lucrează cu valorile reale; ce se salvează rămâne mascat. Telefoanele străine: în PR #20 |
-| Verificări pe răspuns (`Features/Checks`) | Pe `main`, agentul CRS are `pii-leak` (fără date personale scăpate). În PR #20: citatele sunt printre rezultatele uneltelor, semnalele nu sunt prezentate ca alerte, fiecare indiciu are regula și pagina, fără „TIN valid” |
+| `PiiVault` | CNP, IBAN, card, e-mail și telefoane (românești și străine) sunt mascate înainte de model; uneltele lucrează cu valorile reale; ce se salvează rămâne mascat |
+| Verificări pe răspuns (`Features/Checks`) | `pii-leak` (fără date personale scăpate); în `CrsChecks`: `evidence-quoted` (citatele sunt printre rezultatele uneltelor), `signals-never-alert`, `rule-cited` (fiecare indiciu are regula și pagina), `no-tin-valid-claim`. Pe `main`, agentul CRS are activă doar `pii-leak` |
 
 ### Modelele și fallback-ul
 
@@ -221,8 +221,38 @@ Metricile vin doar din rulări reale (`/metrics` și testele), prezentate separa
    îl raportează „indisponibil”: rulările agentului nu sunt legate de cazuri. Nu îl comparăm cu un timp manual: nu avem o
    estimare de la mentor.
 
-`EvaluationService` e pe `main` (PR #29); pagina `/metrics` e încă goală. Cifrele se completează aici după prima rulare
-completă, cu commit-ul, data și modul (mock sau live). Nicio cifră fără rulare.
+### Prima rulare
+
+Rularea `IEvaluationService.RunAsync()` pe commit-ul `bbe131e`, 28.10.2026, 21:27, **fără model** (nicio cheie, niciun
+apel AI). Pagina `/metrics` e încă goală pe `main`, așa că serviciul a fost chemat direct. Toate cifrele de mai jos vin din
+cod determinist, nu din AI.
+
+**1. Acoperirea specificației** (motorul `crs-rules/1.0`)
+
+| Set | Evaluate | Trec | Acțiuni așteptate | Prinse | Ratate | Alarme false |
+| --- | --- | --- | --- | --- | --- | --- |
+| Cazurile-etalon | 20 (cazul 10 e la scut) | 17 | 13 | 12 | 1 | 0 |
+| Clienții sintetici | 50 | 50 | 10 | 10 | 0 | 0 |
+
+Trei cazuri-etalon nu se potrivesc încă cu specificația, deci **nu** spunem încă „regulile din ghid sunt implementate și
+testate”:
+
+- la 2, motorul dă `NoCase` în loc de `Clarification`, pentru că lipsește `SC-TIN-FORMAT` (IT);
+- la 7, decizia (`FatcaAlert`) e corectă, dar lipsește verificarea respinsă `FATCA-IND-POB`;
+- la 12, decizia și termenul (`DL-PRE-YEAR`) sunt corecte, dar lipsește `CRS-IND-MAIL` (IT).
+
+**2. Unde există incertitudine**
+
+| Ce | Rezultat |
+| --- | --- |
+| Scutul, pe 12 PDF-uri generate | 5 texte ascunse (alb 1, microscopic 2, în afara paginii 1, invizibil 1): 5 detectate, 0 ratate; 8 documente curate, 0 alarme false |
+| Citatele, pe banca de test a `EvidenceVerifier` (citate fixe, nu ale modelului) | 10 din 10 citate adevărate verificate; 4 din 4 citate doar din textul ascuns respinse; 38 din 38 de citate inventate respinse |
+| Extragerea autocertificării de către AI | nemăsurată: nu există încă o rulare live |
+| Semnalele care ar fi schimbat decizia | 0, prin construcție (motorul nu primește semnale), verificat la rulare |
+
+**3. Eficiența operațională:** nemăsurată. Timpul agentului pe caz nu se poate măsura încă, iar timpul manual nu are sursă.
+
+Nicio cifră fără rulare: la fiecare rulare nouă, tabelul se refă cu commit-ul, data și modul.
 
 ## 9. Confidențialitate
 
@@ -270,8 +300,8 @@ IAM), niciodată din repo. În `appsettings.Local.json` (ignorat de git): `"AI":
 
 Lucrăm în paralel, pe module; fiecare PR intră doar cu CI verde (build cu 0 warnings, teste unitare și E2E).
 
-Starea de pe `main` la commit-ul `a75d5c9`, verificată în cod pe 28.10.2026, la 21:30: `dotnet build -warnaserror` fără
-warnings, testele unitare 839 din 839, E2E 21 trecute și 1 sărit (vezi „Jurnalul” mai jos).
+Starea de pe `main` la commit-ul `bbe131e`, verificată în cod pe 28.10.2026, la 21:25: `dotnet build -warnaserror` fără
+warnings, testele unitare 1051 din 1051, E2E 21 trecute și 1 sărit (vezi „Jurnalul” mai jos).
 
 | Modul | Rol | Pe `main` | În lucru | Lipsește |
 | --- | --- | --- | --- | --- |
@@ -282,7 +312,7 @@ warnings, testele unitare 839 din 839, E2E 21 trecute și 1 sărit (vezi „Jurn
 | `HiddenTextShield`, `EvidenceVerifier`, `TinFormat` + TIN on Europa, `AuditLog` | R3 | da (#23) | | |
 | Pagina `/privacy` (jurnal, TIN on Europa, Bedrock, retenție, temeiul legal) | R3 | da (#26) | | |
 | Provider Bedrock | R4 | da (#5) | | |
-| Runtime-ul agentului, verificările CRS pe răspuns, mascarea telefoanelor străine | R4 | | PR #20, deschis | |
+| Runtime-ul agentului (aprobarea oprește rularea), verificările CRS pe răspuns, mascarea telefoanelor străine | R4 | da (#20) | | verificările CRS nu sunt încă active pe agentul CRS |
 | `CrsSentinelAgent`: uneltele, system prompt-ul final, mock RO/EN, înregistrarea | R4 | doar scheletul, cu `getCase` | | uneltele de la §3 pașii 4, 5, 7, 8 |
 | Datele: 50 de clienți sintetici, PDF-urile cazurilor-etalon, cazurile-etalon transcrise, seed-ul | R5 | da (#8, #9, #11, #17, #21, #22, #25, #27, #31) | | seed-ul nu trece prin `ChangeService`, deci jurnalul e gol la pornire |
 | `EvaluationService` (cele trei feluri de cifre) | R5 | da (#29) | | |
