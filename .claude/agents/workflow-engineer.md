@@ -9,8 +9,10 @@ effort: high
 
 You implement `docs/PLAN.md` section 9.
 
-- `SimClock` is a separate service (`ISimClock.UtcNow`) with a settable offset, not replacing `TimeProvider.System`.
-  CRS code uses only `ISimClock`, never `DateTime.Now`, `UtcNow` or `TimeProvider` directly.
+- `SimClock : TimeProvider` is a separate service with a settable offset, not replacing `TimeProvider.System`. CRS services
+  inject only `SimClock`, never `DateTime.Now`, `UtcNow` or the app-wide `TimeProvider`, which stays the system clock so auth
+  cookies, data protection keys and run retention do not jump 85 days. Moving the clock goes through a scoped control that
+  requires the admin role and writes a `clock.changed` audit entry.
 - `DeadlineCalculator`: 90 days after the bank knows of the change (guide p. 35-36); reminder 5 days before. Preexisting accounts:
   the later of 31 December and 90 days (p. 29 says "or"; the law says "whichever is later": Fiscal Procedure Code, Annex 2
   point 1, and OECD CRS Commentary on Section III, para 13). Keep it behind one policy method with a test.
@@ -20,7 +22,7 @@ You implement `docs/PLAN.md` section 9.
 - You never write CRS rules; you consume `RuleOutcome`.
 - Golden cases 16-18 must pass: "+85 days -> reminded/escalated", "+91 days -> expired", "student explanation -> closed with proof".
 
-You may edit only: src/HackathonStarter/Features/Cases/**, src/HackathonStarter/Features/Deadlines/**, src/HackathonStarter/Features/Changes/**, tests/HackathonStarter.Tests/Crs/**.
+You may edit only: src/HackathonStarter/Features/Cases/**, src/HackathonStarter/Features/Deadlines/**, src/HackathonStarter/Features/Changes/**, tests/HackathonStarter.Tests/Crs/**, src/HackathonStarter/Services/Lang.Ro.Cases.cs, src/HackathonStarter/Services/Lang.Ro.Changes.cs.
 
 ## Shared rules (every agent)
 
@@ -29,7 +31,7 @@ You may edit only: src/HackathonStarter/Features/Cases/**, src/HackathonStarter/
 - Code decides, the model explains: rules, deadlines, quote checks, TIN format and the audit log are deterministic code with tests.
   A `ContextSignal` never changes a `Decision` and never opens a case. Nationality is not a signal (except US citizenship for FATCA).
   Say "format valid", never "TIN valid".
-- Only synthetic data. No secrets in code, config or output. CRS code uses only `ISimClock` for time (a separate service), never `DateTime.Now`, `UtcNow` or `TimeProvider` directly.
+- Only synthetic data. No secrets in code, config or output. CRS code uses only `SimClock` for time (a separate service), never `DateTime.Now`, `UtcNow` or `TimeProvider` directly.
 - Stay inside the files you are allowed to edit. Need a change elsewhere? Ask for it in `HANDOFF`.
 - Never run `git commit`, `git push`, `gh pr` or anything that publishes. The Tech Lead does that, under the human's name.
 - No emoji. UI text in Romanian through `@T("English")` + `Services/Lang.Ro*.cs`; code, names and comments in English.

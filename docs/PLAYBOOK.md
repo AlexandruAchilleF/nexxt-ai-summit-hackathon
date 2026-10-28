@@ -183,7 +183,7 @@ Rolurile se împart la kickoff. Ore efective, în paralel.
 | --- | --- | --- | --- |
 | Entități `Client`, `ClientChange`, `CrsCase`, `Evidence` + seed: Maria, Andrei, clientul din Cluj și cazurile de test | `tools/NewFeature`, `SyntheticData` (IBAN pe orice țară: `IbanWithCheckDigits`) | dev .NET 1 | 1 |
 | `CrsRules`: filtrul, indiciile CRS a–f și FATCA, verdict cu ID și pagină. **Teste întâi** (cazurile din secțiunea 5) | ca `FinanceCalculator` | dev .NET 1 + domeniu | 2.5 |
-| `CrsDeadlines`: termen pe cont nou / preexistent, memento, expirare și consecința; data simulată = `ISimClock`, serviciu separat cu decalaj setabil (`TimeProvider.System` din `Program.cs` rămâne neschimbat, PLAN §9.1) | `TimeProvider` (doar sub `SimClock`) | dev .NET 1 | 1 |
+| `CrsDeadlines`: termen pe cont nou / preexistent, memento, expirare și consecința; data simulată = `SimClock`, serviciu separat cu decalaj setabil (`TimeProvider.System` din `Program.cs` rămâne neschimbat, PLAN §9.1) | `TimeProvider` (doar sub `SimClock`) | dev .NET 1 | 1 |
 | `HiddenTextShield`: cu PdfPig, litere albe pe fundal alb, font sub 2 pt sau în afara paginii → eliminate + semnal | `DocumentText` (PdfPig) | securitate | 1.5 |
 | `TinCheck`: format OCDE + TIN on Europa prin `TargetClient` (dacă serviciul nu e JSON, extindem `TargetClient`, nu facem un `HttpClient` separat) | `Features/Targets` | dev .NET 2 | 1.5 |
 | `CrsAgent : ToolAgent` cu uneltele din secțiunea 4, aprobări, mock RO/EN (`TextMatch`) | `ToolAgent`, `AgentTool` | dev .NET 2 | 3 |
@@ -270,7 +270,7 @@ există deja); nu înlocuiește nimic, adaugă bucla de după semnal. Obligația
 | Citirea PDF-urilor, literă cu literă | PdfPig (`DocumentText`) | `HiddenTextShield` |
 | Mascarea datelor personale, retenție, `/privacy` | `PiiVault`, `RunRedaction`, `RetentionService` | textele pentru CRS pe `/privacy` |
 | Servicii externe cu timeout și replay | `TargetClient` | ținta `tin-europa` |
-| Data simulată | `TimeProvider` înregistrat în `Program.cs` (rămâne neschimbat) | `ISimClock` (serviciu separat, decalaj setabil) + bara din UI |
+| Data simulată | `TimeProvider` înregistrat în `Program.cs` (rămâne neschimbat) | `SimClock` (serviciu separat, decalaj setabil) + bara din UI |
 | Date sintetice valide (CNP, IBAN pe orice țară) | `SyntheticData` | clienții și documentele CRS |
 | Demo care nu pică | live → înregistrare → mock | scriptul mock-ului pe cazurile-etalon (uneltele reale); înregistrările doar pentru întrebările care citesc |
 | Modele | Anthropic, OpenAI-compatibil (Featherless, Ollama), Azure OpenAI | Bedrock, opțional |

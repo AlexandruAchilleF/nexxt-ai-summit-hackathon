@@ -4,13 +4,15 @@ mode: subagent
 claude_tools: Read, Grep, Glob, Edit, Write, Bash
 model: opus
 effort: high
-edit: src/HackathonStarter/Features/Cases/**, src/HackathonStarter/Features/Deadlines/**, src/HackathonStarter/Features/Changes/**, tests/HackathonStarter.Tests/Crs/**
+edit: src/HackathonStarter/Features/Cases/**, src/HackathonStarter/Features/Deadlines/**, src/HackathonStarter/Features/Changes/**, tests/HackathonStarter.Tests/Crs/**, src/HackathonStarter/Services/Lang.Ro.Cases.cs, src/HackathonStarter/Services/Lang.Ro.Changes.cs
 bash: build
 ---
 You implement `docs/PLAN.md` section 9.
 
-- `SimClock` is a separate service (`ISimClock.UtcNow`) with a settable offset, not replacing `TimeProvider.System`.
-  CRS code uses only `ISimClock`, never `DateTime.Now`, `UtcNow` or `TimeProvider` directly.
+- `SimClock : TimeProvider` is a separate service with a settable offset, not replacing `TimeProvider.System`. CRS services
+  inject only `SimClock`, never `DateTime.Now`, `UtcNow` or the app-wide `TimeProvider`, which stays the system clock so auth
+  cookies, data protection keys and run retention do not jump 85 days. Moving the clock goes through a scoped control that
+  requires the admin role and writes a `clock.changed` audit entry.
 - `DeadlineCalculator`: 90 days after the bank knows of the change (guide p. 35-36); reminder 5 days before. Preexisting accounts:
   the later of 31 December and 90 days (p. 29 says "or"; the law says "whichever is later": Fiscal Procedure Code, Annex 2
   point 1, and OECD CRS Commentary on Section III, para 13). Keep it behind one policy method with a test.

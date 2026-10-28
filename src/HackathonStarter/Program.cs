@@ -4,11 +4,21 @@ using HackathonStarter.Components;
 using HackathonStarter.Data;
 using HackathonStarter.Features.Arena;
 using HackathonStarter.Features.Assistant;
+using HackathonStarter.Features.Audit;
+using HackathonStarter.Features.Cases;
+using HackathonStarter.Features.Changes;
 using HackathonStarter.Features.Checks;
+using HackathonStarter.Features.Clients;
+using HackathonStarter.Features.Deadlines;
+using HackathonStarter.Features.Evaluation;
 using HackathonStarter.Features.Exports;
 using HackathonStarter.Features.Items;
+using HackathonStarter.Features.Rules;
 using HackathonStarter.Features.Scenarios;
+using HackathonStarter.Features.Sentinel;
+using HackathonStarter.Features.Shield;
 using HackathonStarter.Features.Targets;
+using HackathonStarter.Features.Tin;
 using HackathonStarter.Services;
 using Microsoft.AspNetCore.DataProtection;
 using MudBlazor.Services;
@@ -84,6 +94,19 @@ builder.Services.AddSingleton<AgentRunService>();
 
 // Feature services.
 builder.Services.AddScoped<ItemService>();
+
+// CRS Sentinel modules (docs/PLAN.md 6.4): each module registers itself in its own folder, so this list never changes.
+// SimClock (demo date) is registered by AddDeadlines on top of the system TimeProvider above, which stays real on purpose.
+builder.Services.AddClients();
+builder.Services.AddChanges();
+builder.Services.AddRules();
+builder.Services.AddDeadlines();
+builder.Services.AddCases();
+builder.Services.AddShield();
+builder.Services.AddTin();
+builder.Services.AddAudit();
+builder.Services.AddSentinel();
+builder.Services.AddEvaluation();
 // @gen:services (the feature generator inserts new services above this line)
 
 var app = builder.Build();

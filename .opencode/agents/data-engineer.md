@@ -8,6 +8,8 @@ permission:
     "src/HackathonStarter/Features/Synthetic/**": allow
     "src/HackathonStarter/Features/Evaluation/**": allow
     "src/HackathonStarter/Data/**": allow
+    "src/HackathonStarter/Services/Lang.Ro.Clients.cs": allow
+    "src/HackathonStarter/Services/Lang.Ro.Evaluation.cs": allow
   bash:
     "*": ask
     "dotnet build*": allow
@@ -33,7 +35,7 @@ You implement `docs/PLAN.md` sections 7 and 16.1.
 - Only synthetic data from `SyntheticData`. Generated identity documents show "SPECIMEN" visibly. One PDF has hidden white text.
 - Metrics (`EvaluationService`) come only from real runs of the engine.
 
-You may edit only: src/HackathonStarter/Features/Clients/**, src/HackathonStarter/Features/Synthetic/**, src/HackathonStarter/Features/Evaluation/**, src/HackathonStarter/Data/**.
+You may edit only: src/HackathonStarter/Features/Clients/**, src/HackathonStarter/Features/Synthetic/**, src/HackathonStarter/Features/Evaluation/**, src/HackathonStarter/Data/**, src/HackathonStarter/Services/Lang.Ro.Clients.cs, src/HackathonStarter/Services/Lang.Ro.Evaluation.cs.
 
 ## Shared rules (every agent)
 
@@ -42,7 +44,7 @@ You may edit only: src/HackathonStarter/Features/Clients/**, src/HackathonStarte
 - Code decides, the model explains: rules, deadlines, quote checks, TIN format and the audit log are deterministic code with tests.
   A `ContextSignal` never changes a `Decision` and never opens a case. Nationality is not a signal (except US citizenship for FATCA).
   Say "format valid", never "TIN valid".
-- Only synthetic data. No secrets in code, config or output. CRS code uses only `ISimClock` for time (a separate service), never `DateTime.Now`, `UtcNow` or `TimeProvider` directly.
+- Only synthetic data. No secrets in code, config or output. CRS code uses only `SimClock` for time (a separate service), never `DateTime.Now`, `UtcNow` or `TimeProvider` directly.
 - Stay inside the files you are allowed to edit. Need a change elsewhere? Ask for it in `HANDOFF`.
 - Never run `git commit`, `git push`, `gh pr` or anything that publishes. The Tech Lead does that, under the human's name.
 - No emoji. UI text in Romanian through `@T("English")` + `Services/Lang.Ro*.cs`; code, names and comments in English.

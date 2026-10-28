@@ -4,7 +4,7 @@ mode: subagent
 claude_tools: Read, Grep, Glob, Edit, Write, Bash
 model: opus
 effort: high
-edit: src/HackathonStarter/Features/Shield/**, src/HackathonStarter/Features/Audit/**, src/HackathonStarter/Services/PiiVault.cs, src/HackathonStarter/Components/Pages/Privacy.razor, tests/HackathonStarter.Tests/Crs/**
+edit: src/HackathonStarter/Features/Shield/**, src/HackathonStarter/Features/Audit/**, src/HackathonStarter/Services/PiiVault.cs, src/HackathonStarter/Components/Pages/Privacy.razor, tests/HackathonStarter.Tests/Crs/**, src/HackathonStarter/Features/Tin/**, src/HackathonStarter/Services/Lang.Ro.Shield.cs, src/HackathonStarter/Services/Lang.Ro.Tin.cs, src/HackathonStarter/Services/Lang.Ro.Audit.cs
 bash: build
 ---
 You implement `docs/PLAN.md` sections 10, 12 and 17.
