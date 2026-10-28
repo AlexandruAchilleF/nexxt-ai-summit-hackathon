@@ -111,7 +111,7 @@ public class SentinelMariaTests
         [
             AuditKinds.CaseOpened, AuditKinds.EvidenceRecorded, AuditKinds.EvidenceRecorded, AuditKinds.SignalRecorded, AuditKinds.RequestDrafted,
             AuditKinds.RequestApproved,
-            AuditKinds.CaseReminded, AuditKinds.CaseEscalated, AuditKinds.ResponseRegistered, AuditKinds.CaseClosed,
+            AuditKinds.CaseReminded, AuditKinds.CaseEscalated, AuditKinds.TinChecked, AuditKinds.ResponseRegistered, AuditKinds.CaseClosed,
         ];
         Assert.Equal(expected, kinds.Where(expected.Contains));
         Assert.True(kinds.Take(kinds.IndexOf(AuditKinds.EvidenceRecorded)).Count(k => k == AuditKinds.RuleApplied) >= 2); // the two indicia

@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using HackathonStarter.Agents;
 using HackathonStarter.Config;
+using HackathonStarter.Features.Audit;
 using HackathonStarter.Features.Cases;
 using HackathonStarter.Features.Changes;
 using HackathonStarter.Features.Clients;
@@ -40,6 +41,7 @@ public sealed class MariaWorld
     }
 
     public FakeTinValidator Tins { get; } = new();
+    public FakeAuditLog Audit { get; } = new();
     public CrsRuleEngine Engine { get; }
     public FakeClients Clients { get; }
     public FakeCases Cases { get; }
@@ -62,6 +64,7 @@ public sealed class MariaWorld
         s.AddSingleton<IChangeService>(Changes);
         s.AddSingleton<ICrsRuleEngine>(Engine);
         s.AddSingleton<ITinValidator>(Tins);
+        s.AddSingleton<IAuditLog>(Audit);
         s.AddSingleton<IHiddenTextShield, HiddenTextShield>();
         s.AddSingleton<IEvidenceVerifier, EvidenceVerifier>();
         s.AddScoped<IShieldedDocuments, ShieldedDocuments>();
@@ -321,6 +324,29 @@ public sealed class FakeTinValidator : ITinValidator
 
         public bool? IssuesTinToAllResidents(string country) => null;
     }
+}
+
+/// <summary>The entries the tools append, in memory (the real hash chain is tested over RealWorld and in AuditLogTests).</summary>
+public sealed class FakeAuditLog : IAuditLog
+{
+    public List<AuditEntry> Entries { get; } = [];
+
+    public Task<AuditEntry> AppendAsync(string actor, string kind, object? payload = null, int? caseId = null)
+    {
+        var e = new AuditEntry
+        {
+            Seq = Entries.Count + 1, Actor = actor, Kind = kind, CaseId = caseId,
+            PayloadJson = payload is null ? "{}" : JsonSerializer.Serialize(payload, JsonSerializerOptions.Web),
+        };
+        Entries.Add(e);
+        return Task.FromResult(e);
+    }
+
+    public Task<List<AuditEntry>> ListAsync(int? caseId = null, int take = 200) =>
+        Task.FromResult(Entries.Where(e => caseId is null || e.CaseId == caseId).OrderByDescending(e => e.Seq).Take(take).ToList());
+
+    public Task<AuditVerification> VerifyAsync() => Task.FromResult(new AuditVerification(true, Entries.Count, null, null, null));
+    public Task TamperAsync(long seq) => throw new NotSupportedException();
 }
 
 /// <summary>A shield result chosen by the test (e.g. with hidden text).</summary>

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using HackathonStarter.Agents;
+using HackathonStarter.Features.Audit;
 using HackathonStarter.Features.Cases;
 using HackathonStarter.Features.Clients;
 using HackathonStarter.Features.Sentinel;
@@ -250,6 +251,46 @@ public class AgentToolTests
         Assert.Equal(expected, t.GetProperty("result").GetString());
         Assert.Equal(source.ToString(), t.GetProperty("source").GetString());
         Assert.DoesNotContain(t.Strings(), s => TextMatch.ContainsAny(s, "TIN valid"));
+    }
+
+    [Fact]
+    public async Task CheckTin_writes_tin_checked_to_the_hash_chained_log_with_the_case_and_never_the_tin()
+    {
+        var (host, _) = await RealWorld.CreateAsync();
+        await using var __ = host;
+        var change = await host.RecordGoldenChangeAsync("4");
+        var opened = (await host.CaseAsync(change.CaseCode!))!;
+
+        await host.ToolAsync("checkTin", new { caseCode = opened.Code, country = "de", tin = "860 951 742 23" });
+        await host.ToolAsync("checkTin", new { country = "US", tin = "521-48-3907" });
+
+        var entries = (await host.Get<IAuditLog>().ListAsync(take: 500)).Where(e => e.Kind == AuditKinds.TinChecked).OrderBy(e => e.Seq).ToList();
+        Assert.Equal(2, entries.Count);
+        Assert.All(entries, e => Assert.Equal(AuditActors.Agent, e.Actor));
+        Assert.Equal([opened.Id, null], entries.Select(e => e.CaseId));
+        var de = JsonDocument.Parse(entries[0].PayloadJson).RootElement;
+        Assert.Equal("DE", de.GetProperty("country").GetString());
+        Assert.Equal("Valid", de.GetProperty("status").GetString());
+        Assert.Equal(nameof(TinCheckSource.LocalRules), de.GetProperty("source").GetString());
+        Assert.Equal("US", JsonDocument.Parse(entries[1].PayloadJson).RootElement.GetProperty("country").GetString());
+        foreach (var tin in (string[])["86095174223", "860 951", "742 23", "521-48-3907", "521483907"])
+            Assert.All(entries, e => Assert.DoesNotContain(tin, e.PayloadJson));
+        Assert.True((await host.VerifyAuditAsync()).Ok);
+    }
+
+    [Fact]
+    public async Task CheckTin_drops_a_note_that_repeats_the_tin_and_logs_an_unknown_case_without_a_case_id()
+    {
+        var world = new MariaWorld();
+        world.Tins.Override = (country, tin) => new TinCheck(country, tin, false, TinCheckSource.LocalRules, $"TIN on Europa unavailable: HTTP 500: <tinNumber>{tin}</tinNumber>");
+        await using var host = await world.HostAsync();
+
+        await host.ToolAsync("checkTin", new { caseCode = "CRS-2099-9999", country = "DE", tin = "86095174224" });
+
+        var e = Assert.Single(world.Audit.Entries);
+        Assert.Equal((AuditActors.Agent, AuditKinds.TinChecked, (int?)null), (e.Actor, e.Kind, e.CaseId));
+        Assert.DoesNotContain("86095174224", e.PayloadJson);
+        Assert.Equal("Invalid", JsonDocument.Parse(e.PayloadJson).RootElement.GetProperty("status").GetString());
     }
 
     [Fact]

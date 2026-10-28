@@ -222,7 +222,7 @@ internal static partial class SentinelMock
             var country = j.Str("country")!;
             if (j.Str("tin") is { Length: > 0 } tin)
             {
-                var t = await m.CallAsync("checkTin", new { country, tin });
+                var t = await m.CallAsync("checkTin", new { country, tin, caseCode = code });
                 tins.Add($"{country} (TIN: {t.Str("result")})");
             }
             else tins.Add(L($"{country} (fără TIN, motivul {j.Str("noTinReason")?[..1]})", $"{country} (no TIN, reason {j.Str("noTinReason")?[..1]})"));

@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Text.Json;
 using HackathonStarter.Agents;
 using HackathonStarter.Config;
+using HackathonStarter.Features.Audit;
 using HackathonStarter.Features.Cases;
 using HackathonStarter.Features.Changes;
 using HackathonStarter.Features.Clients;
@@ -75,7 +76,7 @@ public sealed class SentinelTools(IServiceProvider services)
             ExtractSelfCertificationAsync);
         yield return AgentTool.Create("checkTin",
             "Use to check the format of a TIN for a country. Report the result as given (format valid, format invalid, " +
-            "format not checked); never say TIN valid.",
+            "format not checked); never say TIN valid. Pass caseCode when the TIN is for a case.",
             CheckTinAsync);
         yield return AgentTool.Create("draftClientRequest",
             "Use to save your letter to the client: short, plain Romanian, the exact documents and the due date from getCase. " +
@@ -358,9 +359,17 @@ public sealed class SentinelTools(IServiceProvider services)
 
     public async Task<object> CheckTinAsync(
         [Description("ISO 3166-1 alpha-2 country code, e.g. DE")] string country,
-        [Description("The TIN as written in the form")] string tin)
+        [Description("The TIN as written in the form")] string tin,
+        [Description("Case code, when the TIN is checked for a case")] string? caseCode = null)
     {
         var check = await services.GetRequiredService<ITinValidator>().CheckAsync(Jurisdictions.Normalize(country), tin.Trim());
+        // PLAN 12: every TIN check goes into the audit log, never the TIN (a service error may echo it, so such a note is dropped).
+        var caseId = string.IsNullOrWhiteSpace(caseCode) ? null : (await FindCaseAsync(caseCode))?.Id;
+        var note = new[] { tin.Trim(), check.Normalized }.Any(t => t.Length > 0 && check.Note.Contains(t)) ? null : check.Note;
+        await services.GetRequiredService<IAuditLog>().AppendAsync(AuditActors.Agent, AuditKinds.TinChecked, new
+        {
+            check.Country, Status = check.Status.ToString(), Source = check.Source.ToString(), Note = note,
+        }, caseId);
         return new
         {
             check.Country, Result = SentinelWording.TinFormat(check),
