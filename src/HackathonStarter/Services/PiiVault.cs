@@ -130,30 +130,38 @@ public partial class PiiVault
     {
         var prefix = run.AsSpan(start, numberStart - start);
         var number = run.AsSpan(numberStart, end - numberStart);
-        if (Digits(number, max: 20) is > 15 and < 20 && IsLuhnValid(number.ToString()) && !number.ContainsAnyExcept("0123456789 -"))
+        if (Digits(number, max: 20) is > 15 and < 20 && IsLuhnValid(number.ToString()) && !number.ContainsAnyExcept("0123456789 -   "))
         {
             output.Append(prefix).Append(Token("CARD", number.ToString()));
             return end;
         }
 
         var (kept, previous, cut) = (0, 0, 0);
-        foreach (var range in number.Split(' '))
+        int partStart = 0;
+        for (int i = 0; i <= number.Length; i++)
         {
-            var part = number[range];
-            var digits = Digits(part);
-            if (kept >= 10 && (digits > 2 || previous > 2)) break;
-            if (part is ['0', '0', >= '1' and <= '9', ..] && Digits(number[range.Start..], max: 9) - 2 >= 7) break;
-            if (kept + digits > 15)
+            if (i == number.Length || IsPhoneSeparator(number[i]))
             {
-                if (part.IndexOfAny('-', '.') >= 0) (kept, cut) = (kept + digits, range.End.GetOffset(number.Length));
-                break;
+                if (i > partStart)
+                {
+                    var part = number[partStart..i];
+                    var digits = Digits(part);
+                    if (kept >= 10 && (digits > 2 || previous > 2)) break;
+                    if (part is ['0', '0', >= '1' and <= '9', ..] && Digits(number[partStart..], max: 9) - 2 >= 7) break;
+                    if (kept + digits > 15)
+                    {
+                        if (part.IndexOfAny('-', '.') >= 0) (kept, cut) = (kept + digits, i);
+                        break;
+                    }
+                    (kept, previous, cut) = (kept + digits, digits, i);
+                }
+                partStart = i + 1;
             }
-            (kept, previous, cut) = (kept + digits, digits, range.End.GetOffset(number.Length));
         }
         if (kept < 7)
         {
             // Not a phone ("+12"): keep its first part and scan the rest, which may hold one ("+12 0049 89 4521 7730").
-            var first = number.IndexOf(' ') is var space and >= 0 ? space : number.Length;
+            var first = FindFirstPhoneSeparator(number);
             output.Append(run, start, numberStart + first - start);
             return numberStart + first;
         }
@@ -174,9 +182,32 @@ public partial class PiiVault
     private static int Digits(ReadOnlySpan<char> text, int max)
     {
         var digits = 0;
-        foreach (var range in text.Split(' '))
-            if ((digits += Digits(text[range])) >= max) break;
+        int start = 0;
+        for (int i = 0; i <= text.Length; i++)
+        {
+            if (i == text.Length || IsPhoneSeparator(text[i]))
+            {
+                if (i > start)
+                {
+                    if ((digits += Digits(text[start..i])) >= max) break;
+                }
+                start = i + 1;
+            }
+        }
         return digits;
+    }
+
+    /// <summary>Check if character is a phone separator: space, non-breaking space (U+00A0), or narrow non-breaking space (U+202F).</summary>
+    private static bool IsPhoneSeparator(char c) => c is ' ' or ' ' or ' ';
+
+    /// <summary>Find first occurrence of a phone separator.</summary>
+    private static int FindFirstPhoneSeparator(ReadOnlySpan<char> text)
+    {
+        for (int i = 0; i < text.Length; i++)
+        {
+            if (IsPhoneSeparator(text[i])) return i;
+        }
+        return text.Length;
     }
 
     private string Token(string type, string value)
@@ -230,10 +261,10 @@ public partial class PiiVault
     [GeneratedRegex(@"(?<!(?<![\w+]|\w-)\+)\b[1-9]\d{12}\b")]
     private static partial Regex CnpRegex();
 
-    [GeneratedRegex(@"(?<=\+)[1-9]\d{12}\b")]
+    [GeneratedRegex(@"(?<=\+|\\u002[Bb])[1-9]\d{12}\b")]
     private static partial Regex CnpAfterPlusRegex();
 
-    [GeneratedRegex(@"(?<=\+)(?:\d[ -]?){12,18}\d\b")]
+    [GeneratedRegex(@"(?<=\+|\\u002[Bb])(?:\d[ -]?){12,18}\d\b")]
     private static partial Regex CardAfterPlusRegex();
 
     // Romanian mobile/landline numbers: +40 / 0040 / 0 prefix, optional separators.

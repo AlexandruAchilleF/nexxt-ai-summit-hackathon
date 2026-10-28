@@ -65,13 +65,23 @@ public abstract class Check : ICheck
     protected CheckResult Fail(string reason, IEnumerable<CheckFinding> findings) => new(Id, Version, Title, CheckOutcome.Fail, reason, [.. findings]);
     protected CheckResult NotApplicable(string reason) => new(Id, Version, Title, CheckOutcome.NotApplicable, reason, []);
 
-    /// <summary>The text around a match (about 40 characters each side), with personal data masked.</summary>
+    /// <summary>
+    /// The text around a match (about 40 characters each side), with personal data masked. The window first grows to
+    /// take in whole any personal data item it cuts: cut first, the rest of a phone ("+49 89 4521 7730" to "49 89 4521
+    /// 7730") would no longer look like personal data and stay in clear.
+    /// </summary>
     protected static string Excerpt(string text, int index, int length)
     {
         var start = Math.Max(0, index - 40);
         var end = Math.Min(text.Length, index + length + 40);
-        var excerpt = (start > 0 ? "…" : "") + text[start..end].ReplaceLineEndings(" ") + (end < text.Length ? "…" : "");
-        return PiiVault.ForStorage().Mask(excerpt);
+        foreach (var item in PiiVault.Detect(text))
+            for (var at = text.IndexOf(item.Value, StringComparison.Ordinal); at >= 0; at = text.IndexOf(item.Value, at + 1, StringComparison.Ordinal))
+            {
+                var itemEnd = at + item.Value.Length;
+                if (at < start && itemEnd > start) start = at;
+                if (at < end && itemEnd > end) end = itemEnd;
+            }
+        return (start > 0 ? "…" : "") + PiiVault.ForStorage().Mask(text[start..end]).ReplaceLineEndings(" ") + (end < text.Length ? "…" : "");
     }
 }
 
