@@ -14,9 +14,9 @@ BASH = {
     "deny": "  bash: deny\n",
     "allow": "  bash: allow\n",
     "git": '  bash:\n    "*": deny\n    "git diff*": allow\n    "git log*": allow\n    "git status*": allow\n    "git show*": allow\n'
-           '    "git *--output*": deny\n    "git *--ext-diff*": deny\n    "git -c *": deny\n',
+           '    "git *--ou*": deny\n    "git *--ext*": deny\n    "git -c *": deny\n',
     "build": ('  bash:\n    "*": ask\n    "dotnet build*": allow\n    "dotnet test*": allow\n    "git diff*": allow\n'
-              '    "git status*": allow\n    "git log*": allow\n    "git *--output*": deny\n    "git *--ext-diff*": deny\n    "git -c *": deny\n    "git commit*": deny\n    "git push*": deny\n    "gh *": deny\n'),
+              '    "git status*": allow\n    "git log*": allow\n    "git *--ou*": deny\n    "git *--ext*": deny\n    "git -c *": deny\n    "git commit*": deny\n    "git push*": deny\n    "gh *": deny\n'),
     "run": ('  bash:\n    "*": ask\n    "dotnet build*": allow\n    "dotnet test*": allow\n    "dotnet run*": allow\n'
             '    "curl -s http://localhost:5000/*": allow\n    "git commit*": deny\n    "git push*": deny\n    "gh *": deny\n'),
 }
