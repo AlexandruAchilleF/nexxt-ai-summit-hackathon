@@ -1,0 +1,70 @@
+@page "/clients"
+@using HackathonStarter.Features.Clients
+@inject IClientService Clients
+
+<PageTitle>@T("Clients") · @SiteConfig.Name</PageTitle>
+
+<PageHeader Title="@T("Clients")" Description="@T("Synthetic demo clients. Open one to see its data, documents and cases.")" />
+
+<MudTextField T="string" Value="_search" ValueChanged="SearchAsync" DebounceInterval="300" Placeholder="@T("Search by code or name")"
+              Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Rounded.Search" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-4" Clearable="true" />
+
+@if (_error is not null)
+{
+    <ErrorState Message="@_error" OnRetry="LoadAsync" />
+}
+else if (_clients is null)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_clients.Count == 0)
+{
+    <EmptyState Icon="@Icons.Material.Rounded.PersonSearch" Title="@T("No client found")" Description="@T("Try another code or name.")" />
+}
+else
+{
+    <div class="app-list app-card">
+        @foreach (var c in _clients)
+        {
+            <a class="app-list-row has-icon" href="@($"/clients/{c.Code}")">
+                <span class="app-list-icon"><MudIcon Icon="@Icons.Material.Rounded.Person" /></span>
+                <span class="app-list-main">
+                    <span class="app-list-title d-block">@c.FullName</span>
+                    <span class="app-list-meta d-block mono">@c.Code</span>
+                </span>
+                <MudIcon Icon="@Icons.Material.Rounded.ChevronRight" Class="app-chevron" />
+            </a>
+        }
+    </div>
+}
+
+@code {
+    private List<Client>? _clients;
+    private string? _search;
+    private string? _error;
+    private int _version;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private Task SearchAsync(string? value)
+    {
+        _search = value;
+        return LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        // The last search typed wins, not the last answer to arrive.
+        var version = ++_version;
+        _error = null;
+        try
+        {
+            var clients = await Clients.ListAsync(_search);
+            if (version == _version) _clients = clients;
+        }
+        catch (Exception ex)
+        {
+            if (version == _version) _error = ex.Message;
+        }
+    }
+}
