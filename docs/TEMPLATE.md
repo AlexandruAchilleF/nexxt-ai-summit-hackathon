@@ -112,7 +112,9 @@ The C# parameters become the JSON schema the model sees: use clear names and `[D
 - **Human in the loop:** `needsApproval: true` → the agent only proposes; an admin/member approves in the chat, then the tool runs.
 - **Record / replay:** rehearse with a real model and `"AI": { "Record": true }` (Development). Runs are saved to
   `Recordings/<agent>.json`: commit them. On stage, if the model fails, the closest recording is replayed;
-  `"AgentMode": "Replay"` forces it (identical takes for the video, or no Wi-Fi).
+  `"AgentMode": "Replay"` forces it (no Wi-Fi). Replay does not run the tools (only a replayed approval runs,
+  with the recording's masked arguments), so film or demo data-changing steps live or on the mock and keep recordings for
+  read-only questions.
 - **Any model:** `"ToolMode": "Auto"` uses native tool calling and falls back to a JSON protocol if the model rejects tools.
 - **Safe fallbacks:** a recording is replayed only for a similar question (`AI:ReplayMinSimilarity`), otherwise the scripted
   mock runs with the real tools. The chat says why it fell back and which recorded question it replayed.
@@ -159,7 +161,7 @@ The C# parameters become the JSON schema the model sees: use clear names and `[D
 
 - **Installable app (PWA):** on a phone or laptop the web app installs with its own icon and window (Install app
   button / Share → Add to Home Screen). Phones get a bottom navigation bar (`SiteConfig.MobileNav`).
-- **Photos:** the chat's 📎 accepts images; on a phone it offers the camera. Vision-capable models read them.
+- **Photos:** the chat's attach (paperclip) button accepts images; on a phone it offers the camera. Vision-capable models read them.
 - **Separate frontend** (Lovable, React, a mobile web app): call the API below from another origin with
   `Security:AllowedOrigins`. Ready-to-paste JS, a Lovable prompt and the native-app option: [`CLIENTS.md`](CLIENTS.md).
 

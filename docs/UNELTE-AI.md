@@ -24,7 +24,7 @@
 | `code-reviewer` | Review pe diff, cu lista CRS |
 | `docs-writer` | README, documente, pitch |
 
-**Comenzile:** `/verify` (build + teste) · `/golden` (cele 18 cazuri) · `/crs-review` (review pe branch) ·
+**Comenzile:** `/verify` (build + teste) · `/golden` (cazurile-etalon) · `/crs-review` (review pe branch) ·
 `/ghid <întrebare>` (răspuns din ghid) · `/handoff` (distribuie blocurile HANDOFF) · `/pr` (commit + PR pe numele tău).
 
 ## 2. Skill-uri de proces (cum lucrăm)

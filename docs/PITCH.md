@@ -21,7 +21,7 @@ CRS Sentinel transformă fiecare modificare de date într-o decizie CRS/FATCA, �
 | 1:35–1:50 | Trei capcane: Cluj → Iași, ordin din cont curent, telefon străin + RO | Fără alarme false, fiecare cu explicația de ce nu e indiciu. |
 | 1:50–2:10 | PDF cu text alb ascuns; semnal roșu de la scut | Un document poate încerca să manipuleze modelul. Scutul scoate textul ascuns înainte ca modelul să-l vadă. |
 | 2:10–2:30 | Diagrama: cod / AI / om; jurnalul, „Tamper”, intrarea ruptă | Codul decide, AI-ul explică, omul aprobă. Orice modificare a jurnalului se vede. |
-| 2:30–2:50 | `/metrics` | Cifrele reale pe cele 18 cazuri-etalon și cei 50 de clienți sintetici: prinse, ratate, alarme false. Ce nu prindem încă. |
+| 2:30–2:50 | `/metrics` | Cifrele reale pe cele 21 de cazuri-etalon și cei 50 de clienți sintetici: prinse, ratate, alarme false. Ce nu prindem încă. |
 | 2:50–3:00 | Logo | Fraza de final. |
 
 ## Fraza de final (variante)
@@ -35,7 +35,7 @@ CRS Sentinel transformă fiecare modificare de date într-o decizie CRS/FATCA, �
 2. **Deciziile sunt cod verificabil**, cu ID și pagina din Ghidul ANAF; AI-ul nu decide nimic.
 3. **Capcanele sunt testate**: excepția conturilor de depozit, telefonul străin cu telefon RO, mutarea în țară. Alte semnale (venitul din străinătate) sunt testate ca non-indicii, fără alertă.
 4. **Încredere**: scut împotriva textului ascuns, citate verificate, jurnal cu lanț de hash-uri, aprobare umană.
-5. **Merge fără internet**: replay și mock, aceleași unelte reale.
+5. **Merge fără internet**: mock-ul cheamă aceleași unelte reale; înregistrările doar pentru întrebările care citesc.
 
 ## Întrebări probabile și răspunsuri
 

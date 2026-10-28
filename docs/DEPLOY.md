@@ -71,11 +71,14 @@ For persistent data: create a free PostgreSQL (Render or [Neon](https://neon.tec
 - **CI** (`.github/workflows/ci.yml`) builds with warnings-as-errors and runs the tests on every push. Red = don't merge.
 - **Secrets only in the host's environment variables**, never in the repo.
 - **Code freeze before recording the video** (see `docs/SUBMISSION.md`); after that, only demo-path fixes.
-- **Plan B, always:** the presenting laptop can run everything offline:
+- **Plan B, always:** the presenting laptop can run everything offline on the mock, which calls the real tools:
   ```bash
-  AI__AgentMode=Replay dotnet run --project src/HackathonStarter -c Release
+  AI__Provider=None dotnet run --project src/HackathonStarter -c Release
   ```
-  (Windows PowerShell: `$env:AI__AgentMode="Replay"; dotnet run --project src/HackathonStarter -c Release`)
+  (Windows PowerShell: `$env:AI__Provider="None"; dotnet run --project src/HackathonStarter -c Release`)
+  Do not force `AI__AgentMode=Replay` for data-changing steps: replay shows the recorded steps without running the tools
+  (only a replayed approval runs, with the recording's masked arguments). Without a model a recording is still replayed
+  for a similar question before the mock runs, so keep only read-only questions in `Recordings/`.
 
 ## Troubleshooting
 
