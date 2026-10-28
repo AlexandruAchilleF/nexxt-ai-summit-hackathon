@@ -66,10 +66,15 @@ public class DemoResetTests
                 scope.ServiceProvider.GetRequiredService<CurrentUser>().Use(SiteConfig.Users[1]); // member: refused
                 await Assert.ThrowsAsync<UnauthorizedAccessException>(() => scope.ServiceProvider.GetRequiredService<DemoData>().ResetAsync());
             }
+            var maintenance = root.GetRequiredService<DemoMaintenance>();
+            var pausedWhenTheClockWentBack = false;
+            clock.Changed += () => pausedWhenTheClockWentBack = maintenance.IsPaused;
             await using (var scope = root.CreateAsyncScope())
             {
                 scope.ServiceProvider.GetRequiredService<CurrentUser>().Use(SiteConfig.Users[0]);
                 await scope.ServiceProvider.GetRequiredService<DemoData>().ResetAsync();
+                Assert.True(pausedWhenTheClockWentBack); // the watcher's wake-up from clock.Reset() is skipped
+                Assert.False(maintenance.IsPaused); // and the pause ends with the reset
                 Assert.Equal(TimeSpan.Zero, clock.Offset);
                 Assert.Equal(startup, await CountsAsync(root));
                 var verification = await scope.ServiceProvider.GetRequiredService<IAuditLog>().VerifyAsync();

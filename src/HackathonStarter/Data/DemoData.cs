@@ -12,11 +12,13 @@ namespace HackathonStarter.Data;
 /// CRS: every case, change, evaluation and the audit chain go, the demo clock goes back to today, then the clients and the
 /// change history are seeded again exactly as on a new database (ClientSeed + ChangeHistorySeed).
 /// </summary>
-public class DemoData(IDbContextFactory<AppDbContext> dbFactory, CurrentUser currentUser, ISimClock clock, IServiceProvider services)
+public class DemoData(IDbContextFactory<AppDbContext> dbFactory, CurrentUser currentUser, ISimClock clock, DemoMaintenance maintenance, IServiceProvider services)
 {
     public async Task ResetAsync()
     {
         await currentUser.Require(Roles.Admin);
+        // DeadlineWatcher sits the reset out (clock.Reset() below wakes it) and ticks once when it ends, as after a new start.
+        using var _ = maintenance.Pause();
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
             await db.AgentRuns.ExecuteDeleteAsync();

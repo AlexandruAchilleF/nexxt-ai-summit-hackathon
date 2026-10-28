@@ -59,10 +59,12 @@ public sealed class DeadlineCalculator : IDeadlineCalculator
 
 public static class DeadlinesSetup
 {
-    /// <summary>Registers <see cref="ISimClock"/> on top of the app's <see cref="TimeProvider"/> (the system clock, unchanged).</summary>
+    /// <summary>Registers <see cref="ISimClock"/> on top of the app's <see cref="TimeProvider"/> (the system clock, unchanged),
+    /// and the one <see cref="DemoMaintenance"/> that the demo reset pauses and DeadlineWatcher obeys.</summary>
     public static IServiceCollection AddDeadlines(this IServiceCollection services)
     {
         services.AddSingleton<ISimClock>(sp => new SimClock(sp.GetService<TimeProvider>() ?? TimeProvider.System));
+        services.AddSingleton<DemoMaintenance>();
         services.AddSingleton<IDeadlineCalculator, DeadlineCalculator>();
         services.AddScoped<SimClockControl>();
         return services;
