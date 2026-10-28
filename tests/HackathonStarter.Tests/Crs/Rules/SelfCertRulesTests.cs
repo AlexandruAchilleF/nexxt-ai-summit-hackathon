@@ -188,6 +188,15 @@ public class SelfCertRulesTests
         Assert.Equal((RuleIds.SelfCertConsistent, "AT"), (hit.RuleId, hit.Jurisdiction));
     }
 
+    // A c/o address on file is a mailing address too (GOLDEN-CASES Î10; guide p. 29 lit. b, 48).
+    [Fact]
+    public void Reportable_in_care_of_address_on_file_that_is_not_declared_fails_reasonableness()
+    {
+        var client = RoResident().WithAddress(AddressKind.InCareOf, "IT");
+        var hit = Assert.Single(Run(Form(new SubjectTaxResidence("RO", "1900101400004")), client).Indicia);
+        Assert.Equal((RuleIds.SelfCertConsistent, "IT"), (hit.RuleId, hit.Jurisdiction));
+    }
+
     [Fact]
     public void Us_citizen_on_file_without_us_status_on_the_form_is_a_fatca_alert()
     {
