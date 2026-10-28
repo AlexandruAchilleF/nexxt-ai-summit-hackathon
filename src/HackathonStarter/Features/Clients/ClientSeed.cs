@@ -6,6 +6,6 @@ namespace HackathonStarter.Features.Clients;
 /// </summary>
 public static class ClientSeed
 {
-    /// <param name="now">The demo date (SimClock) at startup: seed dates relative to it, so open cases stay open on any day.</param>
+    /// <param name="now">The demo date (ISimClock) at startup: seed dates relative to it, so open cases stay open on any day.</param>
     public static List<Client> Create(DateTime now) => [];
 }

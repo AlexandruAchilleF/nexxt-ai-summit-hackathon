@@ -24,6 +24,7 @@ namespace HackathonStarter.Tests.Crs;
 public class Phase0ContractTests
 {
     private static readonly Regex PageReference = new(@"^\d{1,3}(-\d{1,3})?(, \d{1,3}(-\d{1,3})?)*$");
+    private static readonly Regex ExpectedHit = new(@"^[A-Z0-9]+(-[A-Z0-9]+)*:[A-Z]{2}$");
 
     [Fact]
     public async Task Schema_is_created_on_sqlite_with_every_crs_table()
@@ -41,6 +42,7 @@ public class Phase0ContractTests
         Assert.Equal(0, await db.PowersOfAttorney.CountAsync());
         Assert.Equal(0, await db.SelfCertifications.CountAsync());
         Assert.Equal(0, await db.ClientDocuments.CountAsync());
+        Assert.Equal(0, await db.AcceptedExplanations.CountAsync());
         Assert.Equal(0, await db.ChangeEvents.CountAsync());
         Assert.Equal(0, await db.RuleEvaluations.CountAsync());
         Assert.Equal(0, await db.Cases.CountAsync());
@@ -62,13 +64,19 @@ public class Phase0ContractTests
         Type[] contracts =
         [
             typeof(IClientService), typeof(IChangeService), typeof(ICrsRuleEngine), typeof(IDeadlineCalculator),
-            typeof(SimClock), typeof(ICaseService), typeof(IHiddenTextShield), typeof(IEvidenceVerifier),
+            typeof(ISimClock), typeof(ICaseService), typeof(IHiddenTextShield), typeof(IEvidenceVerifier),
             typeof(IShieldedDocuments), typeof(ITinFormat), typeof(ITinValidator), typeof(IAuditLog), typeof(IEvaluationService),
         ];
         foreach (var contract in contracts)
             Assert.NotNull(scope.ServiceProvider.GetRequiredService(contract)); // throws with the type name if missing
 
-        Assert.Same(crs.Root.GetRequiredService<SimClock>(), scope.ServiceProvider.GetRequiredService<SimClock>());
+        // One simulated clock for the whole app, injected as ISimClock only; the app-wide TimeProvider stays the system clock (PLAN 9.1).
+        Assert.Same(crs.Root.GetRequiredService<ISimClock>(), scope.ServiceProvider.GetRequiredService<ISimClock>());
+        Assert.IsType<SimClock>(crs.Root.GetRequiredService<ISimClock>());
+        Assert.Null(crs.Root.GetService<SimClock>());
+        Assert.False(typeof(TimeProvider).IsAssignableFrom(typeof(SimClock)), "SimClock must not be a TimeProvider");
+        Assert.Same(TimeProvider.System, crs.Root.GetRequiredService<TimeProvider>());
+
         Assert.Same(RuleCatalog.All, scope.ServiceProvider.GetRequiredService<ICrsRuleEngine>().Catalog);
 
         // The rule engine is a singleton and checks TIN formats synchronously: it may depend on ITinFormat, never on the async validator.
@@ -94,6 +102,8 @@ public class Phase0ContractTests
         var deIban = SyntheticData.IbanWithCheckDigits("DE", "100000000000000001");
         var signedAt = new DateTime(2026, 2, 10, 9, 30, 0, DateTimeKind.Utc);
         var uploadedAt = new DateTime(2026, 2, 11, 14, 0, 0, DateTimeKind.Utc);
+        var acceptedAt = new DateTime(2026, 4, 20, 10, 0, 0, DateTimeKind.Utc);
+        var openedOn = new DateOnly(2018, 3, 1);
         byte[] pdfBytes = [0x25, 0x50, 0x44, 0x46, 0x2D]; // "%PDF-": a few bytes, never parsed here
         var client = new Client
         {
@@ -110,9 +120,9 @@ public class Phase0ContractTests
             [
                 new Account
                 {
-                    Iban = roIban, Type = AccountType.Custodial, Product = "Cont de custodie", OpenedOn = new DateOnly(2018, 3, 1),
-                    IsPreexisting = false, Balance = 12500.50m, Currency = "RON",
-                    StandingOrders = [new StandingOrder { BeneficiaryIban = deIban, BeneficiaryCountry = "DE", Amount = 250m }],
+                    Iban = roIban, Type = AccountType.Custodial, Product = "Cont de custodie", OpenedOn = openedOn,
+                    Balance = 12500.50m, Currency = "RON",
+                    StandingOrders = [new StandingOrder { BeneficiaryAccount = deIban, BeneficiaryCountry = "DE", Amount = 250m }],
                 },
             ],
             PowersOfAttorney = [new PowerOfAttorney { HolderName = "Ion Test", HolderAddress = "Teststrasse 1, Wien", HolderCountry = "AT", Scope = "Full", ValidFrom = new DateOnly(2025, 6, 1) }],
@@ -135,6 +145,7 @@ public class Phase0ContractTests
                     Kind = DocumentKind.Payslip, FileName = "payslip-test.pdf", Content = pdfBytes, Pages = 1, UploadedAt = uploadedAt,
                 },
             ],
+            AcceptedExplanations = [new AcceptedExplanation { Jurisdiction = "DE", Category = ExplanationCategory.Student, CaseCode = "CRS-TEST-0001", AcceptedAt = acceptedAt }],
         };
         await using (var db = await crs.CreateDbAsync())
         {
@@ -186,11 +197,14 @@ public class Phase0ContractTests
         Assert.Equal("RO", phone.Country);
 
         var account = Assert.Single(snapshot.Accounts);
+        Assert.Equal(12500.50m, account.Balance);
+        Assert.Equal("RON", account.Currency);
         Assert.Equal(roIban, account.Iban);
         Assert.Equal(AccountType.Custodial, account.Type);
-        Assert.False(account.IsPreexisting);
+        Assert.Equal(openedOn, account.OpenedOn);
+        Assert.False(Preexisting.For(Regime.Crs, account.OpenedOn)); // computed per regime, never stored
         var order = Assert.Single(account.StandingOrders);
-        Assert.Equal(deIban, order.BeneficiaryIban);
+        Assert.Equal(deIban, order.BeneficiaryAccount);
         Assert.Equal("DE", order.BeneficiaryCountry);
         Assert.True(order.IsActive);
 
@@ -210,6 +224,13 @@ public class Phase0ContractTests
         Assert.Null(at.Tin);
         Assert.Equal(NoTinReason.A_CountryDoesNotIssue, at.NoTinReason);
         Assert.Equal("Synthetic test reason", at.NoTinExplanation);
+
+        var explanation = Assert.Single(snapshot.AcceptedExplanations);
+        Assert.Equal("DE", explanation.Jurisdiction);
+        Assert.Equal(ExplanationCategory.Student, explanation.Category);
+        Assert.Equal("CRS-TEST-0001", explanation.CaseCode);
+        Assert.Equal(acceptedAt, explanation.AcceptedAt);
+        Assert.Equal(DateTimeKind.Utc, explanation.AcceptedAt.Kind);
     }
 
     [Fact]
@@ -224,7 +245,7 @@ public class Phase0ContractTests
             {
                 Code = "CRS-TEST-0001", ClientId = 1, ClientCode = "CL-TEST", TriggerChangeId = 1, Regime = Regime.Crs,
                 OpenedAt = at, DueAt = at.AddDays(90), RemindAt = at.AddDays(85),
-                DeadlineRuleId = "DL-CHANGE-90", DeadlineGuidePage = "29, 35-36",
+                DeadlineRuleId = "DL-NEW-90", DeadlineGuidePage = "20-21, 35-36",
                 Outcome = "Synthetic outcome", OutcomeRo = "Rezultat sintetic", OutcomeRuleId = "RESP-EXPLANATION",
                 Indicia =
                 [
@@ -331,6 +352,12 @@ public class Phase0ContractTests
                 Code = "CRS-TEST-UTC", ClientId = 1, ClientCode = "CL-TEST", TriggerChangeId = 1, Regime = Regime.Crs, Status = CaseStatus.Closed,
                 OpenedAt = opened, DueAt = opened.AddDays(90), RemindAt = opened.AddDays(85), ClosedAt = closed, ExpiredAt = null,
             });
+            // FATCA change of circumstances: the guide gives no deadline (p. 38), so DueAt and RemindAt stay null.
+            db.Cases.Add(new Case
+            {
+                Code = "CRS-TEST-FATCA", ClientId = 1, ClientCode = "CL-TEST", TriggerChangeId = 1, Regime = Regime.Fatca,
+                OpenedAt = opened, DueAt = null, RemindAt = null, DeadlineRuleId = "FATCA-SC", DeadlineGuidePage = "38",
+            });
             await db.SaveChangesAsync();
         }
 
@@ -350,31 +377,39 @@ public class Phase0ContractTests
         Assert.Equal(DateTimeKind.Utc, saved.ClosedAt.Value.Kind);
         Assert.Equal(closed.Ticks, saved.ClosedAt.Value.Ticks);
         Assert.Null(saved.ExpiredAt);
+        Assert.NotNull(saved.DueAt);
+        Assert.Equal(DateTimeKind.Utc, saved.DueAt.Value.Kind);
+        Assert.Equal(opened.AddDays(90).Ticks, saved.DueAt.Value.Ticks);
+
+        var fatca = await check.Cases.SingleAsync(c => c.Code == "CRS-TEST-FATCA");
+        Assert.Null(fatca.DueAt);
+        Assert.Null(fatca.RemindAt);
     }
 
     [Fact]
     public void SimClock_moves_forward_resets_and_never_moves_back()
     {
-        var start = new DateTimeOffset(2026, 3, 2, 9, 0, 0, TimeSpan.Zero);
-        var clock = new SimClock(new FixedTime(start));
+        var start = new DateTimeOffset(2026, 10, 28, 7, 0, 0, TimeSpan.Zero);
+        ISimClock clock = new SimClock(new FixedTime(start));
         var changed = 0;
         clock.Changed += () => changed++;
-        Assert.Equal(start, clock.GetUtcNow());
+        Assert.Equal(start.UtcDateTime, clock.UtcNow);
+        Assert.Equal(DateTimeKind.Utc, clock.UtcNow.Kind);
+        Assert.Equal(TimeSpan.Zero, clock.Offset);
 
         clock.Advance(TimeSpan.FromDays(85));
 
-        Assert.Equal(start.AddDays(85), clock.GetUtcNow());
         Assert.Equal(start.UtcDateTime.AddDays(85), clock.UtcNow);
         Assert.Equal(TimeSpan.FromDays(85), clock.Offset);
         Assert.Equal(1, changed);
 
         Assert.Throws<ArgumentOutOfRangeException>(() => clock.Advance(TimeSpan.FromDays(-1)));
-        Assert.Equal(start.AddDays(85), clock.GetUtcNow());
+        Assert.Equal(start.UtcDateTime.AddDays(85), clock.UtcNow);
         Assert.Equal(1, changed);
 
         clock.Reset();
 
-        Assert.Equal(start, clock.GetUtcNow());
+        Assert.Equal(start.UtcDateTime, clock.UtcNow);
         Assert.Equal(TimeSpan.Zero, clock.Offset);
         Assert.Equal(2, changed);
     }
@@ -415,25 +450,38 @@ public class Phase0ContractTests
     }
 
     [Fact]
-    public void Golden_cases_are_the_18_cases_with_case_5_split_in_a_and_b()
+    public void Golden_cases_are_the_21_cases_of_golden_cases_md()
     {
-        string[] expected = ["1", "2", "3", "4", "5a", "5b", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18"];
+        // docs/GOLDEN-CASES.md section 2: 18 numbered cases, 5 split in a/b/c and 17 in a/b.
+        string[] expected = ["1", "2", "3", "4", "5a", "5b", "5c", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17a", "17b", "18"];
         var ids = GoldenCases.All.Select(c => c.Id).ToList();
 
         var duplicates = ids.GroupBy(id => id).Where(g => g.Count() > 1).Select(g => g.Key).ToList();
         Assert.Empty(duplicates);
+        Assert.Equal(21, ids.Count);
         Assert.Equal(expected.Order(StringComparer.Ordinal).ToArray(), ids.Order(StringComparer.Ordinal).ToArray());
-        Assert.Equal(18, ids.Select(id => id.TrimEnd('a', 'b')).Distinct().Count());
+        Assert.Equal(18, ids.Select(id => id.TrimEnd('a', 'b', 'c')).Distinct().Count());
     }
 
     [Fact]
     public void Golden_case_rules_exist_in_the_catalog()
     {
         var known = RuleCatalog.All.Select(r => r.Id).ToHashSet();
-        var unknown = GoldenCases.All
-            .SelectMany(c => c.ExpectedIndicia.Concat(c.ExpectedCleared).Where(id => !known.Contains(id)).Select(id => $"case {c.Id}: {id}"))
-            .ToList();
-        Assert.Empty(unknown);
+        var problems = new List<string>();
+        foreach (var c in GoldenCases.All)
+        {
+            foreach (var hit in c.ExpectedHits)
+            {
+                // "RuleId:Jurisdiction", compared exactly (GOLDEN-CASES.md section 1).
+                if (!ExpectedHit.IsMatch(hit)) problems.Add($"case {c.Id}: hit '{hit}' is not RuleId:Jurisdiction (e.g. CRS-IND-ADDR:DE)");
+                var ruleId = hit.Split(':')[0];
+                if (!known.Contains(ruleId)) problems.Add($"case {c.Id}: hit {ruleId}");
+            }
+            problems.AddRange(c.ExpectedCleared.Where(id => !known.Contains(id)).Select(id => $"case {c.Id}: cleared {id}"));
+            if (c.ExpectedDeadlineRule is { } deadline && !known.Contains(deadline))
+                problems.Add($"case {c.Id}: deadline rule {deadline}");
+        }
+        Assert.True(problems.Count == 0, "Golden cases refer to rules missing from RuleCatalog:\n" + string.Join("\n", problems));
     }
 
     private static string RepoRoot()

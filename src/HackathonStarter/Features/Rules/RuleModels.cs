@@ -4,8 +4,11 @@ using HackathonStarter.Features.Clients;
 namespace HackathonStarter.Features.Rules;
 
 /// <summary>
-/// What code concluded for one change. A model never sets it. The rule engine returns NoCase .. FatcaAlert;
-/// ShieldAlert is set by ChangeService when a document's shield verdict is HiddenTextRemoved (the engine never sees documents).
+/// What code concluded for one change (docs/PLAN.md 7.2). A model never sets it.
+/// NoCase = no indicium rule applied (the traps land here, with Cleared). Compliant = indicia exist, all covered
+/// (self-certification or accepted explanation). Clarification / FatcaAlert = at least one uncovered CRS / FATCA indicium.
+/// ShieldAlert = only from the shield (ChangeService on DocumentUploaded); the rule engine never returns it.
+/// Precedence when several apply: ShieldAlert &gt; FatcaAlert &gt; Clarification &gt; Compliant &gt; NoCase.
 /// </summary>
 public enum Decision { NoCase, Compliant, Clarification, FatcaAlert, ShieldAlert }
 
@@ -18,11 +21,17 @@ public record RuleDefinition(string Id, Regime Regime, string Title, string Titl
 /// A rule that was checked: an indicium (it applies) or a cleared rule (it does not, with the reason). Explanations are
 /// code templates in both languages, so the outcome never depends on the caller's culture; show them with Lang.Pick.
 /// </summary>
-public record RuleHit(string RuleId, Regime Regime, string Jurisdiction, string Explanation, string ExplanationRo, string GuidePage, string SourceField);
+/// <param name="CoveredBy">None = uncovered: it starts an action. SelfCertification = the jurisdiction is declared (reportable
+/// for it). AcceptedExplanation = explained (not reportable for it). A Cleared rule did not apply at all.</param>
+public record RuleHit(string RuleId, Regime Regime, string Jurisdiction, string Explanation, string ExplanationRo, string GuidePage,
+                      string SourceField, Coverage CoveredBy = Coverage.None);
 
-/// <param name="Indicia">Rules that apply; only these can open a case.</param>
+public enum Coverage { None, SelfCertification, AcceptedExplanation }
+
+/// <param name="Indicia">Every indicium found; those with CoveredBy = None start actions and open a case.</param>
 /// <param name="Cleared">Rules checked that do not apply, each with the reason (the traps: depository account, RO phone next to a foreign one).</param>
-/// <param name="ReportableFor">Jurisdictions the account is reportable for, e.g. ["DE"] for a correctly declared dual residence.</param>
+/// <param name="ReportableFor">Jurisdictions the account is reportable for, e.g. ["DE"] for a correctly declared dual residence;
+/// never the explained ones.</param>
 /// <param name="Explanation">Text built by code from templates (English), never by a model.</param>
 /// <param name="ExplanationRo">The same text in Romanian.</param>
 public record RuleOutcome(
@@ -34,10 +43,20 @@ public record RuleOutcome(
     string ExplanationRo,
     string EngineVersion)
 {
-    public Regime? Regime => Indicia.Count == 0 ? null
-        : Indicia.All(i => i.Regime == Rules.Regime.Crs) ? Rules.Regime.Crs
-        : Indicia.All(i => i.Regime == Rules.Regime.Fatca) ? Rules.Regime.Fatca
-        : Rules.Regime.Both;
+    public IEnumerable<RuleHit> Uncovered => Indicia.Where(i => i.CoveredBy == Coverage.None);
+
+    /// <summary>The regime of the uncovered indicia (the case's regime), or null when nothing is uncovered.</summary>
+    public Regime? Regime
+    {
+        get
+        {
+            var open = Uncovered.ToList();
+            if (open.Count == 0) return null;
+            if (open.All(i => i.Regime == Rules.Regime.Crs)) return Rules.Regime.Crs;
+            if (open.All(i => i.Regime == Rules.Regime.Fatca)) return Rules.Regime.Fatca;
+            return Rules.Regime.Both;
+        }
+    }
 }
 
 /// <summary>

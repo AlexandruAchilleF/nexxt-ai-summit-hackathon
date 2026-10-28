@@ -40,8 +40,8 @@ The product, its rules and the team plan are in `docs/PLAN.md`; read section 1 a
 - Domain truth: `docs/ghid/pagini/p-XXX.md` (ANAF guide, 29.12.2025) and `docs/reguli-verificate.md`. A rule without a page is
   marked `NEVERIFICAT` in code and README; never guess a page.
 - Say "format valid", never "TIN valid". Only synthetic data; generated identity documents show "SPECIMEN".
-- CRS code (`Features/{Clients,Changes,Rules,Deadlines,Cases,Shield,Tin,Audit,Evaluation,Sentinel}`) uses only `SimClock`
-  for time (a separate service with a settable offset, the demo date "+85 days"), never `DateTime.Now`, `UtcNow` or
+- CRS code (`Features/{Clients,Changes,Rules,Deadlines,Cases,Shield,Tin,Audit,Evaluation,Sentinel}`) uses only `ISimClock`
+  for time (implemented by `SimClock`; a separate service with a settable offset, the demo date "+85 days"), never `DateTime.Now`, `UtcNow` or
   `TimeProvider` directly; `TimeProvider.System` is unchanged in the rest of the app (auth cookies, data protection keys
   and run retention must not jump ahead). `ClockTests` checks it. No emoji anywhere.
 - Bedrock runs in `us-west-2` (`eu-central-1` is denied on the workshop account); credentials come from the AWS default chain only.

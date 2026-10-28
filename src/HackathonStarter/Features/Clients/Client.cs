@@ -21,6 +21,8 @@ public class Client
     public List<PowerOfAttorney> PowersOfAttorney { get; set; } = [];
     public List<SelfCertification> SelfCertifications { get; set; } = [];
     public List<ClientDocument> Documents { get; set; } = [];
+    /// <summary>Explanations accepted when a case was closed: they cover an indicium for that jurisdiction (golden case 18).</summary>
+    public List<AcceptedExplanation> AcceptedExplanations { get; set; } = [];
 
     public string FullName => $"{FirstName} {LastName}";
 }
@@ -58,9 +60,8 @@ public class Account
     public string Iban { get; set; } = "";
     public AccountType Type { get; set; }
     public string Product { get; set; } = "";            // "Cont curent"
+    /// <summary>Preexisting or new is computed from this date per regime: <see cref="Preexisting.For"/> (guide p. 20).</summary>
     public DateOnly OpenedOn { get; set; }
-    /// <summary>CRS: held on 31 Dec 2015 = preexisting; opened on or after 1 Jan 2016 = new (guide p. 20).</summary>
-    public bool IsPreexisting { get; set; }
     public decimal Balance { get; set; }
     public string Currency { get; set; } = "RON";
     public List<StandingOrder> StandingOrders { get; set; } = [];
@@ -70,8 +71,10 @@ public class StandingOrder
 {
     public int Id { get; set; }
     public int AccountId { get; set; }
-    public string BeneficiaryIban { get; set; } = "";
-    public string BeneficiaryCountry { get; set; } = "";  // from the IBAN
+    /// <summary>IBAN, or another account number where there is no IBAN (a US account: ABA routing + account).</summary>
+    public string BeneficiaryAccount { get; set; } = "";
+    /// <summary>Explicit (the US has no IBAN to derive it from); ISO 3166-1 alpha-2.</summary>
+    public string BeneficiaryCountry { get; set; } = "";
     public decimal Amount { get; set; }
     public string Frequency { get; set; } = "Monthly";
     public bool IsActive { get; set; } = true;
@@ -113,6 +116,24 @@ public class SelfCertification
     public bool DeclaresUsPerson { get; set; }
     public SelfCertStatus Status { get; set; } = SelfCertStatus.Valid;
     public int? DocumentId { get; set; }
+}
+
+/// <summary>Reasonable explanations listed by the guide (p. 37). Other = not on the list: never accepted automatically, a person decides.</summary>
+public enum ExplanationCategory { None, Student, TeacherOrTrainee, Diplomat, EuOfficial, Other }
+
+/// <summary>
+/// Written by CaseService.CloseAsync, and only there, when a case closes on a reasonable explanation: before closing it
+/// re-evaluates the snapshot with this candidate explanation added (golden case 18 must reach Compliant), and saves it only
+/// on close. This is CaseService's only write to client data; everything else goes through IChangeService.
+/// </summary>
+public class AcceptedExplanation
+{
+    public int Id { get; set; }
+    public int ClientId { get; set; }
+    public string Jurisdiction { get; set; } = "";
+    public ExplanationCategory Category { get; set; }
+    public string CaseCode { get; set; } = "";
+    public DateTime AcceptedAt { get; set; }
 }
 
 public enum DocumentKind { Passport, IdCard, Payslip, BankStatement, SelfCertForm, UtilityBill, Letter, Other }
