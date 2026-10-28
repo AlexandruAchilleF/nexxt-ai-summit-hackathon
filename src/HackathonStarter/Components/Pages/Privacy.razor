@@ -17,8 +17,8 @@
         <MudText Typo="Typo.body2" Class="mud-text-secondary mb-3">
             @if (Ai.Options.MaskPii)
             {
-                <span>@T("CNPs, IBANs, card numbers, emails and Romanian phone numbers are replaced with placeholders such as [CNP_1] before any text leaves the app, and restored only in the answer shown to you. Tools receive the real values; the model never does.")</span>
-                <span>@T("Not masked: names, addresses, dates of birth, foreign TINs and foreign phone numbers. This is why the demo uses synthetic data only.")</span>
+                <span>@T("CNPs, IBANs, card numbers, emails and phone numbers (Romanian ones, and foreign ones written with the country code after + or 00) are replaced with placeholders such as [CNP_1] before any text leaves the app, and restored only in the answer shown to you. Tools receive the real values; the model never does.")</span>
+                <span>@T("Not masked: names, addresses, dates of birth, foreign TINs and foreign phone numbers written without the country code. This is why the demo uses synthetic data only.")</span>
             }
             else
             {

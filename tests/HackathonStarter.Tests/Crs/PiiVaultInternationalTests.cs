@@ -200,6 +200,23 @@ public class PiiVaultInternationalTests
     }
 
     [Fact]
+    public void The_privacy_page_says_which_phone_numbers_are_masked()
+    {
+        const string masked = "CNPs, IBANs, card numbers, emails and phone numbers (Romanian ones, and foreign ones written with the country code after + or 00) are replaced with placeholders such as [CNP_1] before any text leaves the app, and restored only in the answer shown to you. Tools receive the real values; the model never does.";
+        const string notMasked = "Not masked: names, addresses, dates of birth, foreign TINs and foreign phone numbers written without the country code. This is why the demo uses synthetic data only.";
+        Assert.Equal("[PHONE_1]", new PiiVault().Mask("+49 89 4521 7730"));
+        Assert.Equal("[PHONE_1]", new PiiVault().Mask("0049 89 4521 7730"));
+        Assert.Equal("089 4521 7730", new PiiVault().Mask("089 4521 7730"));
+
+        var page = File.ReadAllText(Path.Combine(RepoRoot(), "src", "HackathonStarter", "Components", "Pages", "Privacy.razor"));
+
+        Assert.Contains($"@T(\"{masked}\")", page);
+        Assert.Contains($"@T(\"{notMasked}\")", page);
+        Assert.Contains("indicativul țării după + sau 00", Lang.Translations.GetValueOrDefault(masked, ""));
+        Assert.Contains("fără indicativul țării", Lang.Translations.GetValueOrDefault(notMasked, ""));
+    }
+
+    [Fact]
     public void A_long_run_of_numbers_is_masked_without_copying_the_rest_for_each_number()
     {
         // One regex match covers the whole run, and each number in it is masked before the rest is scanned again. A copy
@@ -285,5 +302,12 @@ public class PiiVaultInternationalTests
         }
 
         public override Task MockAsync(MockContext mock) => mock.SayAsync("Mock.");
+    }
+
+    private static string RepoRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "HackathonStarter.slnx"))) dir = dir.Parent;
+        return dir?.FullName ?? throw new InvalidOperationException("Repository root not found");
     }
 }
