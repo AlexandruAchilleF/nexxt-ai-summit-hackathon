@@ -221,10 +221,15 @@ internal static class CrsIndicia
                 // current mailing address of lit. b). Not in the guide's text: our reading, said as such. Hold-mail and a c/o
                 // address next to another one are not read this way.
                 if (address.Kind == AddressKind.InCareOf)
-                    f.Hit(RuleIds.CrsMailing, country, field,
-                        $"Adresa «în atenția» din {Place(country)} e singura adresă actuală, deci și adresa de corespondență actuală: indiciu CRS (pct. 12 lit. b; GOLDEN-CASES Î10, interpretare de design). Ruta rămâne cea a adresei «în atenția» (pct. 17).",
-                        $"The in-care-of address in {Place(country, true)} is the only current address, so also the current mailing address: CRS indicium (12(b); GOLDEN-CASES Q10, design interpretation). The route stays the in-care-of one (17).",
-                        RuleBasis.Interpretation);
+                {
+                    var mailRo = $"Adresa «în atenția» din {Place(country)} e singura adresă actuală, deci și adresa de corespondență actuală: indiciu CRS (pct. 12 lit. b; GOLDEN-CASES Î10, interpretare de design).";
+                    var mailEn = $"The in-care-of address in {Place(country, true)} is the only current address, so also the current mailing address: CRS indicium (12(b); GOLDEN-CASES Q10, design interpretation).";
+                    (mailRo, mailEn) = scope.CrsPreexisting
+                        ? (mailRo + " Nu schimbă ruta adresei «în atenția»: fără alte indicii, căutare în registrul pe hârtie sau autocertificare / documente, altfel cont nedocumentat (pct. 17).",
+                           mailEn + " It does not change the in-care-of route: with no other indicia, paper record search or self-certification / documents, otherwise an undocumented account (17).")
+                        : (mailRo + NewAccountRo, mailEn + NewAccountEn);
+                    f.Hit(RuleIds.CrsMailing, country, field, mailRo, mailEn, RuleBasis.Interpretation);
+                }
             }
         }
     }

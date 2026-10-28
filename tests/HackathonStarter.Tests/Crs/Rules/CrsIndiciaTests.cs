@@ -216,6 +216,19 @@ public class CrsIndiciaTests
     }
 
     [Fact]
+    public void The_c_o_mailing_hit_names_the_c_o_route_only_on_a_preexisting_account()
+    {
+        var preexisting = HitOf(Run(RoResident().WithAccounts(Account(AccountType.Depository, Preexisting))
+            .WithOnlyAddress(AddressKind.InCareOf, "IT")), RuleIds.CrsMailing);
+        Assert.Contains("fără alte indicii", preexisting.ExplanationRo);
+        Assert.Contains("(pct. 17)", preexisting.ExplanationRo);
+
+        var newAccount = HitOf(Run(RoResident().WithOnlyAddress(AddressKind.InCareOf, "IT")), RuleIds.CrsMailing);
+        Assert.DoesNotContain("pct. 17", newAccount.ExplanationRo);
+        Assert.Contains("GEN-NEW-ACCOUNT", newAccount.ExplanationRo);
+    }
+
+    [Fact]
     public void Hold_mail_or_a_c_o_address_next_to_another_current_address_is_not_a_mailing_indicium()
     {
         // Î10 decides only the c/o address that is the only one; nothing else is read into it.

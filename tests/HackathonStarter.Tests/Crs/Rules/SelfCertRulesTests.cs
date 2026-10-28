@@ -1,4 +1,5 @@
 using HackathonStarter.Features.Rules;
+using HackathonStarter.Features.Tin;
 using AddressKind = HackathonStarter.Features.Clients.AddressKind;
 using NoTinReason = HackathonStarter.Features.Clients.NoTinReason;
 using static HackathonStarter.Tests.Crs.RuleEngine.Subjects;
@@ -142,6 +143,46 @@ public class SelfCertRulesTests
         var o = Run(Form(new SubjectTaxResidence("RO", "1900101400004"), new SubjectTaxResidence("US", "123-45-6789")) with { DeclaresUsPerson = true });
         Assert.Equal(Decision.NoCase, o.Decision);
         Assert.Equal(["US"], o.ReportableFor);
+        // Every result about the US TIN sits under the FATCA rule, never the CRS one.
+        Assert.Equal(Regime.Fatca, Assert.Single(o.Cleared, c => c.Jurisdiction == "US").Regime);
+        Assert.DoesNotContain(o.Cleared, c => c.RuleId == RuleIds.TinFormat && c.Jurisdiction == "US");
+    }
+
+    [Fact]
+    public void A_us_tin_in_the_wrong_format_is_a_fatca_policy_finding_that_does_not_claim_the_tin_is_missing()
+    {
+        var engine = new CrsRuleEngine(new UsTinFormat());
+        var o = engine.EvaluateSelfCertification(RoResident(), Form(new SubjectTaxResidence("RO", "1900101400004"), new SubjectTaxResidence("US", "000000000")));
+
+        Assert.Equal((Decision.FatcaAlert, Regime.Fatca), (o.Decision, o.Regime));
+        var hit = Assert.Single(o.Uncovered);
+        Assert.Equal((RuleIds.FatcaTin, RuleBasis.Policy), (hit.RuleId, hit.Basis));
+        Assert.Contains("nu are formatul unui TIN SUA", o.ExplanationRo);
+        Assert.DoesNotContain("p. 38", o.ExplanationRo);
+        Assert.DoesNotContain("TIN valid", o.ExplanationRo + o.Explanation);
+
+        Assert.Equal(Regime.Fatca, Assert.Single(engine.EvaluateSelfCertification(RoResident(),
+            Form(new SubjectTaxResidence("RO", "1900101400004"), new SubjectTaxResidence("US", "521374829"))).Cleared, c => c.Jurisdiction == "US").Regime);
+    }
+
+    [Fact]
+    public void A_form_with_a_fatca_and_a_crs_finding_says_both_routes()
+    {
+        var o = Run(Form(new SubjectTaxResidence("US", null), new SubjectTaxResidence("DE", null)));
+
+        Assert.Equal((Decision.FatcaAlert, Regime.Both), (o.Decision, o.Regime));
+        Assert.Contains("Acordul nu dă un termen", o.ExplanationRo);
+        Assert.Contains("CRS: SC-TIN-MISSING (DE)", o.ExplanationRo);
+        Assert.Contains("corectarea", o.ExplanationRo);
+        Assert.Contains("Motorul nu calculează termene", o.ExplanationRo);
+    }
+
+    private sealed class UsTinFormat : ITinFormat
+    {
+        public TinCheck Check(string country, string tin) =>
+            new(country, tin, tin != "000000000", country == "US" ? TinCheckSource.LocalRules : TinCheckSource.NotChecked, "");
+
+        public bool? IssuesTinToAllResidents(string country) => null;
     }
 
     [Theory]
@@ -169,10 +210,26 @@ public class SelfCertRulesTests
     [Fact]
     public void An_unrecognized_code_is_named_and_left_to_the_operator_as_policy()
     {
-        var hit = Assert.Single(Run(Form(new SubjectTaxResidence("XX", "123456789"))).Uncovered, h => h.RuleId == RuleIds.SelfCertValid);
-        Assert.Contains("«XX»", hit.ExplanationRo);
+        var o = Run(Form(new SubjectTaxResidence("XX", "123456789")));
+        var hit = Assert.Single(o.Uncovered, h => h.RuleId == RuleIds.SelfCertValid);
+        Assert.Contains("«XX» nu e un cod de țară ISO 3166-1", hit.ExplanationRo);
+        Assert.DoesNotContain("lipsește", hit.ExplanationRo); // a code is there: p. 36 may still accept it
         Assert.Equal(RuleBasis.Policy, hit.Basis); // p. 36 lets the bank accept an abbreviation an ID document matches
+        Assert.Contains("Operatorul compară întâi jurisdicția", o.ExplanationRo);
         Assert.Equal(RuleBasis.Verified, Assert.Single(Run(Form(new SubjectTaxResidence(" ", "1"))).Uncovered).Basis);
+
+        var two = Assert.Single(Run(Form(new SubjectTaxResidence("XX", "1"), new SubjectTaxResidence("QQ", "2"))).Uncovered);
+        Assert.Contains("«XX», «QQ» nu sunt coduri de țară ISO 3166-1", two.ExplanationRo);
+        Assert.Contains("are not ISO 3166-1 country codes", two.Explanation);
+    }
+
+    [Fact]
+    public void Self_certification_findings_are_the_ones_that_start_no_change_of_circumstances_deadline()
+    {
+        Assert.All([RuleIds.SelfCertValid, RuleIds.TinFormat, RuleIds.TinMissing, RuleIds.SelfCertConsistent, RuleIds.FatcaTin, RuleIds.FatcaChange],
+            id => Assert.True(RuleIds.IsSelfCertificationFinding(id), id));
+        Assert.All(RuleCatalog.All.Where(r => r.Id.StartsWith("CRS-IND-") || r.Id.StartsWith("FATCA-IND-")),
+            r => Assert.False(RuleIds.IsSelfCertificationFinding(r.Id), r.Id));
     }
 
     [Fact]

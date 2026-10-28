@@ -99,6 +99,32 @@ public class CaseWorkflowEngineTests
         Assert.Equal((RuleIds.FatcaTin, "US"), (Assert.Single(item.Indicia).RuleId, Assert.Single(item.Indicia).Jurisdiction));
     }
 
+    [Theory]
+    [InlineData(null, false)]
+    [InlineData("521374829", true)]
+    public async Task A_fatca_tin_case_closes_only_on_a_form_with_the_us_tin(string? usTin, bool closes)
+    {
+        await using var host = await WithRealEngine();
+        var client = await host.SeedClientAsync("CL-0001", new DateOnly(2019, 3, 14));
+        Task<ChangeResult> Form(string? tin) => host.As(Member).Changes.RecordAsync(new ChangeRequest("CL-0001", ChangeKind.SelfCertSubmitted, "online",
+            SelfCertification: new SelfCertificationSnapshot(host.Clock.UtcNow, [new("RO", client.Cnp), new("US", tin)], DeclaresUsPerson: true)));
+
+        var code = await RequestSentAsync(host, await Form(null));
+        host.AdvanceDays(3);
+        await Form(usTin);
+        await using (var db = await host.DbAsync())
+        {
+            var answer = await db.SelfCertifications.Where(x => x.ClientId == client.Id && x.Status == SelfCertStatus.Valid).Select(x => x.Id).SingleAsync();
+            await host.As(Member).Cases.RegisterResponseAsync(code, Answer(answer));
+        }
+
+        if (closes)
+            Assert.Equal(["US"], (await host.As(Admin).Cases.CloseAsync(code, ConfirmationChannel.Online)).ReportableFor);
+        else
+            Assert.Contains("FATCA-TIN:US", (await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                host.As(Admin).Cases.CloseAsync(code, ConfirmationChannel.Online))).Message);
+    }
+
     /// <summary>The real engine, with the closing re-evaluation dated (what R2's CloseAsync would pass).</summary>
     private sealed class ClosesWithDate(CrsRuleEngine real, Func<DateTime?> changeKnownAt) : ICrsRuleEngine
     {

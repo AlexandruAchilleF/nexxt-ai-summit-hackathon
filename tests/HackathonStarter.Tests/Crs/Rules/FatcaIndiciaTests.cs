@@ -332,6 +332,35 @@ public class FatcaIndiciaTests
     }
 
     [Fact]
+    public void A_form_signed_after_the_change_late_at_night_is_still_new()
+    {
+        // 00:10 and 00:40 on 11 March in Bucharest are both 10 March in UTC: same Romanian day, so the form is new.
+        var client = WithUsLink(RoResident(), "phone-next-to-ro", new DateOnly(2019, 3, 14))
+            .WithSelfCert(SelfCert(new DateTime(2026, 3, 10, 22, 40, 0, DateTimeKind.Utc), new SubjectTaxResidence("RO", "1900101400004")));
+
+        Assert.Equal(Decision.Compliant, Engine.EvaluateCurrent(client, new DateTime(2026, 3, 10, 22, 10, 0, DateTimeKind.Utc)).Decision);
+        Assert.Equal(Decision.Compliant, Engine.EvaluateCurrent(client, new DateTime(2026, 3, 10, 21, 50, 0, DateTimeKind.Utc)).Decision);
+        Assert.Equal(Decision.FatcaAlert, Engine.EvaluateCurrent(client, new DateTime(2026, 3, 11, 22, 10, 0, DateTimeKind.Utc)).Decision);
+    }
+
+    [Fact]
+    public void A_us_person_form_on_file_without_the_us_tin_keeps_a_fatca_alert_on_re_evaluation()
+    {
+        // What CaseService.CloseAsync re-evaluates: the form answers the indicia, never its own missing US TIN (guide p. 38).
+        var noTin = SelfCert(ChangeAt, new SubjectTaxResidence("RO", "1900101400004"), new SubjectTaxResidence("US", null)) with { DeclaresUsPerson = true };
+        var o = Engine.EvaluateCurrent(RoResident().WithCitizenships("RO", "US").WithSelfCert(noTin));
+
+        Assert.Equal((Decision.FatcaAlert, Regime.Fatca), (o.Decision, o.Regime));
+        Assert.Equal(Coverage.SelfCertification, HitOf(o, RuleIds.FatcaCitizenship).CoveredBy);
+        Assert.Equal(Coverage.None, HitOf(o, RuleIds.FatcaTin).CoveredBy);
+        Assert.Contains("TIN-ul SUA", o.ExplanationRo);
+        Assert.Equal(["US"], o.ReportableFor); // the account is US reportable either way (III.B.1)
+
+        var withTin = noTin with { Residences = [new("RO", "1900101400004"), new("US", "521374829")] };
+        Assert.Equal(Decision.Compliant, Engine.EvaluateCurrent(RoResident().WithCitizenships("RO", "US").WithSelfCert(withTin)).Decision);
+    }
+
+    [Fact]
     public void Golden_14_closes_on_a_new_not_us_person_form_through_the_shared_contract()
     {
         var c = Features.Evaluation.GoldenCases.Get("14");

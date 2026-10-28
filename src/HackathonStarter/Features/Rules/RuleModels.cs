@@ -83,8 +83,9 @@ public interface ICrsRuleEngine
 
     /// <summary>
     /// The current state of a client whose change the bank has known since <paramref name="changeKnownAt"/> (UTC):
-    /// re-evaluation before closing a case, with the moment of the latest change in it,
-    /// <c>item.Indicia.Select(i => i.AddedAt).DefaultIfEmpty(item.OpenedAt).Max()</c>. A self-certification signed that
+    /// re-evaluation before closing a case, with the moment of the latest change in it (findings on the answering form do not
+    /// count): <c>item.Indicia.Where(i => !RuleIds.IsSelfCertificationFinding(i.RuleId)).Select(i => i.AddedAt)
+    /// .DefaultIfEmpty(item.OpenedAt).Max()</c>. A self-certification signed that
     /// Romanian calendar day or later is a new one, so a "not a US person" form can cover a FATCA indicium where the
     /// agreement allows it (IGA Annex I, II.B.4 and III.B.2). Without the date, only a form declaring US status covers one.
     /// The default ignores the date, which is never more lenient than the dated call (a FATCA case stays open); it exists only

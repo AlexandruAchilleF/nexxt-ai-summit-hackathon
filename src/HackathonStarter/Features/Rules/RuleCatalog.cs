@@ -38,6 +38,14 @@ public static class RuleIds
     public const string DeadlineExpiredPreexisting = "DL-EXPIRED-PRE";
 
     public const string Explanation = "RESP-EXPLANATION";
+
+    /// <summary>
+    /// A finding on a submitted self-certification (SC-*, FATCA-TIN, FATCA-SC from EvaluateSelfCertification), not a change of
+    /// circumstances: it starts no CRS 90 days (guide p. 35-37; golden case 2) and does not move the moment a case's change
+    /// became known (the date for <see cref="ICrsRuleEngine.EvaluateCurrent(Clients.ClientSnapshot, DateTime)"/>).
+    /// </summary>
+    public static bool IsSelfCertificationFinding(string ruleId) =>
+        ruleId.StartsWith("SC-", StringComparison.Ordinal) || ruleId is FatcaTin or FatcaChange;
 }
 
 /// <summary>
