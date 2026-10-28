@@ -253,6 +253,7 @@ public static partial class Lang
             ["Recorded runs (demo fallback)"] = "Rulări înregistrate (rezerva pentru demo)",
             ["Recording"] = "Înregistrare",
             ["Registered in Program.cs"] = "Înregistrați în Program.cs",
+            ["CRS Sentinel and its tools (the template's example agents are hidden)"] = "CRS Sentinel și instrumentele lui (agenții de exemplu din șablon sunt ascunși)",
             ["Reject"] = "Respinge",
             ["Rejected"] = "Respins",
             ["Rejected by {0}"] = "Respinsă de {0}",

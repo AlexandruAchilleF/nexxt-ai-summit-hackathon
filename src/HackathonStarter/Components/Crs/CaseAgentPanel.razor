@@ -36,9 +36,16 @@
     @if (_run is { } run)
     {
         <div class="d-flex align-center justify-space-between mt-3 mb-1">
-            <div class="crs-hint" style="margin:0">@(_busy ? T("The agent is working…") : T("Last run"))</div>
+            <div class="d-flex align-center gap-2">
+                <div class="crs-hint" style="margin:0">@(_busy ? T("The agent is working…") : T("Last run"))</div>
+                <SourceBadge Source="run.Source" />
+            </div>
             <MudButton Variant="Variant.Text" Size="Size.Small" Href="@($"/runs/{run.Id}")" EndIcon="@Icons.Material.Rounded.ChevronRight">@T("Open the run")</MudButton>
         </div>
+        @if (run.FallbackReason is { } reason)
+        {
+            <div class="crs-hint mb-2" style="margin-top:0">@T("Live model not used ({0}): showing a {1} run.", Short(reason), T(run.Source.ToString()).ToLower())</div>
+        }
         <AgentTrace Run="run" Running="_busy" OnDecide="@(IsEditor && !_busy ? EventCallback.Factory.Create<(AgentStep Step, bool Approved)>(this, DecideAsync) : default)" />
     }
 </MudPaper>
@@ -121,6 +128,8 @@
             });
         }, TaskScheduler.Default);
     }
+
+    private static string Short(string reason) => reason.Length > 80 ? reason[..80] + "…" : reason;
 
     private DateTime _lastRender;
 
