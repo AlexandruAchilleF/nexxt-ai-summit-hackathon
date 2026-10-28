@@ -154,16 +154,43 @@ public class SeedHistoryTests
     public async Task A_second_start_on_the_same_database_adds_nothing()
     {
         await using var host = await SeededHost.CreateAsync(Now);
-        await using (var db = await host.DbAsync())
-            Assert.True(await db.ChangeEvents.AnyAsync()); // AppDbContext runs the history only while this is false
+        var before = await CountsAsync(host);
 
-        Assert.Equal(ChangeHistorySeed.Steps.Count, (await host.Get<IChangeService>().ListAsync(take: 500)).Count);
+        Assert.Empty(await ChangeHistorySeed.RunIfEmptyAsync(host.Root, Now.AddDays(1)));
+        Assert.Equal(before, await CountsAsync(host));
+        Assert.True((await host.Get<IAuditLog>().VerifyAsync()).Ok);
+
+        static async Task<(int, int, int)> CountsAsync(SeededHost host)
+        {
+            await using var db = await host.DbAsync();
+            return (await db.ChangeEvents.CountAsync(), await db.Cases.CountAsync(), await db.AuditEntries.CountAsync());
+        }
+    }
+
+    [Fact]
+    public void Only_the_seed_takes_the_system_path()
+    {
+        var root = new DirectoryInfo(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "HackathonStarter.slnx"))) root = root.Parent;
+        Assert.NotNull(root);
+        var src = Path.Combine(root.FullName, "src", "HackathonStarter");
+
+        // internal is not enough: pages and agent tools live in the same assembly and must keep the role check.
+        var callers = Directory.EnumerateFiles(src, "*.*", SearchOption.AllDirectories)
+            .Where(f => (f.EndsWith(".cs", StringComparison.Ordinal) || f.EndsWith(".razor", StringComparison.Ordinal))
+                        && !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")
+                        && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"))
+            .Where(f => File.ReadAllText(f) is var text && (text.Contains("RecordAsSystemAsync") || text.Contains("OpenAsSystemAsync")))
+            .Select(Path.GetFileName)
+            .Order(StringComparer.Ordinal);
+        Assert.Equal(["CaseService.cs", "ChangeHistorySeed.cs", "ChangeService.cs"], callers);
     }
 
     private sealed class SeededHost : IAsyncDisposable
     {
         private readonly string _file = Path.Combine(Path.GetTempPath(), $"crs-history-{Guid.NewGuid():N}.db");
         private readonly ServiceProvider _root;
+        public IServiceProvider Root => _root;
         private readonly AsyncServiceScope _scope;
 
         private SeededHost()
@@ -198,7 +225,7 @@ public class SeedHistoryTests
                 db.Clients.AddRange(ClientSeed.Create(now));
                 await db.SaveChangesAsync();
             }
-            host.Seeded = await ChangeHistorySeed.RunAsync(host._root, now);
+            host.Seeded = await ChangeHistorySeed.RunIfEmptyAsync(host._root, now); // as AppDbContext
             return host;
         }
 

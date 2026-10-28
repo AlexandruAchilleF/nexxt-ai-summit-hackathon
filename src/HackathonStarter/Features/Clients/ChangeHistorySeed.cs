@@ -40,6 +40,14 @@ public static class ChangeHistorySeed
     /// <summary>In the order they are received (oldest first).</summary>
     public static IReadOnlyList<Step> Steps { get; } = Build();
 
+    /// <summary>AppDbContext's call: the history only while no change exists (a new database); otherwise nothing.</summary>
+    public static async Task<IReadOnlyList<SeededChange>> RunIfEmptyAsync(IServiceProvider services, DateTime now)
+    {
+        await using (var db = await services.GetRequiredService<IDbContextFactory<AppDbContext>>().CreateDbContextAsync())
+            if (await db.ChangeEvents.AnyAsync()) return [];
+        return await RunAsync(services, now);
+    }
+
     /// <summary>Records <see cref="Steps"/>; <paramref name="now"/> is the simulated now at startup (ISimClock).</summary>
     public static async Task<IReadOnlyList<SeededChange>> RunAsync(IServiceProvider services, DateTime now)
     {
@@ -111,14 +119,15 @@ public static class ChangeHistorySeed
             Golden("14", TimeSpan.FromDays(5)),
             // Case 3's form is signed on 26.10.2026: received the day before the start, never before it is signed.
             Golden("3", TimeSpan.FromDays(1)),
-            // Cases 6 and 7: the passport is uploaded (the shield scans it, no case), then its US data is recorded and the
-            // engine decides as on the card (the golden After). Hours before the start: ClientSeed dates the PDFs at the start.
-            Document("6", TimeSpan.FromHours(3)),
-            new("Golden 6: place of birth from the passport", "6", TimeSpan.FromHours(3) - TimeSpan.FromMinutes(10),
+            // Cases 6 and 7, at the start (ClientSeed dates the PDFs then): the passport is uploaded and the shield scans it, no
+            // case. The card's change is that upload; the second change records the US data a person reads in the passport
+            // (the confirmation the card's After assumes, no quote yet), so the engine decides as on the card.
+            Document("6", TimeSpan.Zero),
+            new("Golden 6: place of birth from the passport", "6", TimeSpan.Zero,
                 new("CL-0006", ChangeKind.PersonalDataChanged, "online", BirthCountry: "US",
                     Summary: "Locul nașterii din pașaport: Chicago, Illinois, S.U.A.")),
-            Document("7", TimeSpan.FromHours(2)),
-            new("Golden 7: US citizenship from the second passport", "7", TimeSpan.FromHours(2) - TimeSpan.FromMinutes(10),
+            Document("7", TimeSpan.Zero),
+            new("Golden 7: US citizenship from the second passport", "7", TimeSpan.Zero,
                 new("CL-0007", ChangeKind.PersonalDataChanged, "online", Citizenships: ["RO", "US"],
                     Summary: "Cetățenie SUA din al doilea pașaport (cetățenii: RO, US)")),
         ];
