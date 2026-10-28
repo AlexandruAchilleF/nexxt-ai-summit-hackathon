@@ -1,0 +1,40 @@
+@* One piece of evidence: the exact quote between „ and ”, where it comes from and whether code found it in the visible text. *@
+<figure class="crs-quote">
+    <blockquote>„@Evidence.Quote”</blockquote>
+    <figcaption>
+        <span>
+            @if (Evidence.Source == EvidenceSource.BankData)
+            {
+                @T("From the bank's data")
+            }
+            else
+            {
+                @(DocumentName ?? T("Document {0}", DocumentId))
+                @if (Evidence.Page is { } page)
+                {
+                    <text>, @T("page {0}", page)</text>
+                }
+            }
+        </span>
+        @if (Evidence.Verified)
+        {
+            <Pill Tone="success" Icon="@Icons.Material.Rounded.Verified" Title="@Evidence.VerificationNote">@T("Quote verified")</Pill>
+        }
+        else
+        {
+            <Pill Tone="danger" Icon="@Icons.Material.Rounded.ReportGmailerrorred" Title="@Evidence.VerificationNote">@T("Quote not found")</Pill>
+        }
+    </figcaption>
+    @if (!Evidence.Verified && !string.IsNullOrWhiteSpace(Evidence.VerificationNote))
+    {
+        <div class="crs-quote-note">@Evidence.VerificationNote</div>
+    }
+</figure>
+
+@code {
+    [Parameter, EditorRequired] public Evidence Evidence { get; set; } = default!;
+    /// <summary>The file name of <see cref="Evidence.DocumentId"/>, when known.</summary>
+    [Parameter] public string? DocumentName { get; set; }
+
+    private string DocumentId => Evidence.DocumentId?.ToString() ?? "";
+}

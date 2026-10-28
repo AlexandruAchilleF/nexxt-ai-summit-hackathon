@@ -1,4 +1,5 @@
 @inherits LayoutComponentBase
+@using HackathonStarter.Components.Crs
 @inject NavigationManager Nav
 
 <MudThemeProvider Theme="AppTheme.Theme" @bind-IsDarkMode="_dark" />
@@ -31,6 +32,7 @@
                         <MudIconButton Class="pwa-install" Size="Size.Small" Icon="@Icons.Material.Rounded.InstallDesktop" Color="Color.Inherit" aria-label="@T("Install app")" />
                     </MudTooltip>
                 }
+                <DemoDateBar />
                 <LangSwitch />
                 <MudTooltip Text="@T("Toggle dark mode")">
                     <MudIconButton Size="Size.Small" Icon="@(_dark ? Icons.Material.Rounded.LightMode : Icons.Material.Rounded.DarkMode)" Color="Color.Inherit" OnClick="() => _dark = !_dark" aria-label="@T("Toggle dark mode")" />

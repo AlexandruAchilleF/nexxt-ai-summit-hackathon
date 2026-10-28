@@ -1,7 +1,142 @@
 @page "/cases"
+@implements IDisposable
+@inject ICaseService Cases
+@inject ISimClock SimClock
+@inject IServiceProvider Services
+@inject CurrentUser CurrentUser
 
 <PageTitle>@T("Cases") · @SiteConfig.Name</PageTitle>
 
-<PageHeader Title="@T("Cases")" Description="@T("The queue of CRS/FATCA cases, ordered by deadline.")" />
+<PageHeader Title="@T("Cases")" Description="@T("The queue of CRS/FATCA cases, ordered by deadline. Days left are counted on the demo date.")">
+    <Actions>
+        <MudSwitch T="bool" Value="_openOnly" ValueChanged="OnOpenOnly" Color="Color.Primary" Label="@T("Open cases only")" />
+    </Actions>
+</PageHeader>
 
-<EmptyState Icon="@Icons.Material.Rounded.AssignmentLate" Title="@T("Coming in the next phase")" Description="@T("The backend for this page is being built.")" />
+@if (_error is not null)
+{
+    <ErrorState Message="@_error" OnRetry="Load" />
+}
+else if (_cases is { Count: 0 })
+{
+    <EmptyState Icon="@Icons.Material.Rounded.AssignmentTurnedIn" Title="@T(_openOnly ? "No open cases" : "No cases yet")"
+                Description="@T("A case opens when a change to a client's data has an indicium the rules do not see covered.")">
+        @if (_canEdit)
+        {
+            <MudButton Href="/changes/new" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.PlayArrow">@T("Apply a demo scenario")</MudButton>
+        }
+    </EmptyState>
+}
+else
+{
+    <MudTable T="Case" Items="_cases" Loading="@(_cases is null)" Hover="true" Outlined="true" Elevation="0" Breakpoint="Breakpoint.Sm"
+              Class="crs-queue" RowClassFunc="RowClass" LoadingProgressColor="Color.Primary">
+        <HeaderContent>
+            <MudTh>@T("Case")</MudTh>
+            <MudTh>@T("Client")</MudTh>
+            <MudTh>@T("Status")</MudTh>
+            <MudTh>@T("Regime")</MudTh>
+            <MudTh>@T("Due date")</MudTh>
+            <MudTh>@T("Days left")</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="@T("Case")"><a class="crs-case-link" href="@($"/cases/{context.Code}")">@context.Code</a></MudTd>
+            <MudTd DataLabel="@T("Client")">@context.ClientCode</MudTd>
+            <MudTd DataLabel="@T("Status")"><CaseStatusPill Status="context.Status" /></MudTd>
+            <MudTd DataLabel="@T("Regime")">@CaseText.Regime(context.Regime)</MudTd>
+            <MudTd DataLabel="@T("Due date")">
+                @if (context.DueAt is { } due)
+                {
+                    <span class="tabular">@Format.Date(due)</span>
+                }
+                else
+                {
+                    <span class="mud-text-secondary">@T("none in the guide")</span>
+                }
+            </MudTd>
+            <MudTd DataLabel="@T("Days left")"><DaysLeft Case="context" Now="Now" /></MudTd>
+        </RowTemplate>
+        <LoadingContent><span class="crs-meta">@T("Loading the queue…")</span></LoadingContent>
+    </MudTable>
+}
+
+@code {
+    private static readonly TimeSpan PollEvery = TimeSpan.FromSeconds(3);
+
+    private List<Case>? _cases;
+    private string? _error, _fingerprint;
+    private bool _openOnly = true, _canEdit, _disposed;
+    private IDemoClock? _demoClock;
+    private readonly CancellationTokenSource _stop = new();
+
+    private DateTime Now => _demoClock?.UtcNow ?? SimClock.UtcNow;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _demoClock = Services.GetService<IDemoClock>();
+        _canEdit = (await CurrentUser.GetAsync()).Role is Roles.Admin or Roles.Member;
+        SimClock.Changed += OnClockChanged;
+        await Load();
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender) _ = PollAsync(); // interactive only: the deadline watcher moves cases while the queue is open
+    }
+
+    private async Task PollAsync()
+    {
+        using var timer = new PeriodicTimer(PollEvery);
+        var stop = _stop.Token;
+        try
+        {
+            while (await timer.WaitForNextTickAsync(stop))
+                await InvokeAsync(() => Load(quiet: true));
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private void OnClockChanged() => _ = InvokeAsync(() => Load(quiet: true));
+
+    private async Task Load() => await Load(quiet: false);
+
+    /// <param name="quiet">A background refresh: keeps the current rows on a transient error and renders only on a change.</param>
+    private async Task Load(bool quiet)
+    {
+        if (_disposed) return;
+        try
+        {
+            var cases = await Cases.QueueAsync(new CaseQueueFilter(OpenOnly: _openOnly));
+            var fingerprint = string.Join("|", cases.Select(c => $"{c.Code}:{c.Status}:{c.DueAt?.Ticks}")) + $"@{CaseText.DaysUntil(Now, DateTime.UnixEpoch)}";
+            if (quiet && fingerprint == _fingerprint && _error is null) return;
+            _fingerprint = fingerprint;
+            _cases = cases;
+            _error = null;
+        }
+        catch (Exception ex) when (!quiet || _cases is null) { _error = ex.Message; }
+        catch (Exception) { return; }
+        if (quiet) StateHasChanged();
+    }
+
+    private async Task OnOpenOnly(bool value)
+    {
+        _openOnly = value;
+        _cases = null;
+        await Load();
+    }
+
+    private string RowClass(Case c, int _) => CaseText.Deadline(c, Now) switch
+    {
+        DeadlineState.Overdue => "crs-row-overdue",
+        DeadlineState.ReminderDue => "crs-row-reminder",
+        _ => "",
+    };
+
+    public void Dispose()
+    {
+        _disposed = true;
+        SimClock.Changed -= OnClockChanged;
+        _stop.Cancel();
+        _stop.Dispose();
+    }
+}

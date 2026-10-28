@@ -1,0 +1,101 @@
+@implements IDisposable
+@inject ISimClock SimClock
+@inject IServiceProvider Services
+@inject CurrentUser CurrentUser
+@inject ISnackbar Snackbar
+
+@*
+    The demo date in the top bar (docs/PLAN.md 9.1, 15): "Today: 21 ian. 2027 (+85 days)". Admin moves it through
+    IDemoClock (role check and audit entry there); everyone else sees the date only. Re-renders on ISimClock.Changed, so
+    every open screen follows the same date.
+*@
+<div class="@($"crs-datebar{(_offsetDays > 0 ? " shifted" : "")}")">
+    <span class="crs-datebar-date" data-testid="demo-date" title="@T("The date CRS deadlines are computed on. The rest of the app keeps the real time.")">
+        <MudIcon Icon="@Icons.Material.Rounded.Today" />
+        <span class="crs-datebar-prefix">@T("Today:")</span>
+        <span class="tabular">@Format.Date(Now)</span>
+        @if (_offsetDays > 0)
+        {
+            <span class="crs-datebar-offset tabular">@T("(+{0} days)", _offsetDays)</span>
+        }
+    </span>
+
+    @if (_isAdmin)
+    {
+        <span class="crs-datebar-actions">
+            @foreach (var days in Steps)
+            {
+                <MudTooltip Text="@(_clock is null ? T("The demo clock is not available in this build.") : T("Move the demo date forward"))">
+                    <MudButton Variant="Variant.Text" Size="Size.Small" Class="crs-datebar-step" Disabled="@(_clock is null || _busy)"
+                               OnClick="() => Advance(days)" aria-label="@StepLabel(days)">+@days</MudButton>
+                </MudTooltip>
+            }
+            <MudTooltip Text="@T("Back to today's real date")">
+                <MudIconButton Icon="@Icons.Material.Rounded.Restore" Size="Size.Small" Disabled="@(_clock is null || _busy || Offset == TimeSpan.Zero)"
+                               OnClick="Reset" aria-label="@T("Reset the demo date")" />
+            </MudTooltip>
+        </span>
+        <MudMenu Class="crs-datebar-menu" Icon="@Icons.Material.Rounded.EditCalendar" Size="Size.Small" Dense="true"
+                 AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" AriaLabel="@T("Move the demo date")" Disabled="@(_clock is null)">
+            @foreach (var days in Steps)
+            {
+                <MudMenuItem OnClick="() => Advance(days)" Disabled="_busy">@StepLabel(days)</MudMenuItem>
+            }
+            <MudMenuItem OnClick="Reset" Disabled="@(_busy || Offset == TimeSpan.Zero)">@T("Reset the demo date")</MudMenuItem>
+        </MudMenu>
+    }
+</div>
+
+@code {
+    private static readonly int[] Steps = [1, 30, 85];
+
+    private IDemoClock? _clock;
+    private bool _isAdmin, _busy;
+    private int _offsetDays;
+
+    private DateTime Now => _clock?.UtcNow ?? SimClock.UtcNow;
+    private TimeSpan Offset => _clock?.Offset ?? SimClock.Offset;
+
+    private static string StepLabel(int days) => days == 1 ? T("+1 day") : T("+{0} days", days);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _clock = Services.GetService<IDemoClock>();
+        _isAdmin = (await CurrentUser.GetAsync()).Role == Roles.Operator; // IDemoClock checks the role again
+        _offsetDays = CaseText.OffsetDays(Offset);
+        SimClock.Changed += OnClockChanged;
+    }
+
+    private void OnClockChanged() => _ = InvokeAsync(() =>
+    {
+        _offsetDays = CaseText.OffsetDays(Offset);
+        StateHasChanged();
+    });
+
+    private async Task Advance(int days)
+    {
+        if (_clock is null) return;
+        await Run(() => _clock.AdvanceAsync(TimeSpan.FromDays(days)), () => T("Demo date: {0}", Format.Date(Now)));
+    }
+
+    private async Task Reset()
+    {
+        if (_clock is null) return;
+        await Run(_clock.ResetAsync, () => T("Demo date back to today"));
+    }
+
+    private async Task Run(Func<Task> action, Func<string> done)
+    {
+        _busy = true;
+        try
+        {
+            await action();
+            _offsetDays = CaseText.OffsetDays(Offset);
+            Snackbar.Add(done(), Severity.Info);
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+
+    public void Dispose() => SimClock.Changed -= OnClockChanged;
+}

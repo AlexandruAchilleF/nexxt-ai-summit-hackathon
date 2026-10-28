@@ -27,7 +27,7 @@ public class ChangeServiceTests
     {
         await using var host = await CreateAsync();
         await host.SeedClientAsync("CL-0016", NewAccount);
-        host.Engine.OnEvaluate = (_, after, _) => Outcome(Rules(after).Indicia, [Hit("GEN-DOMESTIC", "RO")]);
+        host.Engine.OnEvaluate = (_, after, _) => Outcome(ScriptedRuleEngine.Rules(after).Indicia, [Hit("GEN-DOMESTIC", "RO")]);
 
         var result = await host.MoveAsync("CL-0016", "ES");
 

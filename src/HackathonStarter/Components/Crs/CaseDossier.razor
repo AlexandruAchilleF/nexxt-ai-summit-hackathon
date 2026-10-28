@@ -1,0 +1,229 @@
+@*
+    Everything code and the agent recorded on one case, read-only: the deadline clock, the consequence, the legal indicia
+    with their evidence, the context signals (separate, never an alert), other evidence, the requests, the responses and
+    the confirmation proof. The page around it loads and refreshes the case; <ResponseActions> adds the demo action.
+*@
+@{ var c = Case; }
+<DeadlineClock Case="Case" Now="Now" Offset="Offset" />
+
+@if (!string.IsNullOrWhiteSpace(c.OutcomeRo ?? c.Outcome))
+{
+    <section class="@($"crs-consequence{(c.Status == CaseStatus.Expired ? " expired" : "")}")" aria-label="@T("Consequence")">
+        <MudIcon Icon="@(c.Status == CaseStatus.Expired ? Icons.Material.Rounded.EventBusy : Icons.Material.Rounded.TaskAlt)" />
+        <div>
+            <div>@Pick(c.OutcomeRo ?? c.Outcome, c.Outcome ?? c.OutcomeRo)</div>
+            <div class="crs-meta">
+                @if (c.OutcomeRuleId is { Length: > 0 } rule)
+                {
+                    <span class="crs-rule-id">@rule</span>
+                }
+                @if (c.ReportableFor.Count > 0)
+                {
+                    <span>@T("Reportable for: {0}", string.Join(", ", c.ReportableFor.Select(CaseText.Country)))</span>
+                }
+            </div>
+        </div>
+    </section>
+}
+
+<section class="crs-section" data-testid="indicia" aria-labelledby="crs-indicia">
+    <h2 class="crs-section-title" id="crs-indicia">@T("Legal indicia")</h2>
+    <p class="crs-hint">@T("Found by code, each with its rule and guide page. Only these can start a deadline.")</p>
+    @if (c.Indicia.Count == 0)
+    {
+        <p class="crs-meta">@T("No indicia on this case.")</p>
+    }
+    @foreach (var i in c.Indicia.OrderBy(i => i.AddedAt))
+    {
+        <article class="crs-law">
+            <div class="crs-law-head">
+                <span class="crs-rule-id">@i.RuleId</span>
+                <span class="crs-meta">@CaseText.Country(i.Jurisdiction), <GuidePageRef Page="@i.GuidePage" /></span>
+            </div>
+            @if (CaseText.RuleTitle(i.RuleId) is { } title)
+            {
+                <div class="crs-law-title">@title</div>
+            }
+            <div class="crs-law-text">@Pick(i.ExplanationRo, i.Explanation)</div>
+            @foreach (var e in c.Evidence.Where(e => e.LinkedRuleId == i.RuleId))
+            {
+                <QuoteBlock Evidence="e" DocumentName="@DocName(e.DocumentId)" />
+            }
+        </article>
+    }
+</section>
+
+<section class="crs-section crs-signals" data-testid="signals" aria-labelledby="crs-signals">
+    <h2 class="crs-section-title" id="crs-signals">@T("Context signals")</h2>
+    <p class="crs-hint">@T("Found by the AI, each with a verified quote. A signal never changes the decision and never opens a case.")</p>
+    @if (c.Signals.Count == 0)
+    {
+        <p class="crs-meta">@T("No context signals yet. The agent records them when it reads the client's documents.")</p>
+    }
+    @foreach (var s in c.Signals.OrderBy(s => s.At))
+    {
+        <article class="crs-signal">
+            <div class="crs-signal-tag">
+                <MudIcon Icon="@Icons.Material.Rounded.Lightbulb" />
+                <span>@T("signal, no alert")</span>
+                <span class="crs-meta">@CaseText.Strength(s.Strength)</span>
+            </div>
+            <div class="crs-signal-text">@s.Description</div>
+            @if (c.Evidence.FirstOrDefault(e => e.Id == s.EvidenceId) is { } se)
+            {
+                <QuoteBlock Evidence="se" DocumentName="@DocName(se.DocumentId)" />
+            }
+        </article>
+    }
+</section>
+
+@if (OtherEvidence(c) is { Count: > 0 } other)
+{
+    <section class="crs-section" data-testid="evidence" aria-labelledby="crs-evidence">
+        <h2 class="crs-section-title" id="crs-evidence">@T("Other evidence")</h2>
+        <p class="crs-hint">@T("Quotes saved on the case that are not tied to an indicium or a signal.")</p>
+        @foreach (var e in other)
+        {
+            <QuoteBlock Evidence="e" DocumentName="@DocName(e.DocumentId)" />
+        }
+    </section>
+}
+
+<section class="crs-section" data-testid="requests" aria-labelledby="crs-requests">
+    <h2 class="crs-section-title" id="crs-requests">@T("Requests to the client")</h2>
+    <p class="crs-hint">@T("Code lists the documents from the indicia; the AI writes the letter. Nothing leaves without a person's approval.")</p>
+    @if (c.Requests.Count == 0)
+    {
+        <p class="crs-meta">@T("No request yet. Ask the agent to prepare the case: it drafts the letter and waits for approval.")</p>
+    }
+    @foreach (var r in c.Requests.OrderBy(r => r.CreatedAt))
+    {
+        <article class="crs-request">
+            <div class="crs-request-head">
+                <span class="crs-request-kind">@CaseText.RequestKind(r.Kind)</span>
+                <Pill Tone="@CaseText.RequestTone(r.Status)">@CaseText.RequestStatus(r.Status)</Pill>
+                @if (!string.IsNullOrWhiteSpace(r.Channel))
+                {
+                    <span class="crs-meta">@T("channel: {0}", r.Channel)</span>
+                }
+            </div>
+            <div class="crs-meta">
+                @T("Drafted by {0} on {1}", r.DraftedBy, Format.DateTime(r.CreatedAt))
+                @if (r.ApprovedBy is { Length: > 0 } by && r.ApprovedAt is { } at)
+                {
+                    <span>. @T("Approved by {0} on {1}", by, Format.DateTime(at))</span>
+                }
+                @if (r.RejectedBy is { Length: > 0 } rb)
+                {
+                    <span>. @T("Rejected by {0}: {1}", rb, r.RejectionReason ?? "")</span>
+                }
+            </div>
+            @if (!string.IsNullOrWhiteSpace(r.Body))
+            {
+                <div class="crs-letter" lang="@r.Language">@r.Body</div>
+            }
+            @if (r.RequestedDocuments.Count > 0)
+            {
+                <div class="crs-docs">
+                    <div class="crs-docs-title">@T("Documents requested")</div>
+                    <ul>
+                        @foreach (var d in r.RequestedDocuments)
+                        {
+                            <li>@d</li>
+                        }
+                    </ul>
+                </div>
+            }
+        </article>
+    }
+</section>
+
+<section class="crs-section" data-testid="responses" aria-labelledby="crs-responses">
+    <h2 class="crs-section-title" id="crs-responses">@T("Client responses")</h2>
+    @if (c.Responses.Count == 0)
+    {
+        <p class="crs-meta">@T("No answer from the client yet.")</p>
+    }
+    @foreach (var r in c.Responses.OrderBy(r => r.ReceivedAt))
+    {
+        <article class="crs-response">
+            <div class="crs-request-head">
+                <span class="crs-request-kind">@CaseText.ResponseKind(r.Kind)</span>
+                @if (CaseText.Category(r.Category) is { } category)
+                {
+                    <Pill>@category</Pill>
+                }
+                @if (r.HasDocumentaryEvidence)
+                {
+                    <Pill Tone="success" Icon="@Icons.Material.Rounded.Description">@T("With documentary evidence")</Pill>
+                }
+            </div>
+            <div class="crs-meta">
+                @T("Received on {0}, day {1}", Format.Date(r.ReceivedAt), CaseText.DayOf(r.ReceivedAt, c.OpenedAt))
+                @if (!string.IsNullOrWhiteSpace(r.Channel))
+                {
+                    <span>, @T("channel: {0}", r.Channel)</span>
+                }
+                @if (DocName(r.DocumentId) is { } doc)
+                {
+                    <span>, @doc</span>
+                }
+            </div>
+            @if (!string.IsNullOrWhiteSpace(r.Summary))
+            {
+                <p class="mt-2 mb-0">@r.Summary</p>
+            }
+        </article>
+    }
+
+    @ResponseActions
+</section>
+
+@if (c.Proof is { } p)
+{
+    <section class="crs-section crs-proof" data-testid="proof" aria-labelledby="crs-proof">
+        <h2 class="crs-section-title" id="crs-proof">@T("Confirmation proof")</h2>
+        <p class="crs-hint">@T("How the self-certification was obtained and confirmed (guide p. 34-35), kept for audit.")</p>
+        <dl class="crs-facts">
+            <div><dt>@T("Channel")</dt><dd>@CaseText.Channel(p.Channel)</dd></div>
+            <div><dt>@T("Confirmed on")</dt><dd>@Format.DateTime(p.ConfirmedAt)</dd></div>
+            <div><dt>@T("Declaration dated")</dt><dd>@Format.Date(p.DeclarationDatedAt)</dd></div>
+            <div><dt>@T("Declaration received")</dt><dd>@Format.Date(p.DeclarationReceivedAt)</dd></div>
+            <div><dt>@T("Signed by")</dt><dd>@p.SignedBy, @CaseText.Signer(p.SignerCapacity)</dd></div>
+            <div><dt>@T("Form of confirmation")</dt><dd>@CaseText.EvidenceKind(p.EvidenceKind)</dd></div>
+            @if (!string.IsNullOrWhiteSpace(p.TransactionOrDocumentId))
+            {
+                <div><dt>@T("Transaction or document")</dt><dd>@p.TransactionOrDocumentId</dd></div>
+            }
+            @if (!string.IsNullOrWhiteSpace(p.EvidenceSha256))
+            {
+                <div><dt>@T("Document hash (SHA-256)")</dt><dd class="crs-hash" title="@p.EvidenceSha256">@Short(p.EvidenceSha256)</dd></div>
+            }
+            <div><dt>@T("Closing approved by")</dt><dd>@p.ApprovedBy</dd></div>
+        </dl>
+        @if (!string.IsNullOrWhiteSpace(p.CollectionSteps))
+        {
+            <div class="crs-docs-title mt-3">@T("Collection steps")</div>
+            <p class="crs-steps">@p.CollectionSteps</p>
+        }
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public Case Case { get; set; } = default!;
+    /// <summary>The demo date (IDemoClock, or ISimClock when the demo clock is missing).</summary>
+    [Parameter, EditorRequired] public DateTime Now { get; set; }
+    [Parameter] public TimeSpan Offset { get; set; }
+    /// <summary>The client's document names by id, for the quotes and the responses.</summary>
+    [Parameter] public IReadOnlyDictionary<int, string> Documents { get; set; } = new Dictionary<int, string>();
+    /// <summary>Shown under the responses (the page puts the demo action "Simulate the client's answer" here).</summary>
+    [Parameter] public RenderFragment? ResponseActions { get; set; }
+
+    private string? DocName(int? id) => id is { } v && Documents.TryGetValue(v, out var name) ? name : null;
+
+    /// <summary>Evidence that is neither under an indicium nor under a signal.</summary>
+    private static List<Evidence> OtherEvidence(Case c) =>
+        [.. c.Evidence.Where(e => !c.Indicia.Any(i => i.RuleId == e.LinkedRuleId) && !c.Signals.Any(s => s.EvidenceId == e.Id))];
+
+    private static string Short(string hash) => hash.Length > 16 ? $"{hash[..8]}…{hash[^8..]}" : hash;
+}

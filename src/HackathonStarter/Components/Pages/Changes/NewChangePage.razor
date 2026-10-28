@@ -1,7 +1,136 @@
 @page "/changes/new"
+@inject IServiceProvider Services
+@inject CurrentUser CurrentUser
 
-<PageTitle>@T("New change") · @SiteConfig.Name</PageTitle>
+<PageTitle>@T("Demo scenarios") · @SiteConfig.Name</PageTitle>
 
-<PageHeader Title="@T("New change")" Description="@T("Record a change to a client's data and see the decision immediately.")" />
+<PageHeader Title="@T("Demo scenarios")" Description="@T("In production these changes come from core banking. Apply one and see what the rules decide, with the rule and the guide page.")" />
 
-<EmptyState Icon="@Icons.Material.Rounded.EditNote" Title="@T("Coming in the next phase")" Description="@T("The backend for this page is being built.")" />
+@if (_scenarios is null)
+{
+    <EmptyState Icon="@Icons.Material.Rounded.CloudOff" Title="@T("Demo scenarios are not available")"
+                Description="@T("This build has no demo scenario service yet. The page works once the CRS services are integrated.")" />
+}
+else if (_error is not null && _scenarios.Count == 0)
+{
+    <ErrorState Message="@_error" OnRetry="Load" />
+}
+else if (_scenarios.Count == 0)
+{
+    <EmptyState Icon="@Icons.Material.Rounded.EditNote" Title="@T("No demo scenarios")" Description="@T("The scenario list is empty. Add golden cases to the demo scenarios.")" />
+}
+else
+{
+    @if (!_canEdit)
+    {
+        <MudAlert Severity="Severity.Info" Dense="true" Variant="Variant.Text" Class="mb-4">@T("Only operators can apply a change. You can read the scenarios and open the cases.")</MudAlert>
+    }
+
+    <div class="crs-changes">
+        <div class="@($"crs-changes-grid{(_result is null && _error is null ? "" : " has-result")}")">
+            <div class="crs-scenarios">
+                @foreach (var s in _scenarios)
+                {
+                    <MudPaper Outlined="true" Class="@($"crs-scenario pa-4{(s.Id == _appliedId ? " applied" : "")}")" data-scenario="@s.Id">
+                        <div class="crs-meta">@T("Golden case {0}", s.GoldenCase), @T("client {0}", s.ClientCode)</div>
+                        <h2 class="crs-scenario-title">@Pick(s.TitleRo, s.Title)</h2>
+                        <p class="crs-scenario-text">@Pick(s.DescriptionRo, s.Description)</p>
+                        @if (_canEdit)
+                        {
+                            <MudButton Variant="@(s.Id == _appliedId ? Variant.Outlined : Variant.Filled)" Color="Color.Primary" Disabled="@(_busyId is not null)"
+                                       StartIcon="@Icons.Material.Rounded.PlayArrow" OnClick="() => Apply(s)">
+                                @if (_busyId == s.Id)
+                                {
+                                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                                }
+                                @T("Apply change")
+                            </MudButton>
+                        }
+                    </MudPaper>
+                }
+            </div>
+
+            <section class="crs-change-result" aria-live="polite">
+                @if (_error is not null)
+                {
+                    <ErrorState Title="@T("The change was not applied")" Message="@_error" />
+                }
+                else if (_result is { } r)
+                {
+                    <MudPaper Outlined="true" Class="pa-4 app-enter" data-testid="change-result">
+                        <div class="crs-meta">@Pick(_applied!.TitleRo, _applied.Title), @T("client {0}", _applied.ClientCode)</div>
+                        <h2 class="crs-section-title">@T("What the rules decided")</h2>
+                        @if (r.CaseCode is { } code)
+                        {
+                            <MudButton Href="@($"/cases/{code}")" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.FolderOpen" Class="my-3">@T("Open case {0}", code)</MudButton>
+                        }
+                        else
+                        {
+                            <p class="crs-meta my-2">@T("No case was opened: nothing here starts a deadline.")</p>
+                        }
+                        <RuleOutcomeView Outcome="r.Outcome" />
+                    </MudPaper>
+                }
+                else
+                {
+                    <div class="crs-result-hint">
+                        <MudIcon Icon="@Icons.Material.Rounded.Rule" />
+                        <span>@T("Apply a scenario to see the decision here: the indicia with rule and page, and the rules that do not apply, with the reason.")</span>
+                    </div>
+                }
+            </section>
+        </div>
+    </div>
+}
+
+@code {
+    private IDemoScenarios? _demo;
+    private IReadOnlyList<DemoScenario>? _scenarios;
+    private DemoScenario? _applied;
+    private ChangeResult? _result;
+    private string? _error, _busyId, _appliedId;
+    private bool _canEdit;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _demo = Services.GetService<IDemoScenarios>();
+        _canEdit = (await CurrentUser.GetAsync()).Role is Roles.Admin or Roles.Member; // IDemoScenarios checks the role again
+        Load();
+    }
+
+    private void Load()
+    {
+        if (_demo is null) return;
+        try
+        {
+            _error = null;
+            _scenarios = _demo.List();
+        }
+        catch (Exception ex)
+        {
+            _scenarios = [];
+            _error = ex.Message;
+        }
+    }
+
+    private async Task Apply(DemoScenario scenario)
+    {
+        if (_demo is null) return;
+        _busyId = scenario.Id;
+        _error = null;
+        try
+        {
+            _result = await _demo.ApplyAsync(scenario.Id);
+            _applied = scenario;
+            _appliedId = scenario.Id;
+        }
+        catch (Exception ex)
+        {
+            _result = null;
+            _applied = null;
+            _appliedId = null;
+            _error = ex.Message;
+        }
+        finally { _busyId = null; }
+    }
+}

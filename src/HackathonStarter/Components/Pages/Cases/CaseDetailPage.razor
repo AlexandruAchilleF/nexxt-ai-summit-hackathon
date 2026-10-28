@@ -1,13 +1,222 @@
 @page "/cases/{Code}"
+@implements IDisposable
+@inject ICaseService Cases
+@inject IClientService Clients
+@inject ISimClock SimClock
+@inject IServiceProvider Services
+@inject CurrentUser CurrentUser
+@inject ISnackbar Snackbar
 
 <PageTitle>@T("Case {0}", Code) · @SiteConfig.Name</PageTitle>
 
 <MudButton Href="/cases" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Class="mb-4" Size="Size.Small">@T("All cases")</MudButton>
 
-<PageHeader Title="@T("Case {0}", Code)" Description="@T("Indicia with the guide page, evidence, the client request and the deadline.")" />
+@if (_case is null && _error is not null)
+{
+    <ErrorState Title="@T("The case could not be loaded")" Message="@_error" OnRetry="Retry" />
+}
+else if (_loading)
+{
+    <div class="crs-case-loading" aria-busy="true" aria-label="@T("Loading the case…")">
+        <MudSkeleton SkeletonType="SkeletonType.Text" Width="40%" Height="48px" />
+        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="220px" Class="mt-4" Style="border-radius:20px" />
+        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="160px" Class="mt-4" Style="border-radius:20px" />
+    </div>
+}
+else if (_case is null)
+{
+    <EmptyState Icon="@Icons.Material.Rounded.SearchOff" Title="@T("Case {0} was not found", Code)"
+                Description="@T("No case has this code. A case opens when a change has an uncovered indicium: apply a demo scenario first.")">
+        <MudButton Href="/cases" Variant="Variant.Outlined">@T("All cases")</MudButton>
+        @if (_canEdit)
+        {
+            <MudButton Href="/changes/new" Variant="Variant.Filled" Color="Color.Primary">@T("Apply a demo scenario")</MudButton>
+        }
+    </EmptyState>
+}
+else
+{
+    var c = _case;
+    <PageHeader Title="@T("Case {0}", c.Code)" Description="@HeaderLine(c)">
+        <Actions><CaseStatusPill Status="c.Status" Large="true" TestId="case-status" /></Actions>
+    </PageHeader>
 
-<EmptyState Icon="@Icons.Material.Rounded.FactCheck" Title="@T("Coming in the next phase")" Description="@T("The backend for this page is being built.")" />
+    <div class="crs-case">
+        <div class="crs-case-grid">
+            <div class="crs-case-main">
+                <CaseDossier Case="c" Now="Now" Offset="Offset" Documents="_documents">
+                    <ResponseActions>
+                        @if (_canEdit && c.Status is (CaseStatus.AwaitingClient or CaseStatus.Reminded or CaseStatus.Escalated) && (_demo is null || _answerScenario is not null))
+                        {
+                            <div class="crs-demo-action">
+                                <div>
+                                    <div class="crs-demo-title">@T("Demo: the client's answer")</div>
+                                    <div class="crs-meta">
+                                        @if (_demo is null)
+                                        {
+                                            @T("Demo scenarios are not available in this build.")
+                                        }
+                                        else
+                                        {
+                                            @T("In production the answer comes from the client. Here it arrives as a new document; the case does not change until the agent registers it.")
+                                        }
+                                    </div>
+                                </div>
+                                <MudButton Variant="Variant.Filled" Color="Color.Secondary" StartIcon="@Icons.Material.Rounded.MarkEmailUnread"
+                                           Disabled="@(_demo is null || _delivering || _deliveredDoc is not null)" OnClick="Deliver">
+                                    @if (_delivering)
+                                    {
+                                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                                    }
+                                    @T("Simulate the client's answer")
+                                </MudButton>
+                            </div>
+                        }
+                        @if (_deliveredDoc is not null)
+                        {
+                            <div class="crs-delivered" data-testid="delivered" role="status">
+                                <MudIcon Icon="@Icons.Material.Rounded.MarkEmailRead" />
+                                <span>@T("The answer arrived as {0}. Ask the agent to check it and close the case.", _deliveredDoc)</span>
+                            </div>
+                        }
+                    </ResponseActions>
+                </CaseDossier>
+            </div>
+
+            <aside class="crs-case-side" aria-label="@T("CRS Sentinel agent")">
+                <AgentChat AgentName="crs-sentinel" Context="@($"Case: {c.Code}")"
+                           Placeholder="@T("Ask CRS Sentinel about this case…")"
+                           EmptyTitle="@T("Ask the agent to prepare this case")"
+                           EmptyDescription="@StarterPrompts" />
+            </aside>
+        </div>
+    </div>
+}
 
 @code {
     [Parameter] public string Code { get; set; } = "";
+
+    private static readonly TimeSpan PollEvery = TimeSpan.FromSeconds(2);
+
+    private Case? _case;
+    private Client? _client;
+    private Dictionary<int, string> _documents = [];
+    private IDemoScenarios? _demo;
+    private IDemoClock? _demoClock;
+    private DemoScenario? _answerScenario;
+    private string? _error, _fingerprint, _deliveredDoc;
+    private bool _loading = true, _canEdit, _delivering, _disposed;
+    private readonly CancellationTokenSource _stop = new();
+
+    private DateTime Now => _demoClock?.UtcNow ?? SimClock.UtcNow;
+    private TimeSpan Offset => _demoClock?.Offset ?? SimClock.Offset;
+
+    private static string StarterPrompts => Pick(
+        "Scrie „Pregătește cazul”: agentul citește documentele, salvează dovezile cu citat verificat și scrie cererea către clientă, care pleacă doar după aprobare. După răspuns: „Clienta a răspuns: verifică și închide cazul”.",
+        "Write \"Pregătește cazul\" (prepare the case): the agent reads the documents, saves evidence with verified quotes and drafts the request, which leaves only after approval. After the answer: \"Clienta a răspuns: verifică și închide cazul\" (the client answered: check and close the case).");
+
+    protected override async Task OnInitializedAsync()
+    {
+        _demo = Services.GetService<IDemoScenarios>();
+        _demoClock = Services.GetService<IDemoClock>();
+        _canEdit = (await CurrentUser.GetAsync()).Role is Roles.Admin or Roles.Member; // the services check the role again
+        SimClock.Changed += OnClockChanged;
+        await Load(quiet: false);
+        _loading = false;
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        // Interactive only. The agent runs in the background and approvals run without the page: poll so the status moves live.
+        if (firstRender) _ = PollAsync();
+    }
+
+    private async Task PollAsync()
+    {
+        using var timer = new PeriodicTimer(PollEvery);
+        var stop = _stop.Token;
+        try
+        {
+            while (await timer.WaitForNextTickAsync(stop))
+                await InvokeAsync(() => Load(quiet: true));
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private void OnClockChanged() => _ = InvokeAsync(async () =>
+    {
+        _fingerprint = null; // days left change even when the case does not
+        await Load(quiet: true);
+    });
+
+    private async Task Retry()
+    {
+        _error = null;
+        _loading = true;
+        await Load(quiet: false);
+        _loading = false;
+    }
+
+    /// <param name="quiet">A background refresh: keeps the page on a transient error and renders only when the case changed.</param>
+    private async Task Load(bool quiet)
+    {
+        if (_disposed) return;
+        try
+        {
+            var c = await Cases.GetAsync(Code);
+            var fingerprint = Fingerprint(c);
+            if (quiet && fingerprint == _fingerprint) return;
+            _fingerprint = fingerprint;
+            if (c is not null)
+            {
+                if (_client?.Code != c.ClientCode) _client = await Clients.GetAsync(c.ClientCode);
+                _documents = (await Clients.ListDocumentsAsync(c.ClientCode)).ToDictionary(d => d.Id, d => d.FileName);
+                _answerScenario ??= _demo?.List().FirstOrDefault(s => s.ClientCode == c.ClientCode && s.HasResponse);
+            }
+            _case = c;
+            _error = null;
+        }
+        catch (Exception ex) when (!quiet || _case is null) { _error = ex.Message; }
+        catch (Exception) { return; }
+        if (quiet) StateHasChanged();
+    }
+
+    /// <summary>Everything the page shows that can change; a poll re-renders only when it differs.</summary>
+    private static string Fingerprint(Case? c) => c is null ? "none" : string.Join("|",
+        c.Status, c.DueAt?.Ticks, c.RemindedAt?.Ticks, c.EscalatedAt?.Ticks, c.ClosedAt?.Ticks, c.ExpiredAt?.Ticks, c.Outcome,
+        c.Indicia.Count, string.Join(",", c.Evidence.Select(e => $"{e.Id}{e.Verified}")), c.Signals.Count,
+        string.Join(",", c.Requests.Select(r => $"{r.Id}{r.Status}")), c.Responses.Count, c.Proof?.Id);
+
+    private async Task Deliver()
+    {
+        if (_demo is null || _case is null) return;
+        _delivering = true;
+        try
+        {
+            var documentId = await _demo.DeliverResponseAsync(_case.Code);
+            _fingerprint = null;
+            await Load(quiet: true);
+            _deliveredDoc = DocName(documentId) ?? T("Document {0}", documentId);
+            Snackbar.Add(T("The client's answer arrived"), Severity.Success);
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        finally { _delivering = false; }
+    }
+
+    private string HeaderLine(Case c)
+    {
+        var who = _client is null ? T("client {0}", c.ClientCode) : $"{_client.FullName}, {T("client {0}", c.ClientCode)}";
+        var account = c.IsPreexisting ? T("preexisting account") : T("new account");
+        return $"{who}. {CaseText.Regime(c.Regime)}, {account}.";
+    }
+
+    private string? DocName(int? id) => id is { } v && _documents.TryGetValue(v, out var name) ? name : null;
+
+    public void Dispose()
+    {
+        _disposed = true;
+        SimClock.Changed -= OnClockChanged;
+        _stop.Cancel();
+        _stop.Dispose();
+    }
 }

@@ -461,7 +461,7 @@ public class CaseServiceTests
         Assert.Equal((client.Id, "DE", ExplanationCategory.Student, code, answeredAt.AddHours(3)), (accepted.ClientId, accepted.Jurisdiction, accepted.Category, accepted.CaseCode, accepted.AcceptedAt));
 
         var snapshot = (await host.As(Viewer).Clients.SnapshotAsync(client.Id))!;
-        var now = Rules(snapshot);
+        var now = ScriptedRuleEngine.Rules(snapshot);
         Assert.Equal(Decision.Compliant, now.Decision);
         Assert.Equal(Coverage.AcceptedExplanation, Assert.Single(now.Indicia).CoveredBy);
     }

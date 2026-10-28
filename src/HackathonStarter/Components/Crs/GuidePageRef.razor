@@ -1,0 +1,13 @@
+@* A reference to the ANAF guide (29.12.2025): "guide p. 29", or NEVERIFICAT when the page is not known (never guessed). *@
+@if (CaseText.PageUnverified(Page))
+{
+    <span class="crs-page"><Pill Tone="warning" Icon="@Icons.Material.Rounded.HelpOutline" Title="@T("No page in the guide was found for this rule.")">NEVERIFICAT</Pill></span>
+}
+else
+{
+    <span class="crs-page">@CaseText.Page(Page!)</span>
+}
+
+@code {
+    [Parameter, EditorRequired] public string? Page { get; set; }
+}
