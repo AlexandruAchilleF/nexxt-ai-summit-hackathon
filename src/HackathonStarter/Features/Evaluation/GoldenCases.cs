@@ -638,30 +638,3 @@ public static class GoldenCases
     /// <summary>The US has no IBAN (Î2): the ABA routing number, a space, the account number; the country is explicit.</summary>
     private static StandingOrder ChicagoOrder() => new() { BeneficiaryAccount = "073909523 4417209358", BeneficiaryCountry = "US", Amount = 300.00m };
 }
-
-public record EvaluationRow(string CaseId, string Title, string Expected, string Actual, bool Passed, bool FalseAlarm, TimeSpan Duration);
-
-public record EvaluationReport(DateTime RanAt, IReadOnlyList<EvaluationRow> Rows)
-{
-    public int Passed => Rows.Count(r => r.Passed);
-    public int FalseAlarms => Rows.Count(r => r.FalseAlarm);
-}
-
-/// <summary>Runs the rules on the golden cases and the synthetic clients; the only source of the numbers on /metrics. Owner: R5.</summary>
-public interface IEvaluationService
-{
-    Task<EvaluationReport> RunAsync(CancellationToken ct = default);
-}
-
-/// <summary>Phase 0 placeholder. R5 replaces it.</summary>
-public sealed class EvaluationService : IEvaluationService
-{
-    public Task<EvaluationReport> RunAsync(CancellationToken ct = default) =>
-        Task.FromResult(new EvaluationReport(DateTime.MinValue, []));
-}
-
-public static class EvaluationSetup
-{
-    public static IServiceCollection AddEvaluation(this IServiceCollection services) =>
-        services.AddScoped<IEvaluationService, EvaluationService>();
-}
