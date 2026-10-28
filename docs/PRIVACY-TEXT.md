@@ -97,7 +97,8 @@ Ce face codul acum: `RunRedaction.Redact` copiază pașii rulării și îi masch
 
 Rândul „Clients and cases” spune „nemascate”: PLAN 13.1 spune că argumentele uneltelor ajung la cod demascate
 (inclusiv citatele pentru `recordEvidence`). Pe `main`, tabelele (`Clients`, `Cases`, `Evidence`, `AuditEntries` etc.)
-există de la Faza 0, dar sunt goale: `ClientSeed` nu întoarce nimic, `CaseService` nu salvează nimic, `AuditLog` nu
+există de la Faza 0. `ClientSeed` pune la pornire 25 de clienți sintetici (clienții cazurilor-etalon, cu PDF-urile lor
+sintetice în `ClientDocuments`, plus clienți de umplutură), dar `CaseService` nu salvează nimic, iar `AuditLog` nu
 salvează nimic. R3 confirmă înainte să-l publice (vezi HANDOFF).
 
 ## 3. Cât timp
@@ -249,7 +250,8 @@ alin. (11) apare la fel și în OUG 102/2022.
 Pași pentru R3 (`security-engineer`, proprietarul `/privacy`). Sunt propuneri; Tech Lead-ul decide.
 
 **Înainte:** Faza 0 (#13) e pe `main` din 28.10.2026, dar are doar contracte și înlocuitori: `AuditLog` nu salvează
-nimic, `CrsRuleEngine` întoarce `NoCase`, `CaseService` aruncă excepții, `ClientSeed` e gol, agentul nu are unelte.
+nimic, `CrsRuleEngine` întoarce `NoCase`, `CaseService` aruncă excepții, agentul nu are unelte. `ClientSeed` pune
+clienții sintetici (r5/seed), fără cazuri.
 Rândurile marcate „după R1”–„după R5” sau „după #5” intră doar când e pe `main` codul pe care îl descriu. #9 e pe `main`
 (4c8addb), deci rândul „Test data” poate intra acum. Ce nu e gata rămâne afară, nu se scrie la viitor.
 
