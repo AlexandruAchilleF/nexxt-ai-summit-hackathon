@@ -126,6 +126,23 @@ public class CheckPrivacyTests
         Assert.DoesNotContain("7730", excerpt);
     }
 
+    [Fact]
+    public void An_excerpt_still_shows_the_match_when_masking_shortens_the_text_before_it()
+    {
+        // Eight phones of 16 characters become [PHONE-1]…[PHONE-8] of 9: the match moves 56 characters to the left,
+        // more than the 40 of the window, so a window cut at its unmasked index would miss it.
+        var phones = string.Join(", ", Enumerable.Range(1, 8).Select(i => $"+49 89 4521 773{i}"));
+        var answer = $"Maria are telefoanele {phones}, iar fiecare este un indiciu pe care operatorul il verifica in dosarul clientului.";
+        var result = Assert.Single(new CheckEngine([new RuleCitedCheck()]).Evaluate(new CheckSubject(answer, "x"), ["rule-cited"]).Results);
+
+        var excerpt = Assert.Single(result.Findings).Excerpt;
+
+        Assert.NotNull(excerpt);
+        Assert.Contains("un indiciu pe care", excerpt);
+        Assert.Contains("[PHONE-8]", excerpt);
+        Assert.DoesNotContain("4521", excerpt);
+    }
+
     [Theory]
     [InlineData("0049 89 4521 7730", "+49 89 4521 7730")] // "00" in, "+" out
     [InlineData("0722 123 456", "+40 722 123 456")] // Romanian national in, international out
