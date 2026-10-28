@@ -1,4 +1,5 @@
 using System.Text.Json;
+using HackathonStarter.Features.Changes;
 using HackathonStarter.Features.Clients;
 using HackathonStarter.Features.Evaluation;
 using HackathonStarter.Features.Rules;
@@ -8,8 +9,9 @@ using HackathonStarter.Services;
 namespace HackathonStarter.Tests.Crs;
 
 /// <summary>
-/// The golden cases' data (docs/GOLDEN-CASES.md), not the engine: unique ids, a layer per transcribed case, the details
-/// agree with the headers, every identifier passes its checksum, every moment is UTC and the deadlines follow section 1.
+/// The golden cases' data (docs/GOLDEN-CASES.md), not the engine: unique ids, all 21 transcribed with a layer, the details
+/// agree with the headers, the change is in After, the documents are the synthetic PDFs, every identifier passes its
+/// checksum, every moment is UTC and the deadlines follow section 1.
 /// </summary>
 public class GoldenCasesDataTests
 {
@@ -30,12 +32,18 @@ public class GoldenCasesDataTests
     }
 
     [Fact]
-    public void The_approved_cases_are_transcribed()
+    public void All_21_cases_are_transcribed()
     {
+        Assert.All(GoldenCases.All, c => Assert.True(c.HasInput, $"case {c.Id} has no input"));
         Assert.Equal(Approved, GoldenCases.All.Where(c => c.Status == GoldenStatus.ApprovedR5).Select(c => c.Id));
-        Assert.All(Approved, id => Assert.True(GoldenCases.Get(id).HasInput, $"case {id} has no input"));
-        Assert.Equal(Approved, GoldenCases.Ready(GoldenLayer.Engine).Select(c => c.Id));
-        Assert.Equal(["4"], GoldenCases.Ready(GoldenLayer.Workflow).Select(c => c.Id));
+        Assert.All(GoldenCases.All.Where(c => !Approved.Contains(c.Id)), c => Assert.Equal(GoldenStatus.Validated, c.Status));
+
+        // GOLDEN-CASES.md 2, column "Strat".
+        Assert.Equal(["1", "2", "3", "4", "5a", "5b", "5c", "6", "7", "8", "9", "11", "12", "13", "14", "15", "18"], Ready(GoldenLayer.Engine));
+        Assert.Equal(["4", "16", "17a", "17b", "18"], Ready(GoldenLayer.Workflow));
+        Assert.Equal(["10"], Ready(GoldenLayer.Shield));
+        Assert.Equal(["2", "3"], Ready(GoldenLayer.TinFormat));
+        Assert.Equal(["4", "8"], Ready(GoldenLayer.Agent));
     }
 
     [Fact]
@@ -60,7 +68,7 @@ public class GoldenCasesDataTests
             Assert.Equal(c.ExpectedCleared, c.ExpectedClearedRules.Select(h => h.RuleId));
             Assert.Equal(c.ExpectedDeadlineRule, c.ExpectedDeadline?.RuleId);
             Assert.All(c.ExpectedClearedRules, h => Assert.Equal(Coverage.None, h.CoveredBy));
-            Assert.All(c.Documents.SelectMany(d => d.Quotes).Where(q => q.EvidenceFor is not null), q => Assert.Contains(q.EvidenceFor!, known));
+            Assert.All(Documents(c).SelectMany(d => d.Quotes).Where(q => q.EvidenceFor is not null), q => Assert.Contains(q.EvidenceFor!, known));
 
             Assert.NotNull(c.Change);
             Assert.Equal(c.ClientCode, c.Change.ClientCode);
@@ -68,6 +76,67 @@ public class GoldenCasesDataTests
             Assert.Equal(c.ClientCode, c.After!.Code);
             Assert.Equal(c.Before.ClientId, c.After.ClientId);
         });
+    }
+
+    [Fact]
+    public void The_change_carries_its_payload_and_after_has_it()
+    {
+        Assert.All(Transcribed, c =>
+        {
+            var change = c.Change!;
+            switch (change.Kind)
+            {
+                case ChangeKind.AddressChanged or ChangeKind.AddressAdded:
+                    Assert.Contains(change.Address!, c.After!.CurrentAddresses);
+                    break;
+                case ChangeKind.PhoneAdded or ChangeKind.PhoneChanged:
+                    Assert.Contains(change.Phone!, c.After!.CurrentPhones);
+                    break;
+                case ChangeKind.StandingOrderCreated:
+                    Assert.Contains(change.StandingOrder!, c.After!.Accounts.Single(a => a.Iban == change.AccountIban).StandingOrders);
+                    break;
+                case ChangeKind.PowerOfAttorneyGranted:
+                    Assert.Contains(change.PowerOfAttorney!, c.After!.PowersOfAttorney);
+                    break;
+                case ChangeKind.SelfCertSubmitted:
+                    // The engine reads the declaration from the change; the snapshot is unchanged.
+                    Assert.NotNull(change.SelfCertification);
+                    Assert.Equal(Json(c.Before!), Json(c.After!));
+                    break;
+                case ChangeKind.DocumentUploaded:
+                    Assert.NotEmpty(c.Documents);
+                    break;
+                default:
+                    Assert.Fail($"case {c.Id}: no check for {change.Kind}");
+                    break;
+            }
+        });
+    }
+
+    [Fact]
+    public void Documents_are_the_synthetic_pdfs_of_the_client()
+    {
+        Assert.All(Transcribed, c => Assert.All(Documents(c), d =>
+        {
+            Assert.Contains(d.FileName, SyntheticPdfs.FileNames);
+            Assert.Equal(c.ClientCode, SyntheticPdfs.Get(d.FileName).ClientCode);
+        }));
+    }
+
+    [Fact]
+    public async Task Evidence_and_signal_quotes_are_in_the_text_of_their_pdf()
+    {
+        // What EvidenceVerifier will look for; the hidden text of case 10 is never a quote.
+        var problems = new List<string>();
+        foreach (var c in Transcribed)
+            foreach (var d in Documents(c))
+            {
+                var file = await DocumentText.ExtractAsync(new MemoryStream(SyntheticPdfs.Get(d.FileName).Bytes), d.FileName);
+                foreach (var q in d.Quotes.Where(q => q.EvidenceFor is not null || q.IsSignal))
+                    if (!file.Text.Contains(q.Text, StringComparison.Ordinal)) problems.Add($"case {c.Id}: {d.FileName} has no \"{q.Text}\"");
+                if (d.Quotes.Any(q => q.Text.Contains(SyntheticPdfs.Injection, StringComparison.Ordinal))) problems.Add($"case {c.Id}: the injection is quoted");
+            }
+        Assert.True(problems.Count == 0, string.Join("\n", problems));
     }
 
     [Fact]
@@ -112,10 +181,12 @@ public class GoldenCasesDataTests
                 if (routing.Length != 9 || SyntheticData.AbaCheckDigit(routing[..8]) != routing[8] - '0') problems.Add($"case {c.Id}: ABA {routing}");
             }
             foreach (var phone in clients.SelectMany(s => s.Phones).Append(c.Change.Phone).OfType<PhoneSnapshot>())
-                if (!phone.Number.StartsWith(PhonePrefixes[phone.Country], StringComparison.Ordinal) || !phone.Number[1..].All(char.IsDigit))
+                if (!phone.Number.StartsWith(PhonePrefixes[phone.Country], StringComparison.Ordinal) || !phone.Number[1..].All(char.IsDigit)
+                    || (phone.Country == "RO" && phone.Number.Length != 12)) // +40 and 9 digits
                     problems.Add($"case {c.Id}: phone {phone.Number} is not E.164 for {phone.Country}");
 
-            var certifications = clients.Select(s => s.SelfCertification).Append(c.Response?.SelfCertification).OfType<SelfCertificationSnapshot>();
+            var certifications = clients.Select(s => s.SelfCertification).Append(c.Change.SelfCertification).Append(c.Response?.SelfCertification)
+                .OfType<SelfCertificationSnapshot>();
             foreach (var tin in certifications.SelectMany(s => s.Residences).Where(r => r.Country == "DE").Select(r => r.Tin ?? ""))
                 if (tin.Length != 11 || SyntheticData.Mod11_10CheckDigit(tin[..10]) != tin[10] - '0') problems.Add($"case {c.Id}: DE TIN {tin}");
         }
@@ -144,19 +215,21 @@ public class GoldenCasesDataTests
             Check($"case {c.Id} reminder", c.ExpectedDeadline?.RemindAt);
             Check($"case {c.Id} answer", c.Response?.ReceivedAt);
             Check($"case {c.Id} new self-certification", c.Response?.SelfCertification?.SignedAt);
+            Check($"case {c.Id} submitted self-certification", c.Change!.SelfCertification?.SignedAt);
             foreach (var s in new[] { c.Before!, c.After! })
             {
                 Check($"case {c.Id} self-certification", s.SelfCertification?.SignedAt);
                 foreach (var e in s.AcceptedExplanations) Check($"case {c.Id} accepted explanation", e.AcceptedAt);
             }
         }
+        foreach (var e in GoldenCases.TeodoraAfterAnswer.AcceptedExplanations) Check("case 18 after the answer", e.AcceptedAt);
         Assert.True(problems.Count == 0, string.Join("\n", problems));
     }
 
     [Fact]
     public void Deadlines_follow_the_conventions()
     {
-        // GOLDEN-CASES.md 1: DueAt = ReceivedAt + 90 days (new account), RemindAt = DueAt - 5 days; FATCA: no deadline (Î1).
+        // GOLDEN-CASES.md 1: DueAt = ReceivedAt + 90 days (new account), RemindAt = DueAt - 5 days; FATCA and case 2: no deadline (Î1).
         Assert.Equal(GoldenCases.ChangeMoment.AddDays(90), GoldenCases.NewAccountDueAt);
         Assert.Equal(GoldenCases.NewAccountDueAt.AddDays(-5), GoldenCases.NewAccountRemindAt);
 
@@ -170,18 +243,23 @@ public class GoldenCasesDataTests
             switch (deadline.RuleId)
             {
                 case null:
-                    Assert.Equal(Regime.Fatca, c.ExpectedRegime);
+                    Assert.True(c.ExpectedRegime == Regime.Fatca || c.ExpectedIndicia.All(h => h.RuleId.StartsWith("SC-", StringComparison.Ordinal)),
+                        $"case {c.Id}: no deadline rule, but neither FATCA nor a self-certification");
                     Assert.Null(deadline.DueAt);
                     Assert.Null(deadline.RemindAt);
                     break;
                 case "DL-NEW-90":
+                case "DL-EXPIRED-NEW": // 17a: the expired deadline of 16
                     Assert.False(deadline.Preexisting);
                     Assert.Equal(c.ReceivedAt!.Value.AddDays(90), deadline.DueAt);
                     Assert.Equal(deadline.DueAt!.Value.AddDays(-5), deadline.RemindAt);
                     break;
                 case "DL-PRE-YEAR":
+                    // The later of 31.12 at 23:59:59 in Bucharest (UTC+2 in winter, Î5) and ReceivedAt + 90 days (N1: our interpretation).
                     Assert.True(deadline.Preexisting);
-                    Assert.True(deadline.DueAt >= c.ReceivedAt!.Value.AddDays(90), $"case {c.Id}: DL-PRE-YEAR before the 90 days");
+                    var received = c.ReceivedAt!.Value;
+                    var yearEnd = new DateTime(received.Year, 12, 31, 21, 59, 59, DateTimeKind.Utc);
+                    Assert.Equal(yearEnd > received.AddDays(90) ? yearEnd : received.AddDays(90), deadline.DueAt);
                     Assert.Equal(deadline.DueAt!.Value.AddDays(-5), deadline.RemindAt);
                     break;
             }
@@ -201,6 +279,13 @@ public class GoldenCasesDataTests
         var before = new[] { "5a", "5b", "5c" }.Select(id => JsonSerializer.Serialize(GoldenCases.Get(id).Before)).Distinct();
         Assert.Single(before);
         Assert.Equal(JsonSerializer.Serialize(ClientSnapshot.From(GoldenClients.Create("CL-0005"))), before.Single());
+
+        // The shared clients (GOLDEN-CASES.md 1, "Coduri"): case 1 starts where 15 ends, 8 where 13 starts, 17a is 16 later.
+        Assert.Equal(Json(GoldenCases.Get("15").After!), Json(GoldenCases.Get("1").Before!));
+        Assert.Equal(Json(GoldenCases.Get("13").Before!), Json(GoldenCases.Get("8").Before!));
+        Assert.Equal(Json(GoldenCases.Get("16").Before!), Json(GoldenCases.Get("17a").Before!));
+        Assert.Equal(Json(GoldenCases.Get("16").After!), Json(GoldenCases.Get("17a").After!));
+        Assert.Equal(GoldenCases.Get("16").Change, GoldenCases.Get("17a").Change);
     }
 
     [Fact]
@@ -221,6 +306,46 @@ public class GoldenCasesDataTests
             }
         Assert.True(problems.Count == 0, string.Join("\n", problems));
     }
+
+    [Fact]
+    public void The_domain_decisions_are_in_the_data()
+    {
+        // GOLDEN-CASES.md 5 (28.10). Case 2: only the Milan address before the change, no self-certification on file.
+        var cristina = GoldenCases.Get("2").Before!;
+        Assert.Equal("IT", Assert.Single(cristina.Addresses).Country);
+        Assert.Empty(cristina.Phones);
+        Assert.Null(cristina.SelfCertification);
+
+        // Î9: over 50.000 USD on the depository accounts of the FATCA cases; in EUR, with a margin, so no exchange rate.
+        foreach (var id in new[] { "5c", "6", "7", "14" })
+            Assert.All(GoldenCases.Get(id).After!.Accounts.Where(a => a.Type == AccountType.Depository),
+                a => Assert.True(a.Currency == "EUR" && a.Balance >= 75_000m, $"case {id}: {a.Balance} {a.Currency}"));
+
+        // 7: born in RO, so FATCA-IND-POB is cleared. 12: the c/o address is the only current one (Î6, variant A).
+        Assert.Equal("RO", GoldenCases.Get("7").After!.BirthCountry);
+        Assert.Equal(AddressKind.InCareOf, Assert.Single(GoldenCases.Get("12").After!.CurrentAddresses).Kind);
+    }
+
+    [Fact]
+    public void Case_18_after_the_answer_adds_only_the_accepted_explanation()
+    {
+        var c = GoldenCases.Get("18");
+        var answered = GoldenCases.TeodoraAfterAnswer;
+
+        Assert.Empty(c.After!.AcceptedExplanations);
+        Assert.Equal(Json(c.After), Json(answered with { AcceptedExplanations = [] }));
+        var explanation = Assert.Single(answered.AcceptedExplanations);
+        Assert.Equal(Assert.Single(c.ExpectedIndicia).Jurisdiction, explanation.Jurisdiction);
+        Assert.Equal(c.Response!.Category, explanation.Category);
+        Assert.InRange(explanation.AcceptedAt, c.Response.ReceivedAt, c.ExpectedDeadline!.DueAt!.Value);
+        Assert.Equal(Coverage.AcceptedExplanation, Assert.Single(c.Response.ExpectedIndicia).CoveredBy);
+    }
+
+    private static string[] Ready(GoldenLayer layer) => [.. GoldenCases.Ready(layer).Select(c => c.Id)];
+
+    private static IEnumerable<GoldenDocument> Documents(GoldenCase c) => c.Response?.Document is { } answer ? c.Documents.Append(answer) : c.Documents;
+
+    private static string Json(ClientSnapshot snapshot) => JsonSerializer.Serialize(snapshot);
 
     private static bool IsIndicium(GoldenHit hit) => hit.RuleId.Contains("-IND-", StringComparison.Ordinal);
 

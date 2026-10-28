@@ -888,12 +888,12 @@ DB și fără serviciile lui R2.
 | 5b | Același ordin din **cont de custodie** | `Clarification` | `CRS-IND-SO` | motor (R1) |
 | 5c | Ordin permanent către IBAN US din **cont curent** | `FatcaAlert` | `FATCA-IND-SO` (fără excepția de depozit, p. 31) | motor (R1) |
 | 6 | Pașaport (PDF cu text) cu locul nașterii în SUA | `FatcaAlert` | `FATCA-IND-POB` | motor (R1) |
-| 7 | Cetățenie SUA în pașaport | `FatcaAlert` | `FATCA-IND-CIT` | motor (R1) |
+| 7 | Cetățenie SUA în pașaport | `FatcaAlert` | `FATCA-IND-CIT`; `FATCA-IND-POB` cleared (născut în RO) | motor (R1) |
 | 8 | Rezident RO cu salariu de la o firmă germană | `NoCase`; semnal slab, explicat | niciun indiciu; 1 `ContextSignal` | motor (R1) + agent (R4) pentru semnal |
 | 9 | Dublă rezidență RO + DE, declarată corect, adresă în DE | `Compliant`; raportabil pentru DE | `CRS-IND-ADDR` acoperit (`SelfCertification`), `SC-CONSISTENT` | motor (R1) |
 | 10 | PDF cu text alb ascuns | `ShieldAlert`; textul nu ajunge la model | scut | scut (R3) |
 | 11 | Împuternicire către o persoană cu adresă în AT | `Clarification` | `CRS-IND-POA` | motor (R1) |
-| 12 | Adresă c/o într-o jurisdicție raportabilă, singura adresă | `Clarification` | `CRS-IND-CO` | motor (R1) |
+| 12 | Adresă c/o într-o jurisdicție raportabilă, singura adresă curentă | `Clarification` | `CRS-IND-CO`, `CRS-IND-MAIL` | motor (R1) |
 | 13 | Telefon străin (non-SUA) + telefon RO | `NoCase` | `CRS-IND-PHONE` cleared | motor (R1) |
 | 14 | Telefon SUA, chiar dacă există și telefon RO | `FatcaAlert` | `FATCA-IND-PHONE` | motor (R1) |
 | 15 | Mutare Cluj → Iași | `NoCase`, explicat | `GEN-DOMESTIC` | motor (R1) |
