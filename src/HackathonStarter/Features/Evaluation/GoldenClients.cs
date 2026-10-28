@@ -69,6 +69,7 @@ public static class GoldenClients
             BirthCountry = "RO",
             Cnp = cnp,
             Citizenships = ["RO"],
+            // ValidFrom added by R5, not on the card.
             Addresses = [new Address { Kind = AddressKind.Residence, Line = line, City = city, Country = "RO", ValidFrom = firstOpened }],
             Phones = [new Phone { Number = phone, Country = "RO" }],
             Accounts = [.. accounts],
@@ -76,6 +77,7 @@ public static class GoldenClients
             [
                 new SelfCertification
                 {
+                    // ReceivedAt added by R5, not on the card.
                     SignedAt = signedAt, ReceivedAt = signedAt, Channel = "ghișeu",
                     Residences = [new TaxResidence { Country = "RO", Tin = cnp }],
                 },

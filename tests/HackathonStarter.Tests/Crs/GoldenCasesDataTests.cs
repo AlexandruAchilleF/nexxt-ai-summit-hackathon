@@ -3,6 +3,7 @@ using HackathonStarter.Features.Clients;
 using HackathonStarter.Features.Evaluation;
 using HackathonStarter.Features.Rules;
 using HackathonStarter.Features.Synthetic;
+using HackathonStarter.Services;
 
 namespace HackathonStarter.Tests.Crs;
 
@@ -200,6 +201,25 @@ public class GoldenCasesDataTests
         var before = new[] { "5a", "5b", "5c" }.Select(id => JsonSerializer.Serialize(GoldenCases.Get(id).Before)).Distinct();
         Assert.Single(before);
         Assert.Equal(JsonSerializer.Serialize(ClientSnapshot.From(GoldenClients.Create("CL-0005"))), before.Single());
+    }
+
+    [Fact]
+    public async Task Documents_are_generated_and_contain_their_quotes()
+    {
+        // The quotes must be in the generated PDF as DocumentText extracts it, or EvidenceVerifier rejects them.
+        var problems = new List<string>();
+        foreach (var c in GoldenCases.All)
+            foreach (var d in c.Documents.Append(c.Response?.Document).OfType<GoldenDocument>())
+            {
+                if (!SyntheticPdfs.FileNames.Contains(d.FileName)) { problems.Add($"case {c.Id}: {d.FileName} is not generated"); continue; }
+                var pdf = SyntheticPdfs.Get(d.FileName);
+                if (pdf.ClientCode != c.ClientCode) problems.Add($"case {c.Id}: {d.FileName} belongs to {pdf.ClientCode}");
+                var file = await DocumentText.ExtractAsync(new MemoryStream(pdf.Bytes), pdf.FileName);
+                if (d.Pages is { } pages && pages != file.Pages) problems.Add($"case {c.Id}: {d.FileName} has {file.Pages} pages, not {pages}");
+                foreach (var q in d.Quotes.Where(q => !file.Text.Contains(q.Text, StringComparison.Ordinal)))
+                    problems.Add($"case {c.Id}: \"{q.Text}\" is not in {d.FileName}");
+            }
+        Assert.True(problems.Count == 0, string.Join("\n", problems));
     }
 
     private static bool IsIndicium(GoldenHit hit) => hit.RuleId.Contains("-IND-", StringComparison.Ordinal);

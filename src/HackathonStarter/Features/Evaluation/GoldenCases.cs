@@ -131,7 +131,7 @@ public static class GoldenCases
                     [new("Angajator: Müller Logistik GmbH", IsSignal: true), new("Telefon: +49 89 4521 7730", EvidenceFor: "CRS-IND-PHONE")]),
             ],
             ExpectedRegime = Regime.Crs,
-            // CRS-IND-PHONE holds because the old RO phone, no longer current, does not count (Î6: current phones only).
+            // CRS-IND-PHONE holds: the card's After has "+40721384516 necurent", and p. 29 lit. c is read on current phones only.
             ExpectedIndicia = [new("CRS-IND-ADDR", "DE", "Addresses/Residence"), new("CRS-IND-PHONE", "DE", "Phones")],
             ExpectedReportableFor = [],
             ExpectedDeadline = new("DL-NEW-90", Preexisting: false, NewAccountDueAt, NewAccountRemindAt),
@@ -139,11 +139,12 @@ public static class GoldenCases
                 ReceivedAt: new(2027, 1, 22, 8, 0, 0, DateTimeKind.Utc), // day 86, after the reminder, before DueAt
                 Channel: "online", Kind: ResponseKind.NewSelfCertification, Category: ExplanationCategory.None,
                 SelfCertification: new(GoldenClients.Midnight(2027, 1, 21), [new("DE", "86095174223")], DeclaresUsPerson: false),
-                // Everything SC-VALID asks for (p. 34), plus a signature.
+                // Everything SC-VALID asks for (p. 34), plus a signature. The card writes the same dates in ISO (1991-06-08,
+                // 2027-01-21); the form prints them as dd/mm/yyyy, and the quotes must match the document.
                 Document: new("autocertificare-maria-2027.pdf", DocumentKind.SelfCertForm, null,
                 [
-                    new("Maria Popescu"), new("Leopoldstraße 12, 80802 München"), new("1991-06-08"), new("86095174223"),
-                    new("Confirm că datele sunt corecte și complete.", EvidenceFor: "SC-VALID"), new("2027-01-21"),
+                    new("Maria Popescu"), new("Leopoldstraße 12, 80802 München"), new("08/06/1991"), new("86095174223"),
+                    new("Confirm că datele sunt corecte și complete.", EvidenceFor: "SC-VALID"), new("21/01/2027"),
                 ]),
                 ExpectedDecision: Decision.Compliant,
                 ExpectedIndicia:
@@ -161,11 +162,12 @@ public static class GoldenCases
             GuidePage = "29 d",
             Before = Snapshot("CL-0005"),
             After = Snapshot("CL-0005", c => AddOrder(c, RaduCurrentEur, KellerOrder())),
+            // Summary added by R5, not on the card.
             Change = OrderChange(RaduCurrentEur, KellerOrder(),
                 "Ordin permanent lunar din Cont curent EUR către Hausverwaltung Keller GmbH, Leipzig, DE02700100800918273645, 450,00 EUR (chiria fiicei, studentă)"),
             ReceivedAt = ChangeMoment,
             ExpectedClearedRules = [new("CRS-IND-SO", "DE", Reason: "ordin dintr-un cont de depozit, exceptat la CRS", GuidePage: "29 d")],
-            ExpectedReportableFor = [],
+            ExpectedReportableFor = [], // derived, not on the card
         },
         new("5b", "Same standing order from a custodial account", "CL-0005", GoldenOwner.R1, Decision.Clarification, ["CRS-IND-SO:DE"], [], "DL-NEW-90", "Clarification: indicium")
         {
@@ -174,12 +176,13 @@ public static class GoldenCases
             GuidePage = "29 d",
             Before = Snapshot("CL-0005"),
             After = Snapshot("CL-0005", c => AddOrder(c, RaduCustodial, KellerOrder())),
+            // Summary added by R5, not on the card.
             Change = OrderChange(RaduCustodial, KellerOrder(),
                 "Ordin permanent lunar din Cont de instrumente financiare către Hausverwaltung Keller GmbH, Leipzig, DE02700100800918273645, 450,00 EUR (chiria fiicei, studentă)"),
             ReceivedAt = ChangeMoment,
             ExpectedRegime = Regime.Crs,
             ExpectedIndicia = [new("CRS-IND-SO", "DE", "StandingOrders")],
-            ExpectedReportableFor = [],
+            ExpectedReportableFor = [], // derived, not on the card
             ExpectedDeadline = new("DL-NEW-90", Preexisting: false, NewAccountDueAt, NewAccountRemindAt),
         },
         new("5c", "Standing order to the US from a current account", "CL-0005", GoldenOwner.R1, Decision.FatcaAlert, ["FATCA-IND-SO:US"], ["CRS-IND-SO"], null, "FATCA alert, no deadline in the guide")
@@ -190,6 +193,7 @@ public static class GoldenCases
             // The current EUR account is over the FATCA threshold for new depository accounts (p. 25 lit. b): see GoldenClients.
             Before = Snapshot("CL-0005"),
             After = Snapshot("CL-0005", c => AddOrder(c, RaduCurrentEur, ChicagoOrder())),
+            // Summary added by R5, not on the card.
             Change = OrderChange(RaduCurrentEur, ChicagoOrder(),
                 "Ordin permanent lunar din Cont curent EUR către Daniel Ionescu (fratele, Chicago), cont 4417209358, ABA 073909523 (SUA), 300,00 EUR"),
             ReceivedAt = ChangeMoment,
@@ -197,8 +201,8 @@ public static class GoldenCases
             ExpectedIndicia = [new("FATCA-IND-SO", "US")],
             ExpectedClearedRules =
             [
-                new("CRS-IND-SO", "US", GuidePage: "29 d",
-                    Reason: "SUA nu e jurisdicție CRS raportabilă (NEVERIFICAT: nu e în ghid); în plus, cont de depozit (p. 29 lit. d)"),
+                // NEVERIFICAT: "SUA nu e jurisdicție CRS raportabilă" is not in the guide; "cont de depozit" is p. 29 lit. d.
+                new("CRS-IND-SO", "US", GuidePage: "29 d", Reason: "SUA nu e jurisdicție CRS raportabilă; în plus, cont de depozit"),
             ],
             // No deadline in the guide (Î1): the case opens without one; DeadlineCalculator answers FATCA-SC, p. 38, DueAt null.
             ExpectedDeadline = new(null, Preexisting: false, null, null),
@@ -217,11 +221,12 @@ public static class GoldenCases
             GuidePage = "29 c",
             Before = Snapshot("CL-0013"),
             After = Snapshot("CL-0013", c => c.Phones.Add(AndreiGermanPhone())),
+            // Summary added by R5, not on the card.
             Change = new("CL-0013", ChangeKind.PhoneAdded, "call center", Phone: Of(AndreiGermanPhone()),
                 Summary: "Telefon nou +4915144201187 (DE), lângă telefonul RO"),
             ReceivedAt = ChangeMoment,
             ExpectedClearedRules = [new("CRS-IND-PHONE", "DE", Reason: "există și un telefon în România", GuidePage: "29 c")],
-            ExpectedReportableFor = [],
+            ExpectedReportableFor = [], // derived, not on the card
         },
         new("14", "US phone next to the RO phone", "CL-0014", GoldenOwner.R1, Decision.FatcaAlert, ["FATCA-IND-PHONE:US"], ["CRS-IND-PHONE"], null, "FATCA alert"),
         new("15", "Cluj to Iasi", "CL-0015", GoldenOwner.R1, Decision.NoCase, [], ["GEN-DOMESTIC"], null, "No case, with an explanation")
@@ -231,11 +236,12 @@ public static class GoldenCases
             GuidePage = "design",
             Before = Snapshot("CL-0015"),
             After = Snapshot("CL-0015", c => MoveTo(c, IoanaIasi())),
+            // Summary added by R5, not on the card.
             Change = new("CL-0015", ChangeKind.AddressChanged, "ghișeu", Address: Of(IoanaIasi()),
                 Summary: "Adresă nouă: Bd. Ștefan cel Mare și Sfânt 8, ap. 12, 700064 Iași"),
             ReceivedAt = ChangeMoment,
             ExpectedClearedRules = [new("GEN-DOMESTIC", null, Reason: "noua adresă e în România; nicio regulă din lista închisă nu se aplică")],
-            ExpectedReportableFor = [],
+            ExpectedReportableFor = [], // derived, not on the card
         },
         new("16", "Move to Spain, new account, no answer, day 85", "CL-0016", GoldenOwner.R2, Decision.Clarification, ["CRS-IND-ADDR:ES"], [], "DL-NEW-90", "Reminded, then escalated"),
         new("17a", "Same case after the deadline", "CL-0016", GoldenOwner.R2, Decision.Clarification, ["CRS-IND-ADDR:ES"], [], "DL-EXPIRED-NEW", "Expired: resident in RO and ES"),
@@ -283,6 +289,7 @@ public static class GoldenCases
     private static Address MariaMunich() => new() { Kind = AddressKind.Residence, Line = "Leopoldstraße 12", City = "80802 München", Country = "DE", ValidFrom = new(2026, 10, 15) };
     private static Phone MariaGermanPhone() => new() { Number = "+498945217730", Country = "DE" };
     private static Phone AndreiGermanPhone() => new() { Number = "+4915144201187", Country = "DE" };
+    // ValidFrom added by R5, not on the card.
     private static Address IoanaIasi() => new() { Kind = AddressKind.Residence, Line = "Bd. Ștefan cel Mare și Sfânt 8, ap. 12", City = "700064 Iași", Country = "RO", ValidFrom = new(2026, 10, 28) };
 
     // Monthly, active (the entity's defaults). The beneficiary's name is only in the change summary: the entity has no field for it.
