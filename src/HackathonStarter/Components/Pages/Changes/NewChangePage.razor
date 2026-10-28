@@ -1,7 +1,297 @@
 @page "/changes/new"
+@using HackathonStarter.Features.Changes
+@using HackathonStarter.Features.Cases
+@using HackathonStarter.Features.Evaluation
+@using HackathonStarter.Features.Clients
+@using HackathonStarter.Features.Rules
+@inject IChangeService ChangeService
+@inject ICaseService CaseService
+@inject IClientService ClientService
+@inject ISimClock SimClock
+@inject CurrentUser CurrentUser
+@inject NavigationManager Navigation
 
 <PageTitle>@T("New change") · @SiteConfig.Name</PageTitle>
 
 <PageHeader Title="@T("New change")" Description="@T("Record a change to a client's data and see the decision immediately.")" />
 
-<EmptyState Icon="@Icons.Material.Rounded.EditNote" Title="@T("Coming in the next phase")" Description="@T("The backend for this page is being built.")" />
+@if (_isViewOnly)
+{
+    <EmptyState Icon="@Icons.Material.Rounded.Lock" Title="@T("No permission")" Description="@T("Viewers cannot apply changes.")" />
+}
+else if (_error is not null)
+{
+    <ErrorState Message="@_error" OnRetry="LoadClients" />
+}
+else
+{
+    <MudGrid Spacing="3">
+        <MudItem xs="12">
+            <MudPaper Outlined="true" Class="pa-4">
+                <div class="app-card-title">@T("Demo scenarios")</div>
+                <div class="app-card-sub mb-4">@T("Apply a golden case change")</div>
+                @if (_scenariosLoading)
+                {
+                    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="80px" />
+                }
+                else if (_scenarios.Count == 0)
+                {
+                    <MudAlert Severity="Severity.Info" Class="mb-4">@T("No demo scenarios available")</MudAlert>
+                }
+                else
+                {
+                    <div class="app-list">
+                        @foreach (var scenario in _scenarios)
+                        {
+                            <button class="app-list-row app-list-row-clickable" @onclick="async () => await ApplyScenario(scenario)" disabled="@_applying">
+                                <span class="app-list-icon">
+                                    <MudIcon Icon="@Icons.Material.Rounded.AutoAwesome" />
+                                </span>
+                                <span class="app-list-main">
+                                    <span class="app-list-title d-block">@scenario.Title</span>
+                                    <span class="app-list-meta">@scenario.ClientCode</span>
+                                </span>
+                                <MudIcon Icon="@Icons.Material.Rounded.ChevronRight" Class="app-chevron" />
+                            </button>
+                        }
+                    </div>
+                }
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12">
+            <MudDivider Style="margin: 0" />
+        </MudItem>
+
+        <MudItem xs="12">
+            <MudPaper Outlined="true" Class="pa-4">
+                <div class="app-card-title">@T("Manual change")</div>
+                <div class="app-card-sub mb-4">@T("Record a change for a seeded client")</div>
+
+                @if (_clientsLoading)
+                {
+                    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="200px" />
+                }
+                else
+                {
+                    <MudForm @ref="_manualForm" Style="display: flex; flex-direction: column; gap: 16px;">
+                        <MudAutocomplete @bind-Value="@_selectedClient"
+                            T="Client"
+                            Label="@T("Client (required)")"
+                            SearchFunc="@SearchClients"
+                            ToStringFunc="@(c => c is null ? "" : $"{c.Code} - {c.FirstName} {c.LastName}")"
+                            Disabled="@_applying"
+                            Required />
+
+                        <MudSelect @bind-Value="@_manualChangeKind" Label="@T("Change kind")" Disabled="@_applying">
+                            <MudSelectItem Value="@ChangeKind.AddressChanged">@T("Address")</MudSelectItem>
+                            <MudSelectItem Value="@ChangeKind.PhoneChanged">@T("Phone")</MudSelectItem>
+                        </MudSelect>
+
+                        @if (_manualChangeKind == ChangeKind.AddressChanged)
+                        {
+                            <MudTextField @bind-Value="@_addressLine" Label="@T("Street address (required)")" Disabled="@_applying" Required />
+                            <MudTextField @bind-Value="@_addressCity" Label="@T("City (required)")" Disabled="@_applying" Required />
+                            <MudTextField @bind-Value="@_addressCountry" Label="@T("Country code (e.g. DE, RO, IT)")" Disabled="@_applying" Required />
+                        }
+                        else
+                        {
+                            <MudTextField @bind-Value="@_phoneNumber" Label="@T("New phone number")" Disabled="@_applying" Required />
+                            <MudTextField @bind-Value="@_phoneCountry" Label="@T("Country code (e.g. DE, RO, IT)")" Disabled="@_applying" Required />
+                        }
+
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@ApplyManualChange" Disabled="@(_applying || _selectedClient is null)" FullWidth="true">
+                            @if (_applying)
+                            {
+                                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                                <MudText Class="ms-2">@T("Applying...")</MudText>
+                            }
+                            else
+                            {
+                                @T("Apply")
+                            }
+                        </MudButton>
+                    </MudForm>
+                }
+            </MudPaper>
+        </MudItem>
+
+        @if (_changeResult is not null)
+        {
+            <MudItem xs="12">
+                <MudDivider Style="margin: 0" />
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudPaper Outlined="true" Class="pa-4">
+                    <div class="app-card-title">@T("Decision")</div>
+
+                    <RuleOutcomeView Outcome="@_changeResult.Outcome" />
+
+                    @if (_changeResult.CaseCode is not null)
+                    {
+                        <MudButton Variant="Variant.Text" Color="Color.Primary" Class="mt-4" Href="@($"/cases/{_changeResult.CaseCode}")">
+                            @T("Open case") <MudIcon Icon="@Icons.Material.Rounded.ChevronRight" Size="Size.Small" Class="ms-1" />
+                        </MudButton>
+                    }
+                    else
+                    {
+                        <MudAlert Severity="Severity.Success" Class="mt-4">
+                            @T("No case: {0}", _changeResult.Outcome.ExplanationRo ?? _changeResult.Outcome.Explanation)
+                        </MudAlert>
+                    }
+                </MudPaper>
+            </MudItem>
+        }
+    </MudGrid>
+}
+
+@code {
+    private List<GoldenCase> _scenarios = [];
+    private List<Client> _allClients = [];
+    private bool _scenariosLoading = true;
+    private bool _clientsLoading = true;
+    private bool _applying = false;
+    private string? _error;
+    private bool _isViewOnly = false;
+
+    private MudForm? _manualForm;
+    private Client? _selectedClient;
+    private ChangeKind _manualChangeKind = ChangeKind.AddressChanged;
+    private string _addressLine = "";
+    private string _addressCity = "";
+    private string _addressCountry = "";
+    private string _phoneNumber = "";
+    private string _phoneCountry = "";
+
+    private ChangeResult? _changeResult;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var user = await CurrentUser.GetAsync();
+            _isViewOnly = user?.Role == Roles.Viewer;
+        }
+        catch
+        {
+            _isViewOnly = true;
+        }
+
+        await LoadClients();
+        LoadScenarios();
+    }
+
+    private async Task LoadClients()
+    {
+        try
+        {
+            _clientsLoading = true;
+            _error = null;
+            _allClients = await ClientService.ListAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _clientsLoading = false;
+        }
+    }
+
+    private void LoadScenarios()
+    {
+        try
+        {
+            _scenariosLoading = true;
+            _error = null;
+            _scenarios = GoldenCases.All.Where(c => c.HasInput).OrderBy(c => c.ClientCode).ToList();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _scenariosLoading = false;
+        }
+    }
+
+    private async Task<IEnumerable<Client>> SearchClients(string value, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return _allClients;
+
+        var search = value.Trim().ToUpperInvariant();
+        return _allClients.Where(c => c.Code.Contains(search) || c.FirstName.Contains(search, StringComparison.OrdinalIgnoreCase) || c.LastName.Contains(search, StringComparison.OrdinalIgnoreCase)).ToList();
+    }
+
+    private async Task ApplyScenario(GoldenCase scenario)
+    {
+        if (scenario.Change is null || scenario.ReceivedAt is null)
+            return;
+
+        _applying = true;
+        _changeResult = null;
+        _error = null;
+
+        try
+        {
+            _changeResult = await ChangeService.RecordAsync(scenario.Change);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _applying = false;
+        }
+    }
+
+    private async Task ApplyManualChange()
+    {
+        if (_selectedClient is null || _manualForm is null)
+            return;
+
+        await _manualForm.ValidateAsync();
+        if (!_manualForm.IsValid)
+            return;
+
+        _applying = true;
+        _changeResult = null;
+        _error = null;
+
+        try
+        {
+            ChangeRequest request = _manualChangeKind == ChangeKind.AddressChanged
+                ? new(_selectedClient.Code, ChangeKind.AddressChanged, "online",
+                    Address: new(AddressKind.Residence, _addressLine, _addressCity, _addressCountry),
+                    Summary: $"Adresă nouă în {_addressCity}, {_addressCountry}")
+                : new(_selectedClient.Code, ChangeKind.PhoneChanged, "online",
+                    Phone: new(_phoneNumber, _phoneCountry),
+                    Summary: $"Telefon nou {_phoneNumber}, țara {_phoneCountry}");
+
+            _changeResult = await ChangeService.RecordAsync(request);
+
+            // Clear the form
+            _selectedClient = null;
+            _addressLine = "";
+            _addressCity = "";
+            _addressCountry = "";
+            _phoneNumber = "";
+            _phoneCountry = "";
+            if (_manualForm is not null)
+                await _manualForm.ResetAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _applying = false;
+        }
+    }
+}

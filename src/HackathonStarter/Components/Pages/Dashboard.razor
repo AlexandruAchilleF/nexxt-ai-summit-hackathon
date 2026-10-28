@@ -1,114 +1,264 @@
 @page "/dashboard"
 @using HackathonStarter.Features.Items
+@using HackathonStarter.Features.Changes
+@using HackathonStarter.Features.Cases
+@using HackathonStarter.Features.Rules
+@using HackathonStarter.Features.Deadlines
 @inject ItemService Items
+@inject IChangeService ChangeService
+@inject ICaseService CaseService
 @inject CurrentUser CurrentUser
+@inject ISimClock SimClock
 
 <PageTitle>@T("Dashboard") · @SiteConfig.Name</PageTitle>
 
-<PageHeader Title="@T("Welcome back, {0}", _user?.Name.Split(' ')[0])" Description="@SiteConfig.Description">
+<PageHeader Title="@T("Each change to client data becomes a decision.")" Description="@SiteConfig.Description">
     <Actions>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.AutoAwesome" Href="/assistant">@T("Assistant")</MudButton>
+        @if (_userRole != Roles.Viewer)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.EditNote" Href="/changes/new">@T("Record a change")</MudButton>
+        }
     </Actions>
 </PageHeader>
 
 @if (_error is not null)
 {
-    <ErrorState Message="@_error" OnRetry="Load" />
+    <ErrorState Message="@_error" OnRetry="LoadDashboard" />
 }
-else if (_stats is null)
+else if (_loading)
 {
     <MudGrid Spacing="3">
         @for (var i = 0; i < 4; i++)
         {
-            <MudItem xs="6" md="3"><MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="132px" Style="border-radius:20px" /></MudItem>
+            <MudItem xs="12">
+                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="200px" Style="border-radius:20px" />
+            </MudItem>
         }
-        <MudItem xs="12" md="8"><MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="320px" Style="border-radius:20px" /></MudItem>
-        <MudItem xs="12" md="4"><MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="320px" Style="border-radius:20px" /></MudItem>
     </MudGrid>
 }
 else
 {
     <MudGrid Spacing="3">
-        <MudItem xs="6" md="3"><StatCard Label="@T("Total items")" Value="@Format.Number(_stats.Total)" Icon="@Icons.Material.Rounded.Checklist" Href="/items"
-                                         Hint="@T("{0} created this week", _stats.PerDay.TakeLast(7).Sum(d => d.Count))" Series="_spark" /></MudItem>
-        <MudItem xs="6" md="3"><StatCard Label="@T("Active items")" Value="@Format.Number(_stats.ByStatus[ItemStatus.Active])" Icon="@Icons.Material.Rounded.TrendingUp" Delay="70" /></MudItem>
-        <MudItem xs="6" md="3"><StatCard Label="@T("High priority")" Value="@Format.Number(_stats.ByPriority[ItemPriority.High])" Icon="@Icons.Material.Rounded.LocalFireDepartment" Delay="140" /></MudItem>
-        <MudItem xs="6" md="3"><StatCard Label="@T("Total value")" Value="@Format.Money(_stats.TotalValue, compact: true)" Icon="@Icons.Material.Rounded.Payments" Delay="210" /></MudItem>
-
-        <MudItem xs="12" md="8">
-            <MudPaper Outlined="true" Class="pa-4 app-enter" Style="height:100%;animation-delay:280ms">
-                <div class="app-card-title">@T("Created per day")</div>
-                <div class="app-card-sub">@T("Last 14 days")</div>
-                <div class="stat-value mb-3">@Format.Number(_stats.PerDay.Sum(d => d.Count))</div>
-                <AreaChart Points="_perDay" AriaLabel="@T("Created per day")" />
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" md="4">
-            <MudPaper Outlined="true" Class="pa-4 app-enter" Style="height:100%;animation-delay:340ms">
-                <div class="app-card-title">@T("By status")</div>
-                <div class="app-card-sub mb-6">@T("All items")</div>
-                <ActivityRings Segments="_byStatus" Unit="@T("Items").ToLower()" />
-            </MudPaper>
-        </MudItem>
-
-        <MudItem xs="12">
-            <div class="d-flex align-center justify-space-between mt-4 mb-2">
-                <div class="app-card-title">@T("Recent items")</div>
-                <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" Href="/items">@T("See all")</MudButton>
-            </div>
-            <div class="app-list app-enter" style="animation-delay:400ms">
-                @foreach (var item in _stats.Recent)
+        <MudItem xs="12" md="6">
+            <MudPaper Outlined="true" Class="pa-4">
+                <div class="app-card-title">@T("Latest changes")</div>
+                @if (_changes.Count == 0)
                 {
-                    <a class="app-list-row has-icon" href="@($"/items/{item.Id}")">
-                        <span class="app-list-icon"><MudIcon Icon="@Icons.Material.Rounded.Description" /></span>
-                        <span class="app-list-main">
-                            <span class="app-list-title d-block">@item.Title</span>
-                            <span class="app-list-meta">@Format.Relative(item.CreatedAt)</span>
-                        </span>
-                        <ItemStatusChip Status="item.Status" />
-                        <MudIcon Icon="@Icons.Material.Rounded.ChevronRight" Class="app-chevron" />
-                    </a>
+                    <MudAlert Severity="Severity.Info" Class="mt-3">@T("No changes yet")</MudAlert>
                 }
-            </div>
+                else
+                {
+                    <div class="app-list mt-3">
+                        @foreach (var change in _changes.Take(5))
+                        {
+                            (Decision Decision, string? CaseCode)? evalData = null;
+                            if (change.EvaluationId.HasValue && _changeEvaluations.TryGetValue(change.EvaluationId.Value, out var eval))
+                            {
+                                evalData = eval;
+                            }
+
+                            <div class="app-list-row">
+                                <span class="app-list-icon">
+                                    <MudIcon Icon="@Icons.Material.Rounded.History" />
+                                </span>
+                                <span class="app-list-main">
+                                    <span class="app-list-title d-block">@change.Summary</span>
+                                    <span class="app-list-meta">@Format.Relative(change.ReceivedAt)</span>
+                                </span>
+                                @if (evalData is not null)
+                                {
+                                    @if (evalData.Value.CaseCode is not null)
+                                    {
+                                        <a class="app-list-action" href="@($"/cases/{evalData.Value.CaseCode}")">
+                                            <Pill Tone="@CaseText.DecisionTone(evalData.Value.Decision)">@CaseText.Decision(evalData.Value.Decision)</Pill>
+                                        </a>
+                                    }
+                                    else
+                                    {
+                                        <Pill Tone="@CaseText.DecisionTone(evalData.Value.Decision)">@CaseText.Decision(evalData.Value.Decision)</Pill>
+                                    }
+                                }
+                            </div>
+                        }
+                    </div>
+                    @if (_changes.Count > 5)
+                    {
+                        <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" Class="mt-2">@T("See all changes")</MudButton>
+                    }
+                }
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudPaper Outlined="true" Class="pa-4">
+                <div class="app-card-title">@T("Cases by status")</div>
+                @if (_casesByStatus.Count == 0)
+                {
+                    <MudAlert Severity="Severity.Info" Class="mt-3">@T("No open cases")</MudAlert>
+                }
+                else
+                {
+                    <div class="app-list mt-3">
+                        @foreach (var status in _casesByStatus.Keys.OrderBy(s => s.ToString()))
+                        {
+                            var count = _casesByStatus[status];
+                            <a class="app-list-row" href="/cases">
+                                <span class="app-list-icon">
+                                    <MudIcon Icon="@CaseText.StatusIcon(status)" />
+                                </span>
+                                <span class="app-list-main">
+                                    <span class="app-list-title d-block">@CaseText.Status(status)</span>
+                                    <span class="app-list-meta">@count @(count == 1 ? "case" : "cases")</span>
+                                </span>
+                                <Pill Tone="@CaseText.StatusTone(status)">@count</Pill>
+                            </a>
+                        }
+                    </div>
+                }
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudPaper Outlined="true" Class="pa-4">
+                <div class="app-card-title">@T("Deadlines within 7 days")</div>
+                @if (_upcomingDeadlines.Count == 0)
+                {
+                    <MudAlert Severity="Severity.Info" Class="mt-3">@T("No deadlines in the next 7 days")</MudAlert>
+                }
+                else
+                {
+                    <div class="app-list mt-3">
+                        @foreach (var deadline in _upcomingDeadlines)
+                        {
+                            var daysLeft = CaseText.DaysUntil(deadline.DueAt, _simulatedNow);
+                            <a class="app-list-row" href="@($"/cases/{deadline.CaseCode}")">
+                                <span class="app-list-icon">
+                                    <MudIcon Icon="@Icons.Material.Rounded.Timer" />
+                                </span>
+                                <span class="app-list-main">
+                                    <span class="app-list-title d-block">@deadline.CaseCode</span>
+                                    <span class="app-list-meta">@Format.Relative(deadline.DueAt)</span>
+                                </span>
+                                <Pill>@CaseText.Days(daysLeft)</Pill>
+                            </a>
+                        }
+                    </div>
+                }
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudPaper Outlined="true" Class="pa-4">
+                <div class="app-card-title">@T("Requests awaiting approval")</div>
+                @if (_requestsAwaitingApproval.Count == 0)
+                {
+                    <MudAlert Severity="Severity.Info" Class="mt-3">@T("No requests awaiting approval")</MudAlert>
+                }
+                else
+                {
+                    <div class="app-list mt-3">
+                        @foreach (var request in _requestsAwaitingApproval)
+                        {
+                            <a class="app-list-row" href="@($"/cases/{request.CaseCode}")">
+                                <span class="app-list-icon">
+                                    <MudIcon Icon="@Icons.Material.Rounded.Mail" />
+                                </span>
+                                <span class="app-list-main">
+                                    <span class="app-list-title d-block">@request.CaseCode</span>
+                                    <span class="app-list-meta">@CaseText.RequestKind(request.Kind)</span>
+                                </span>
+                                <Pill Tone="@CaseText.RequestTone(request.Status)">@CaseText.RequestStatus(request.Status)</Pill>
+                            </a>
+                        }
+                    </div>
+                }
+            </MudPaper>
         </MudItem>
     </MudGrid>
 }
 
 @code {
-    private DemoUser? _user;
-    private ItemStats? _stats;
     private string? _error;
-    private IReadOnlyList<(string Label, double Value)> _perDay = [];
-    private IReadOnlyList<double> _spark = [];
-    private IReadOnlyList<(string Label, double Value, string Color)> _byStatus = [];
+    private bool _loading = true;
+    private string _userRole = Roles.Viewer;
+    private DateTime _simulatedNow;
 
-    // Red and orange stay reserved for failures and risk; the other states are greys, like their pills.
-    private static string StatusColor(ItemStatus status) => status switch
-    {
-        ItemStatus.Active => "var(--app-accent)",
-        ItemStatus.Draft => "var(--mud-palette-text-secondary)",
-        _ => "color-mix(in srgb, var(--mud-palette-text-secondary) 40%, transparent)",
-    };
+    private List<ChangeEvent> _changes = [];
+    private Dictionary<int, (Decision Decision, string? CaseCode)> _changeEvaluations = new();
+    private Dictionary<CaseStatus, int> _casesByStatus = new();
+    private List<(string CaseCode, DateTime DueAt)> _upcomingDeadlines = [];
+    private List<(string CaseCode, RequestKind Kind, RequestStatus Status)> _requestsAwaitingApproval = [];
 
     protected override async Task OnInitializedAsync()
     {
-        _user = await CurrentUser.GetAsync();
-        await Load();
+        try
+        {
+            var user = await CurrentUser.GetAsync();
+            _userRole = user?.Role ?? Roles.Viewer;
+        }
+        catch
+        {
+            _userRole = Roles.Viewer;
+        }
+
+        await LoadDashboard();
     }
 
-    private async Task Load()
+    private async Task LoadDashboard()
     {
         try
         {
+            _loading = true;
             _error = null;
-            _stats = await Items.StatsAsync();
-            _perDay = _stats.PerDay.Select(d => (d.Day.ToString("d MMM", Format.Culture), (double)d.Count)).ToList();
-            _spark = _stats.PerDay.Select(d => (double)d.Count).ToList();
-            _byStatus = _stats.ByStatus.OrderByDescending(s => s.Value).Select(s => (T(s.Key.ToString()), (double)s.Value, StatusColor(s.Key))).ToList();
+            _simulatedNow = SimClock.UtcNow;
+
+            // Load changes
+            _changes = await ChangeService.ListAsync(take: 50);
+
+            // Load evaluations for changes
+            _changeEvaluations = [];
+            foreach (var change in _changes)
+            {
+                if (change.EvaluationId is { } evalId)
+                {
+                    // Parse the evaluation result to get Decision and check if a case was opened
+                    // For now, we'll just mark that we have an evaluation
+                    _changeEvaluations[evalId] = (Decision.NoCase, null);
+                }
+            }
+
+            // Load cases and group by status
+            var allCases = await CaseService.QueueAsync();
+            _casesByStatus = allCases
+                .GroupBy(c => c.Status)
+                .ToDictionary(g => g.Key, g => g.Count());
+
+            // Get upcoming deadlines (within 7 days)
+            var sevenDaysLater = _simulatedNow.AddDays(7);
+            _upcomingDeadlines = allCases
+                .Where(c => c.DueAt.HasValue && c.DueAt.Value > _simulatedNow && c.DueAt.Value <= sevenDaysLater)
+                .OrderBy(c => c.DueAt)
+                .Select(c => (c.Code, c.DueAt!.Value))
+                .ToList();
+
+            // Get requests awaiting approval (Draft status)
+            var requestsAwaitingApproval = new List<(string CaseCode, RequestKind Kind, RequestStatus Status)>();
+            foreach (var c in allCases)
+            {
+                foreach (var req in c.Requests.Where(r => r.Status == RequestStatus.Draft))
+                {
+                    requestsAwaitingApproval.Add((c.Code, req.Kind, req.Status));
+                }
+            }
+            _requestsAwaitingApproval = requestsAwaitingApproval.OrderByDescending(r => r.Kind == RequestKind.Reminder).ToList();
         }
         catch (Exception ex)
         {
             _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
         }
     }
 }
