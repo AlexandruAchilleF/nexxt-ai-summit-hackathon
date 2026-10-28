@@ -1,0 +1,15 @@
+@using HackathonStarter.Features.Shield
+@* The verdict of EvidenceVerifier on a quote the agent gave as evidence. Decided by code, never by the model. *@
+<Pill Tone="@Tone" Icon="@Icon" Title="@Check.Note">@Text</Pill>
+
+@code {
+    [Parameter, EditorRequired] public EvidenceCheck Check { get; set; } = default!;
+
+    private string Text => Check.Verified ? T("Quote verified") : Check.FoundOnlyInHiddenText ? T("Only in hidden text") : T("Quote not found");
+
+    private string Tone => Check.Verified ? "success" : Check.FoundOnlyInHiddenText ? "danger" : "warning";
+
+    private string Icon => Check.Verified ? Icons.Material.Rounded.Verified
+        : Check.FoundOnlyInHiddenText ? Icons.Material.Rounded.Report
+        : Icons.Material.Rounded.HelpOutline;
+}

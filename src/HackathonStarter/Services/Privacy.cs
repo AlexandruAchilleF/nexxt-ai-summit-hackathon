@@ -36,6 +36,7 @@ public static class DataFlows
     {
         var host = Uri.TryCreate(o.Endpoint, UriKind.Absolute, out var uri) ? uri.Host
             : o.Provider.Equals("Anthropic", StringComparison.OrdinalIgnoreCase) ? "api.anthropic.com"
+            : o.Provider.Equals("Bedrock", StringComparison.OrdinalIgnoreCase) ? $"bedrock-runtime.{o.BedrockRegion}.amazonaws.com"
             : "api.openai.com";
         return new ModelEndpoint(name, o.Provider, o.Model, host, IsOwnInfrastructure(host));
     }

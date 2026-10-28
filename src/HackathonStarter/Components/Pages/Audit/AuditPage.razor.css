@@ -1,0 +1,22 @@
+.audit-table ::deep .audit-ellipsis {
+    display: block;
+    min-width: 0;
+    max-width: 60vw;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Wide layout (MudTable Breakpoint.Sm stacks below 960px): the payload takes only the width left, no sideways scroll. */
+@media (min-width: 960px) {
+    .audit-table ::deep td.audit-payload {
+        max-width: 0;
+        width: 100%;
+    }
+}
+
+/* Eight columns: tighter than MudBlazor's dense padding, so the payload keeps room at 1280px. */
+.audit-table ::deep .mud-table-cell {
+    padding-left: 10px;
+    padding-right: 10px;
+}

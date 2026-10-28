@@ -64,6 +64,7 @@ public static class DeadlinesSetup
     {
         services.AddSingleton<ISimClock>(sp => new SimClock(sp.GetService<TimeProvider>() ?? TimeProvider.System));
         services.AddSingleton<IDeadlineCalculator, DeadlineCalculator>();
+        services.AddScoped<SimClockControl>();
         return services;
     }
 }
