@@ -111,11 +111,20 @@ public class AuditAtomicityTests
         var scopes = Enumerable.Range(0, 8).Select(_ => host.Root.CreateScope()).ToArray();
         try
         {
-            await Task.WhenAll(sessions.Select((session, i) => session.Changes.RecordAsync(
-                new ChangeRequest("CL-0016", ChangeKind.AddressChanged, "online",
-                    Address: new AddressSnapshot(AddressKind.Residence, "Synthetic", "City", i % 2 == 0 ? "ES" : "DE"))))
-                .Cast<Task>().Concat(scopes.Select(scope => scope.ServiceProvider.GetRequiredService<IAuditLog>()
-                    .AppendAsync("system", AuditKinds.TinChecked, new { country = "DE" }))));
+            var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var writers = sessions.Select((session, i) => Task.Run(async () =>
+            {
+                await start.Task;
+                await session.Changes.RecordAsync(new ChangeRequest("CL-0016", ChangeKind.AddressChanged, "online",
+                    Address: new AddressSnapshot(AddressKind.Residence, "Synthetic", "City", i % 2 == 0 ? "ES" : "DE")));
+            })).Concat(scopes.Select(scope => Task.Run(async () =>
+            {
+                await start.Task;
+                await scope.ServiceProvider.GetRequiredService<IAuditLog>()
+                    .AppendAsync("system", AuditKinds.TinChecked, new { country = "DE" });
+            }))).ToArray();
+            start.SetResult();
+            await Task.WhenAll(writers);
             await using var db = await host.DbAsync();
             var entries = await db.AuditEntries.OrderBy(e => e.Seq).ToListAsync();
             Assert.Equal(Enumerable.Range(1, 26).Select(i => (long)i), entries.Select(e => e.Seq));
