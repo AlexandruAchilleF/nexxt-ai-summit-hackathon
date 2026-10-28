@@ -224,23 +224,19 @@ Metricile vin doar din rulări reale (`/metrics` și testele), prezentate separa
 
 ### Prima rulare
 
-Rularea `IEvaluationService.RunAsync()` pe commit-ul `bbe131e` (plus doar README), 28.10.2026, 21:27, **fără model** (nicio cheie, niciun
+Rularea `IEvaluationService.RunAsync()` pe commit-ul `60619b9` (plus doar README), 28.10.2026, 21:38, **fără model** (nicio cheie, niciun
 apel AI). Pagina `/metrics` e încă goală pe `main` (pagina e în PR #38), așa că serviciul a fost chemat direct. Toate cifrele de mai jos vin din
 cod determinist, nu din AI.
 
-**1. Acoperirea specificației** (motorul `crs-rules/1.0`)
+**1. Acoperirea specificației** (motorul `crs-rules/1.1`)
 
 | Set | Evaluate | Trec | Acțiuni așteptate | Prinse | Ratate | Alarme false |
 | --- | --- | --- | --- | --- | --- | --- |
-| Cazurile-etalon | 20 (cazul 10 e la scut) | 17 | 13 | 12 | 1 | 0 |
+| Cazurile-etalon | 20 (cazul 10 e la scut) | 19 | 13 | 12 | 1 | 0 |
 | Clienții sintetici | 50 | 50 | 10 | 10 | 0 | 0 |
 
-Trei cazuri-etalon nu se potrivesc încă cu specificația, deci **nu** spunem încă „regulile din ghid sunt implementate și
-testate”:
-
-- la 2, motorul dă `NoCase` în loc de `Clarification` și lipsește `SC-TIN-FORMAT` (IT);
-- la 7, decizia (`FatcaAlert`) e corectă, dar lipsește verificarea respinsă `FATCA-IND-POB`;
-- la 12, decizia și termenul (`DL-PRE-YEAR`) sunt corecte, dar lipsește `CRS-IND-MAIL` (IT).
+Un caz-etalon nu se potrivește încă cu specificația, deci **nu** spunem încă „regulile din ghid sunt implementate și
+testate”: la 2, motorul dă `NoCase` în loc de `Clarification` și lipsește `SC-TIN-FORMAT` (IT).
 
 **2. Unde există incertitudine**
 
@@ -301,14 +297,14 @@ IAM), niciodată din repo. În `appsettings.Local.json` (ignorat de git): `"AI":
 
 Lucrăm în paralel, pe module; fiecare PR intră doar cu CI verde (build cu 0 warnings, teste unitare și E2E).
 
-Starea de pe `main` la commit-ul `bbe131e`, verificată în cod pe 28.10.2026, la 21:25: `dotnet build -warnaserror` fără
-warnings, testele unitare 1051 din 1051, E2E 21 trecute și 1 sărit (testul sărit: rândul `/audit` de mai jos).
+Starea de pe `main` la commit-ul `60619b9`, verificată în cod pe 28.10.2026, la 21:38: `dotnet build -warnaserror` fără
+warnings, testele unitare 1084 din 1084, E2E 21 trecute și 1 sărit (testul sărit: rândul `/audit` de mai jos).
 
 | Modul | Rol | Pe `main` | În lucru | Lipsește |
 | --- | --- | --- | --- | --- |
 | Documentația: planul, regulile verificate, paginile ghidului, cazurile-etalon, sursele, scenariul video, textul `/privacy` | toți | da (#1–#4, #6, #7, #10, #12, #14, #15, #19, #30, #33) | | |
 | Contractele și entitățile (Faza 0), `SimClock` | integrator | da (#13, #18) | | |
-| `CrsRuleEngine`, `RuleCatalog`, `GoldenEngineTests` | R1 | da (#16) | #37 (cazurile-etalon 7 și 12) | |
+| `CrsRuleEngine`, `RuleCatalog`, `GoldenEngineTests` | R1 | da (#16, #37) | | cazul-etalon 2 (`SC-TIN-FORMAT`, §8) |
 | `ChangeService`, `CaseService` (stările cazului), `DeadlineCalculator`, `DeadlineWatcher`, `SimClockControl` | R2 | da (#28) | | butoanele datei simulate în bara de sus |
 | `HiddenTextShield`, `EvidenceVerifier`, `TinFormat` + TIN on Europa, `AuditLog` | R3 | da (#23) | | |
 | Pagina `/privacy` (jurnal, TIN on Europa, Bedrock, retenție, temeiul legal) | R3 | da (#26) | | |
