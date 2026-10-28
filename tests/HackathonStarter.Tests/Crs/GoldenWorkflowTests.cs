@@ -92,6 +92,33 @@ public class GoldenWorkflowTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public async Task Golden_case_12_is_recorded_through_the_change_service_with_the_cards_after_and_outcome()
+    {
+        // The c/o address becomes the only current one (p. 29 f, 31; not a residence, p. 48): the change ends the Cluj
+        // residence, as the card's After, so /changes/new can record the card as is.
+        var card = GoldenCases.Get("12");
+        var (host, _) = await Sentinel.RealWorld.CreateAsync();
+        await using var _ = host;
+
+        var result = await Sentinel.RealWorld.RecordGoldenChangeAsync(host, card.Id);
+
+        var saved = ClientSnapshot.From((await host.Get<IClientService>().GetAsync(card.ClientCode))!);
+        Assert.Equal(card.After!.CurrentAddresses.Select(a => (a.Kind, a.Line, a.City, a.Country)),
+            saved.CurrentAddresses.Select(a => (a.Kind, a.Line, a.City, a.Country)));
+        Assert.Equal(card.ExpectedDecision, result.Outcome.Decision);
+        Assert.Equal(card.ExpectedRegime, result.Outcome.Regime);
+        Assert.Equal(card.ExpectedHits.Order(), Sentinel.Hits.Of(result.Outcome.Indicia).Order());
+        foreach (var cleared in card.ExpectedCleared)
+            Assert.Contains(result.Outcome.Cleared, h => h.RuleId == cleared);
+
+        var item = (await host.Get<ICaseService>().GetAsync(result.CaseCode!))!;
+        Assert.Equal(card.ExpectedHits.Order(), Sentinel.Hits.Of(item.Indicia).Order());
+        var deadline = card.ExpectedDeadline!;
+        Assert.Equal((card.ExpectedDeadlineRule, deadline.Preexisting, deadline.DueAt, deadline.RemindAt),
+            (item.DeadlineRuleId, item.IsPreexisting, item.DueAt, item.RemindAt));
+    }
+
+    [Fact]
     public async Task The_real_engine_run_waits_only_while_every_call_it_makes_is_the_placeholder()
     {
         var card = GoldenCases.Get("4"); // its run calls Evaluate, EvaluateSelfCertification and EvaluateCurrent
@@ -302,7 +329,7 @@ public class GoldenWorkflowTests(ITestOutputHelper output)
                 if (expected.SourceField is { } field) Assert.Equal(field, indicium.SourceField);
             }
 
-            Trail(OperatorActor, AuditKinds.CaseOpened, AuditKinds.ChangeReceived);
+            Trail(OperatorActor, AuditKinds.ChangeReceived, AuditKinds.CaseOpened);
             Log($"{result.Outcome.Decision}: opened {_code} ({item.Regime}) on {string.Join(", ", Keys(item.Indicia))}; " +
                 $"{item.DeadlineRuleId}, preexisting {item.IsPreexisting}, due {Iso(item.DueAt)}, reminder {Iso(item.RemindAt)}");
         }

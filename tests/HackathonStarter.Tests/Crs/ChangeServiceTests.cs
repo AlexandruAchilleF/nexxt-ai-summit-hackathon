@@ -53,8 +53,8 @@ public class ChangeServiceTests
         Assert.Equal((saved.Id, Decision.Clarification, ScriptedRuleEngine.Version, Base), (evaluation.ChangeEventId, evaluation.Decision, evaluation.EngineVersion, evaluation.EvaluatedAt));
         Assert.Contains("CRS-IND-ADDR", evaluation.ResultJson);
 
-        // The case first, then the change's entries, all linked to the case.
-        Assert.Equal([AuditKinds.CaseOpened, AuditKinds.ChangeReceived, AuditKinds.RuleApplied, AuditKinds.RuleApplied], host.Audit.Entries.Select(e => e.Kind));
+        // The change's entries, then the case they open, all linked to the case.
+        Assert.Equal([AuditKinds.ChangeReceived, AuditKinds.RuleApplied, AuditKinds.RuleApplied, AuditKinds.CaseOpened], host.Audit.Entries.Select(e => e.Kind));
         var caseId = (await host.As(Viewer).Cases.GetAsync(result.CaseCode!))!.Id;
         Assert.All(host.Audit.Entries, e => Assert.Equal(caseId, e.CaseId));
         Assert.All(host.Audit.Entries, e => Assert.Equal("user:member", e.Actor));
@@ -323,6 +323,9 @@ public class ChangeServiceTests
         Assert.Equal(["CRS-IND-ADDR:IT", "SC-TIN-FORMAT:IT"], item.Indicia.Select(i => $"{i.RuleId}:{i.Jurisdiction}"));
         Assert.Equal(answer.Change.Id, item.Indicia.Single(i => i.RuleId == "SC-TIN-FORMAT").ChangeEventId);
         Assert.Single(host.Audit.OfKind(AuditKinds.CaseIndiciumAdded));
+        var answerEntries = host.Audit.Entries.TakeLast(4).ToList(); // the answer's entries, then the case's
+        Assert.Equal([AuditKinds.ChangeReceived, AuditKinds.RuleApplied, AuditKinds.RuleApplied, AuditKinds.CaseIndiciumAdded], answerEntries.Select(e => e.Kind));
+        Assert.All(answerEntries, e => Assert.Equal(item.Id, e.CaseId));
         await using var db = await host.DbAsync();
         Assert.Equal(1, await db.Cases.CountAsync());
     }
@@ -342,6 +345,25 @@ public class ChangeServiceTests
         var item = await db.Cases.Include(c => c.Indicia).SingleAsync();
         Assert.Equal(["CRS-IND-ADDR:ES"], item.Indicia.Select(i => $"{i.RuleId}:{i.Jurisdiction}"));
         Assert.Single(host.Audit.OfKind(AuditKinds.CaseOpened));
+    }
+
+    [Fact]
+    public async Task Maria_golden_case_4_logs_the_change_and_its_rules_before_the_case_they_open()
+    {
+        // The real seed, engine, case service and hash-chained audit log: what /cases/{code} reads.
+        var (host, _) = await Sentinel.RealWorld.CreateAsync();
+        await using var _ = host;
+
+        var result = await Sentinel.RealWorld.RecordGoldenChangeAsync(host, "4");
+
+        var item = (await host.Get<ICaseService>().GetAsync(result.CaseCode!))!;
+        var entries = (await host.Get<IAuditLog>().ListAsync(item.Id)).OrderBy(e => e.Seq).ToList();
+        var rules = result.Outcome.Indicia.Count + result.Outcome.Cleared.Count;
+        Assert.Equal([AuditKinds.ChangeReceived, .. Enumerable.Repeat(AuditKinds.RuleApplied, rules), AuditKinds.CaseOpened],
+            entries.Select(e => e.Kind));
+        Assert.Equal(rules + 2, (await host.Get<IAuditLog>().ListAsync(take: 500)).Count); // nothing logged outside the case
+        Assert.All(entries, e => Assert.Contains($"\"changeId\":{result.Change.Id}", e.PayloadJson));
+        Assert.True((await host.Get<IAuditLog>().VerifyAsync()).Ok);
     }
 
     [Fact]
