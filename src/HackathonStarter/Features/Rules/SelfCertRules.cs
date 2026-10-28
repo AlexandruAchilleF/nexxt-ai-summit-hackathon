@@ -23,8 +23,13 @@ internal static class SelfCertRules
     {
         Validity(sc, f);
         foreach (var residence in sc.Residences) Tin(residence, tins, f);
+        UsPersonWithoutUsResidence(sc, f);
         Consistency(client, sc, f);
     }
+
+    // A row of the form with nothing in it (the p. 53 form has three); ignored next to a filled-in row (policy).
+    private static bool IsBlank(SubjectTaxResidence r) => string.IsNullOrWhiteSpace(r.Country) && string.IsNullOrWhiteSpace(r.Tin)
+        && r.NoTinReason == NoTinReason.None && string.IsNullOrWhiteSpace(r.NoTinExplanation);
 
     // IV.B pct. 3: signed or confirmed, dated, name, residence address, jurisdiction(s), date of birth.
     private static void Validity(SubjectSelfCertification sc, Findings f)
@@ -34,22 +39,52 @@ internal static class SelfCertRules
         if (sc.SignedAt == default) missing.Add(("data", "date"));
         if (sc.FormFieldsKnown && string.IsNullOrWhiteSpace(sc.FullName)) missing.Add(("numele", "name"));
         if (sc.FormFieldsKnown && string.IsNullOrWhiteSpace(sc.ResidenceAddress)) missing.Add(("adresa de rezidență", "residence address"));
-        if (sc.Residences.Count == 0) missing.Add(("jurisdicția de rezidență", "jurisdiction of residence"));
         if (sc.FormFieldsKnown && sc.BirthDate is null) missing.Add(("data nașterii", "date of birth"));
 
-        if (missing.Count == 0 && !sc.FormFieldsKnown)
+        // Guide p. 34: the form names the jurisdiction(s); p. 36: a missing one is never a minor error, so the file cannot
+        // cure it (Verified). A row with a TIN or a reason but no country: the same note, read row by row (our reading). A code
+        // that is no real jurisdiction: p. 36 lets the bank accept an abbreviation an ID document reasonably matches, which
+        // the engine cannot see, so the operator decides (policy).
+        var rows = sc.Residences.Where(r => !IsBlank(r)).ToList();
+        var none = rows.All(r => string.IsNullOrWhiteSpace(r.Country));
+        var rowWithoutCountry = !none && rows.Any(r => string.IsNullOrWhiteSpace(r.Country));
+        var unknown = rows.Where(r => !string.IsNullOrWhiteSpace(r.Country) && !Jurisdictions.IsKnown(r.Country))
+            .Select(r => r.Country.Trim()).Distinct().ToList();
+        var basis = missing.Count > 0 || none ? RuleBasis.Verified
+            : rowWithoutCountry ? RuleBasis.Interpretation
+            : RuleBasis.Policy;
+        if (none) missing.Add(("jurisdicția de rezidență", "jurisdiction of residence"));
+        if (rowWithoutCountry)
+            missing.Add(("jurisdicția de rezidență pe un rând cu TIN sau motiv", "jurisdiction of residence on a row with a TIN or a reason"));
+        var (unknownRo, unknownEn) = ("", "");
+        if (unknown.Count > 0)
+        {
+            var codes = string.Join(", ", unknown.Select(c => $"«{c}»"));
+            (unknownRo, unknownEn) = unknown.Count == 1
+                ? ($"jurisdicția de rezidență {codes} nu e un cod de țară ISO 3166-1", $"the jurisdiction of residence {codes} is not an ISO 3166-1 country code")
+                : ($"jurisdicțiile de rezidență {codes} nu sunt coduri de țară ISO 3166-1", $"the jurisdictions of residence {codes} are not ISO 3166-1 country codes");
+            (unknownRo, unknownEn) = (
+                $"Autocertificarea nu poate fi acceptată fără verificare: {unknownRo}; operatorul o compară cu actul de identitate (ghid p. 36; politică).",
+                $"The self-certification cannot be accepted without a check: {unknownEn}; the operator compares it with the ID document (guide p. 36; policy).");
+        }
+
+        if (missing.Count == 0 && unknownRo.Length == 0 && !sc.FormFieldsKnown)
             f.Clear(RuleIds.SelfCertValid, "", "SelfCertification",
                 "Autocertificarea are dată și jurisdicții. Semnătura sau confirmarea, numele, adresa și data nașterii din formular nu au ajuns la motor: le verifică operatorul pe document (Sec. IV.B pct. 3).",
                 "The self-certification has a date and jurisdictions. The form's signature or confirmation, name, address and date of birth did not reach the engine: the operator checks them on the document (IV.B(3)).",
                 RuleBasis.Policy);
-        else if (missing.Count == 0)
+        else if (missing.Count == 0 && unknownRo.Length == 0)
             f.Clear(RuleIds.SelfCertValid, "", "SelfCertification",
                 "Autocertificarea are toate elementele cerute: semnătură / confirmare, dată, nume, adresă, jurisdicții, data nașterii (Sec. IV.B pct. 3).",
                 "The self-certification has every required element: signature / confirmation, date, name, address, jurisdictions, date of birth (IV.B(3)).");
         else
-            f.Hit(RuleIds.SelfCertValid, "", "SelfCertification",
-                $"Autocertificarea nu e validă, lipsește: {string.Join(", ", missing.Select(m => m.Ro))} (Sec. IV.B pct. 3).",
-                $"The self-certification is not valid, missing: {string.Join(", ", missing.Select(m => m.En))} (IV.B(3)).");
+        {
+            var (ro, en) = missing.Count > 0
+                ? ($"Autocertificarea nu e validă, lipsește: {string.Join(", ", missing.Select(m => m.Ro))} (Sec. IV.B pct. 3).",
+                   $"The self-certification is not valid, missing: {string.Join(", ", missing.Select(m => m.En))} (IV.B(3)).")
+                : ("", "");
+            f.Hit(RuleIds.SelfCertValid, "", "SelfCertification", $"{ro} {unknownRo}".Trim(), $"{en} {unknownEn}".Trim(), basis);
+        }
     }
 
     // A TIN for each reportable jurisdiction (and the US), or a reason; the format is R3's check. NotChecked (no rules for
@@ -65,8 +100,16 @@ internal static class SelfCertRules
 
         if (!string.IsNullOrWhiteSpace(residence.Tin))
         {
+            // The US TIN is a FATCA requirement (guide p. 38): every result about it sits under FATCA-TIN, never a CRS rule.
+            var formatRule = Jurisdictions.IsUnitedStates(country) ? RuleIds.FatcaTin : RuleIds.TinFormat;
             switch (FormatValid(tins.Check(country, residence.Tin.Trim())))
             {
+                case false when Jurisdictions.IsUnitedStates(country):
+                    f.Hit(RuleIds.FatcaTin, country, "SelfCertification/Tin",
+                        "TIN-ul SUA declarat nu are formatul unui TIN SUA (verificare de format, nu de titular): banca nu se poate baza pe el fără clarificare (IGA Anexa I, VI.A). Acordul nu dă un termen.",
+                        "The declared US TIN does not match a US TIN format (a format check, not an ownership check): the bank may not rely on it without clarification (IGA Annex I, VI.A). The agreement sets no deadline.",
+                        RuleBasis.Policy);
+                    break;
                 case false:
                     f.Hit(RuleIds.TinFormat, country, "SelfCertification/Tin",
                         $"TIN-ul declarat pentru {place} nu are formatul acestei țări (verificare de format, nu de titular): e nevoie de clarificare.",
@@ -74,12 +117,12 @@ internal static class SelfCertRules
                         RuleBasis.Policy);
                     break;
                 case true:
-                    f.Clear(RuleIds.TinFormat, country, "SelfCertification/Tin",
+                    f.Clear(formatRule, country, "SelfCertification/Tin",
                         $"TIN pentru {place}: format valid. Formatul nu confirmă că TIN-ul aparține clientului.",
                         $"TIN for {placeEn}: format valid. The format does not confirm the TIN belongs to the client.");
                     break;
                 default:
-                    f.Clear(RuleIds.TinFormat, country, "SelfCertification/Tin",
+                    f.Clear(formatRule, country, "SelfCertification/Tin",
                         $"TIN pentru {place}: formatul nu a fost verificat (nu avem regulile acestei țări).",
                         $"TIN for {placeEn}: format not checked (no rules for this country).", RuleBasis.Policy);
                     break;
@@ -87,12 +130,9 @@ internal static class SelfCertRules
             return;
         }
 
-        // Guide p. 38: a US resident's self-certification includes the US TIN (Form W-9); no reason replaces it.
         if (Jurisdictions.IsUnitedStates(country))
         {
-            f.Hit(RuleIds.TinMissing, country, "SelfCertification/Tin",
-                "Lipsește TIN-ul SUA: declarația unui rezident SUA trebuie să includă TIN-ul din SUA (de exemplu formularul W-9; ghid p. 38). Motivele A, B și C nu îl înlocuiesc.",
-                "The US TIN is missing: a US resident's self-certification must include the US TIN (e.g. Form W-9; guide p. 38). Reasons A, B and C do not replace it.");
+            UsTinMissing(f);
             return;
         }
 
@@ -140,6 +180,31 @@ internal static class SelfCertRules
         }
     }
 
+    // Guide p. 38; IGA Annex I, III.B.1 and art. 2(2)(a)(1): a US resident's (a US citizen counts as one) self-certification
+    // includes the US TIN, on a W-9 or a similar agreed form, and the account is US reportable. FATCA, not CRS: no 90 days.
+    private static void UsTinMissing(Findings f) =>
+        f.Hit(RuleIds.FatcaTin, Jurisdictions.UnitedStates, "SelfCertification/Tin",
+            "Lipsește TIN-ul SUA: autocertificarea unei persoane SUA trebuie să includă TIN-ul din SUA (formularul W-9 sau un formular similar agreat), iar contul se tratează drept raportabil SUA (ghid p. 38; IGA Anexa I, III.B.1). Motivele A, B și C de la CRS nu îl înlocuiesc. Acordul nu dă un termen.",
+            "The US TIN is missing: a US person's self-certification must include the US TIN (Form W-9 or a similar agreed form), and the account is treated as US reportable (guide p. 38; IGA Annex I, III.B.1). The CRS reasons A, B and C do not replace it. The agreement sets no deadline.");
+
+    // A form declaring US person status (e.g. a US citizen resident in Romania) with no US row has no US TIN either.
+    private static void UsPersonWithoutUsResidence(SubjectSelfCertification sc, Findings f)
+    {
+        if (sc.DeclaresUsPerson && !sc.Residences.Any(r => Jurisdictions.IsUnitedStates(r.Country))) UsTinMissing(f);
+    }
+
+    /// <summary>
+    /// The US TIN of the form on file, for re-evaluation (EvaluateCurrent, Evaluate): FATCA-TIN when the form declares US
+    /// status (a US row or DeclaresUsPerson) without a US TIN, or with one in the wrong format. Cleared entries are not repeated.
+    /// </summary>
+    public static void UsTinOnFile(SubjectSelfCertification sc, ITinFormat tins, Findings f)
+    {
+        var us = sc.Residences.Where(r => Jurisdictions.IsUnitedStates(r.Country)).ToList();
+        if (us.Count == 0) UsPersonWithoutUsResidence(sc, f);
+        else foreach (var residence in us) Tin(residence, tins, f);
+        f.Cleared.Clear();
+    }
+
     private static void Accepted(Findings f, string country, string ro, string en, RuleBasis basis = RuleBasis.Verified)
     {
         f.Hit(RuleIds.TinMissing, country, "SelfCertification/Tin", ro, en, basis);
@@ -150,7 +215,8 @@ internal static class SelfCertRules
     // Reasonableness (IV.C pct. 16-18; guide p. 36-37): the form and the bank's file must not contradict the declaration.
     private static void Consistency(RuleSubject client, SubjectSelfCertification sc, Findings f)
     {
-        var declared = sc.Residences.Select(r => Jurisdictions.Normalize(r.Country)).ToHashSet();
+        // Only real jurisdictions: an empty or unknown code is SC-VALID's finding, not a contradiction with the file.
+        var declared = sc.Residences.Where(r => Jurisdictions.IsKnown(r.Country)).Select(r => Jurisdictions.Normalize(r.Country)).ToHashSet();
 
         var formCountry = Jurisdictions.Normalize(sc.ResidenceAddressCountry);
         if (formCountry.Length > 0 && declared.Count > 0 && !declared.Contains(formCountry))

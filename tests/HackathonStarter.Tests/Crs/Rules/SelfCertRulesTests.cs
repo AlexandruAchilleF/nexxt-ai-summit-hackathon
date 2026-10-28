@@ -1,4 +1,5 @@
 using HackathonStarter.Features.Rules;
+using HackathonStarter.Features.Tin;
 using AddressKind = HackathonStarter.Features.Clients.AddressKind;
 using NoTinReason = HackathonStarter.Features.Clients.NoTinReason;
 using static HackathonStarter.Tests.Crs.RuleEngine.Subjects;
@@ -111,13 +112,159 @@ public class SelfCertRulesTests
     [Theory]
     [InlineData(NoTinReason.None)]
     [InlineData(NoTinReason.A_CountryDoesNotIssue)]
+    [InlineData(NoTinReason.B_UnableToObtain)]
     [InlineData(NoTinReason.C_NotRequired)]
-    public void A_us_residence_without_the_us_tin_is_never_accepted(NoTinReason reason)
+    public void A_us_residence_without_the_us_tin_is_a_fatca_alert_not_a_crs_clarification(NoTinReason reason)
     {
+        // Guide p. 38 and IGA Annex I, III.B.1: a US resident's self-certification includes the US TIN. FATCA, so no CRS rule.
         var o = Run(Form(new SubjectTaxResidence("RO", "1900101400004"), new SubjectTaxResidence("US", null, reason, "Nu am.")));
-        var hit = Assert.Single(o.Uncovered, h => h.RuleId == RuleIds.TinMissing);
-        Assert.Equal("US", hit.Jurisdiction);
+
+        Assert.Equal((Decision.FatcaAlert, Regime.Fatca), (o.Decision, o.Regime));
+        var hit = Assert.Single(o.Uncovered);
+        Assert.Equal((RuleIds.FatcaTin, "US", Regime.Fatca, RuleBasis.Verified), (hit.RuleId, hit.Jurisdiction, hit.Regime, hit.Basis));
         Assert.Contains("p. 38", hit.ExplanationRo);
+        Assert.Contains("III.B.1", hit.Explanation);
+        Assert.DoesNotContain(o.Indicia, h => h.RuleId == RuleIds.TinMissing);
+        Assert.Contains("Acordul nu dă un termen", o.ExplanationRo);
+        Assert.DoesNotContain("90", o.ExplanationRo);
+    }
+
+    [Fact]
+    public void A_us_person_form_without_a_us_residence_entry_has_no_us_tin_either()
+    {
+        var o = Run(Form(new SubjectTaxResidence("RO", "1900101400004")) with { DeclaresUsPerson = true });
+        Assert.Equal(RuleIds.FatcaTin, Assert.Single(o.Uncovered).RuleId);
+        Assert.Equal(Decision.FatcaAlert, o.Decision);
+    }
+
+    [Fact]
+    public void A_us_person_form_with_the_us_tin_is_accepted_and_reportable_to_the_us()
+    {
+        var o = Run(Form(new SubjectTaxResidence("RO", "1900101400004"), new SubjectTaxResidence("US", "123-45-6789")) with { DeclaresUsPerson = true });
+        Assert.Equal(Decision.NoCase, o.Decision);
+        Assert.Equal(["US"], o.ReportableFor);
+        // Every result about the US TIN sits under the FATCA rule, never the CRS one.
+        Assert.Equal(Regime.Fatca, Assert.Single(o.Cleared, c => c.Jurisdiction == "US").Regime);
+        Assert.DoesNotContain(o.Cleared, c => c.RuleId == RuleIds.TinFormat && c.Jurisdiction == "US");
+    }
+
+    [Fact]
+    public void A_us_tin_in_the_wrong_format_is_a_fatca_policy_finding_that_does_not_claim_the_tin_is_missing()
+    {
+        var engine = new CrsRuleEngine(new UsTinFormat());
+        var o = engine.EvaluateSelfCertification(RoResident(), Form(new SubjectTaxResidence("RO", "1900101400004"), new SubjectTaxResidence("US", "000000000")));
+
+        Assert.Equal((Decision.FatcaAlert, Regime.Fatca), (o.Decision, o.Regime));
+        var hit = Assert.Single(o.Uncovered);
+        Assert.Equal((RuleIds.FatcaTin, RuleBasis.Policy), (hit.RuleId, hit.Basis));
+        Assert.Contains("nu are formatul unui TIN SUA", o.ExplanationRo);
+        Assert.DoesNotContain("p. 38", o.ExplanationRo);
+        Assert.DoesNotContain("TIN valid", o.ExplanationRo + o.Explanation);
+
+        Assert.Equal(Regime.Fatca, Assert.Single(engine.EvaluateSelfCertification(RoResident(),
+            Form(new SubjectTaxResidence("RO", "1900101400004"), new SubjectTaxResidence("US", "521374829"))).Cleared, c => c.Jurisdiction == "US").Regime);
+    }
+
+    [Fact]
+    public void A_form_with_a_fatca_and_a_crs_finding_says_both_routes()
+    {
+        var o = Run(Form(new SubjectTaxResidence("US", null), new SubjectTaxResidence("DE", null)));
+
+        Assert.Equal((Decision.FatcaAlert, Regime.Both), (o.Decision, o.Regime));
+        Assert.Contains("Acordul nu dă un termen", o.ExplanationRo);
+        Assert.Contains("CRS: SC-TIN-MISSING (DE)", o.ExplanationRo);
+        Assert.Contains("corectarea", o.ExplanationRo);
+        Assert.Contains("Motorul nu calculează termene", o.ExplanationRo);
+    }
+
+    private sealed class UsTinFormat : ITinFormat
+    {
+        public TinCheck Check(string country, string tin) =>
+            new(country, tin, tin != "000000000", country == "US" ? TinCheckSource.LocalRules : TinCheckSource.NotChecked, "");
+
+        public bool? IssuesTinToAllResidents(string country) => null;
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("  ")]
+    [InlineData("XX")]
+    public void A_residence_without_a_recognizable_jurisdiction_makes_the_form_not_valid(string country)
+    {
+        // Guide p. 34: the form names the jurisdiction(s) of residence; p. 36: a missing one is never a minor error.
+        foreach (var sc in new[]
+                 {
+                     Form(new SubjectTaxResidence(country, "123456789")),
+                     Form(new SubjectTaxResidence("RO", "1900101400004"), new SubjectTaxResidence(country, "123456789")),
+                     new SubjectSelfCertification(ChangeAt, [new SubjectTaxResidence(country, "123456789")]) { FormFieldsKnown = false },
+                 })
+        {
+            var o = Run(sc);
+            Assert.Equal(Decision.Clarification, o.Decision);
+            var hit = Assert.Single(o.Uncovered, h => h.RuleId == RuleIds.SelfCertValid);
+            Assert.Contains("jurisdicția de rezidență", hit.ExplanationRo);
+            Assert.DoesNotContain(o.Cleared, c => c.RuleId == RuleIds.SelfCertValid);
+        }
+    }
+
+    [Fact]
+    public void An_unrecognized_code_is_named_and_left_to_the_operator_as_policy()
+    {
+        var o = Run(Form(new SubjectTaxResidence("XX", "123456789")));
+        var hit = Assert.Single(o.Uncovered, h => h.RuleId == RuleIds.SelfCertValid);
+        Assert.Contains("«XX» nu e un cod de țară ISO 3166-1", hit.ExplanationRo);
+        Assert.DoesNotContain("lipsește", hit.ExplanationRo); // a code is there: p. 36 may still accept it
+        Assert.Equal(RuleBasis.Policy, hit.Basis); // p. 36 lets the bank accept an abbreviation an ID document matches
+        Assert.Contains("Operatorul compară întâi jurisdicția", o.ExplanationRo);
+        Assert.Equal(RuleBasis.Verified, Assert.Single(Run(Form(new SubjectTaxResidence(" ", "1"))).Uncovered).Basis);
+
+        var two = Assert.Single(Run(Form(new SubjectTaxResidence("XX", "1"), new SubjectTaxResidence("QQ", "2"))).Uncovered);
+        Assert.Contains("«XX», «QQ» nu sunt coduri de țară ISO 3166-1", two.ExplanationRo);
+        Assert.Contains("are not ISO 3166-1 country codes", two.Explanation);
+    }
+
+    [Fact]
+    public void Self_certification_findings_are_the_ones_that_start_no_change_of_circumstances_deadline()
+    {
+        Assert.All([RuleIds.SelfCertValid, RuleIds.TinFormat, RuleIds.TinMissing, RuleIds.SelfCertConsistent, RuleIds.FatcaTin, RuleIds.FatcaChange],
+            id => Assert.True(RuleIds.IsSelfCertificationFinding(id), id));
+        Assert.All(RuleCatalog.All.Where(r => r.Id.StartsWith("CRS-IND-") || r.Id.StartsWith("FATCA-IND-")),
+            r => Assert.False(RuleIds.IsSelfCertificationFinding(r.Id), r.Id));
+    }
+
+    [Fact]
+    public void Every_jurisdiction_the_engine_lists_is_a_known_country_code()
+    {
+        var codes = from a in Enumerable.Range('A', 26) from b in Enumerable.Range('A', 26) select $"{(char)a}{(char)b}";
+        Assert.All(codes.Where(c => Jurisdictions.IsCrsReportable(c) || Jurisdictions.IsAnafNotReported(c) || Jurisdictions.IsRomania(c)
+                                    || Jurisdictions.IsUnitedStates(c)), c => Assert.True(Jurisdictions.IsKnown(c), c));
+        Assert.True(Jurisdictions.IsKnown(" el "));
+        Assert.True(Jurisdictions.IsKnown("UK")); // normalized to GB
+        Assert.False(Jurisdictions.IsKnown("GER")); // not ISO: the operator matches it to the ID document (p. 36)
+    }
+
+    [Fact]
+    public void A_blank_row_next_to_a_filled_in_one_is_an_unused_line_of_the_form()
+    {
+        var o = Run(Form(new SubjectTaxResidence("RO", "1900101400004"), new SubjectTaxResidence(" ", null)));
+        Assert.Equal(Decision.NoCase, o.Decision);
+        Assert.Contains(o.Cleared, c => c.RuleId == RuleIds.SelfCertValid);
+
+        // The same row with a TIN on it is a missing jurisdiction, read row by row: our reading.
+        var row = Assert.Single(Run(Form(new SubjectTaxResidence("RO", "1900101400004"), new SubjectTaxResidence(" ", "123456789"))).Uncovered);
+        Assert.Equal((RuleIds.SelfCertValid, RuleBasis.Interpretation), (row.RuleId, row.Basis));
+    }
+
+    [Theory]
+    [InlineData("NL", "123456782")] // no TIN-format rule in R3's table: format not checked, the form stays valid
+    [InlineData("jp", "123456789012")]
+    [InlineData("EL", "123456789")] // the EU code for Greece
+    [InlineData("XK", "123456789")] // Kosovo: not in ISO 3166-1, but a code the EU uses
+    public void Any_real_jurisdiction_passes_validity_even_without_a_tin_format_rule(string country, string tin)
+    {
+        var o = Run(Form(new SubjectTaxResidence(country, tin)));
+        Assert.Contains(o.Cleared, c => c.RuleId == RuleIds.SelfCertValid);
+        Assert.DoesNotContain(o.Indicia, h => h.RuleId == RuleIds.SelfCertValid);
     }
 
     [Fact]

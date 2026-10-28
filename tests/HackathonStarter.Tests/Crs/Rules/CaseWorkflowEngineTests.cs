@@ -84,6 +84,50 @@ public class CaseWorkflowEngineTests
         Assert.DoesNotContain("US", closed.ReportableFor);
     }
 
+    [Fact]
+    public async Task A_us_form_without_the_us_tin_opens_a_fatca_case_without_a_deadline()
+    {
+        await using var host = await WithRealEngine();
+        var client = await host.SeedClientAsync("CL-0001", new DateOnly(2019, 3, 14));
+
+        var change = await host.As(Member).Changes.RecordAsync(new ChangeRequest("CL-0001", ChangeKind.SelfCertSubmitted, "online",
+            SelfCertification: new SelfCertificationSnapshot(host.Clock.UtcNow, [new("RO", client.Cnp), new("US", null)], DeclaresUsPerson: true)));
+
+        Assert.Equal((Decision.FatcaAlert, Regime.Fatca), (change.Outcome.Decision, change.Outcome.Regime));
+        await using var db = await host.DbAsync();
+        var item = await db.Cases.Include(c => c.Indicia).SingleAsync(c => c.Code == change.CaseCode);
+        // FATCA, and a finding on the form: no deadline in the guide (p. 38; GOLDEN-CASES Î1), never the CRS 90 days.
+        Assert.Equal((Regime.Fatca, (DateTime?)null), (item.Regime, item.DueAt));
+        Assert.DoesNotContain("DL-", item.DeadlineRuleId);
+        Assert.Equal((RuleIds.FatcaTin, "US"), (Assert.Single(item.Indicia).RuleId, Assert.Single(item.Indicia).Jurisdiction));
+    }
+
+    [Theory]
+    [InlineData(null, false)]
+    [InlineData("521374829", true)]
+    public async Task A_fatca_tin_case_closes_only_on_a_form_with_the_us_tin(string? usTin, bool closes)
+    {
+        await using var host = await WithRealEngine();
+        var client = await host.SeedClientAsync("CL-0001", new DateOnly(2019, 3, 14));
+        Task<ChangeResult> Form(string? tin) => host.As(Member).Changes.RecordAsync(new ChangeRequest("CL-0001", ChangeKind.SelfCertSubmitted, "online",
+            SelfCertification: new SelfCertificationSnapshot(host.Clock.UtcNow, [new("RO", client.Cnp), new("US", tin)], DeclaresUsPerson: true)));
+
+        var code = await RequestSentAsync(host, await Form(null));
+        host.AdvanceDays(3);
+        await Form(usTin);
+        await using (var db = await host.DbAsync())
+        {
+            var answer = await db.SelfCertifications.Where(x => x.ClientId == client.Id && x.Status == SelfCertStatus.Valid).Select(x => x.Id).SingleAsync();
+            await host.As(Member).Cases.RegisterResponseAsync(code, Answer(answer));
+        }
+
+        if (closes)
+            Assert.Equal(["US"], (await host.As(Admin).Cases.CloseAsync(code, ConfirmationChannel.Online)).ReportableFor);
+        else
+            Assert.Contains("FATCA-TIN:US", (await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                host.As(Admin).Cases.CloseAsync(code, ConfirmationChannel.Online))).Message);
+    }
+
     /// <summary>The real engine, with the closing re-evaluation dated (what R2's CloseAsync would pass).</summary>
     private sealed class ClosesWithDate(CrsRuleEngine real, Func<DateTime?> changeKnownAt) : ICrsRuleEngine
     {

@@ -98,8 +98,12 @@ internal static class CrsIndicia
         var en = $"Current in-care-of address in {Place(country, true)}: not a residence address (guide p. 48), but a mailing address, so a CRS indicium (12(b); our reading, GOLDEN-CASES Î10).";
         if (onlyAddress)
         {
-            ro += " E aceeași adresă ca la CRS-IND-CO, nu un alt indiciu: ruta rămâne cea din pct. 17 (ghid p. 31).";
-            en += " It is the same address as CRS-IND-CO, not another indicium: the route stays the one of 17 (guide p. 31).";
+            ro += " E aceeași adresă ca la CRS-IND-CO, nu un alt indiciu.";
+            en += " It is the same address as CRS-IND-CO, not another indicium.";
+            // The pct. 17 route exists only for a preexisting account with no other indicium (p. 31), so it is said only there.
+            if (scope.CrsPreexisting)
+                (ro, en) = (ro + " Fără alte indicii, ruta rămâne cea din pct. 17 (ghid p. 31).",
+                    en + " With no other indicia, the route stays the one of 17 (guide p. 31).");
         }
         if (!scope.CrsPreexisting) (ro, en) = (ro + NewAccountRo, en + NewAccountEn);
         f.Hit(RuleIds.CrsMailing, country, $"Addresses/{AddressKind.InCareOf}", ro, en, RuleBasis.Interpretation);
@@ -116,17 +120,19 @@ internal static class CrsIndicia
         {
             var country = Jurisdictions.Normalize(phone.Country);
             if (Jurisdictions.IsRomania(country)) continue;
+            var (alsoRo, alsoEn) = AlsoNotReportable(country);
 
-            if (!Jurisdictions.IsCrsReportable(country))
-                NotReportable(f, RuleIds.CrsPhone, country, "Phones", "Telefon actual", "Current phone");
-            else if (!counted.Contains(phone))
+            // The guide's exceptions first, then "not a CRS jurisdiction" (decision Î12, golden case 14).
+            if (!counted.Contains(phone))
                 f.Clear(RuleIds.CrsPhone, country, "Phones",
-                    $"Telefonul din {Place(country)} e al unui prestator de servicii, iar banca are și alte numere: nu e indiciu (pct. 13).",
-                    $"The phone in {Place(country, true)} belongs to a service provider and the bank has other numbers: not an indicium (13).");
+                    $"Telefonul din {Place(country)} e al unui prestator de servicii, iar banca are și alte numere: nu e indiciu (pct. 13){alsoRo}",
+                    $"The phone in {Place(country, true)} belongs to a service provider and the bank has other numbers: not an indicium (13){alsoEn}");
             else if (hasRomanianPhone)
                 f.Clear(RuleIds.CrsPhone, country, "Phones",
-                    $"Telefon din {Place(country)}, dar există și un telefon actual în România: nu e indiciu CRS (pct. 12 lit. c).",
-                    $"Phone in {Place(country, true)}, but there is also a current Romanian phone: not a CRS indicium (12(c)).");
+                    $"Telefon din {Place(country)}, dar există și un telefon actual în România: nu e indiciu CRS (pct. 12 lit. c){alsoRo}",
+                    $"Phone in {Place(country, true)}, but there is also a current Romanian phone: not a CRS indicium (12(c)){alsoEn}");
+            else if (!Jurisdictions.IsCrsReportable(country))
+                NotReportable(f, RuleIds.CrsPhone, country, "Phones", "Telefon actual", "Current phone");
             else
             {
                 // The exception says "no phone in Romania"; a Romanian number that is no longer current is not counted
@@ -155,27 +161,23 @@ internal static class CrsIndicia
             var country = Jurisdictions.Normalize(order.BeneficiaryCountry);
             if (Jurisdictions.IsRomania(country)) continue;
             var depository = account.Type == AccountType.Depository;
+            var (alsoRo, alsoEn) = AlsoNotReportable(country);
 
-            if (Jurisdictions.IsUnitedStates(country))
-            {
-                var (why, whyEn) = Jurisdictions.WhyNotCrsReportable(country);
+            // The guide's exceptions first, then "not a CRS jurisdiction" (decision Î12, golden case 5c).
+            if (!order.IsActive)
                 f.Clear(RuleIds.CrsStandingOrder, country, "StandingOrders",
-                    $"Ordin permanent către un cont din SUA: {why}" + (depository ? "; în plus, e dintr-un cont de depozit." : "."),
-                    $"Standing order to a US account: {whyEn}" + (depository ? "; besides, it is from a depository account." : "."),
-                    RuleBasis.Interpretation);
-            }
-            else if (!Jurisdictions.IsCrsReportable(country))
-                NotReportable(f, RuleIds.CrsStandingOrder, country, "StandingOrders", "Ordin permanent", "Standing order");
-            else if (!order.IsActive)
-                f.Clear(RuleIds.CrsStandingOrder, country, "StandingOrders",
-                    $"Ordinul permanent către {Place(country)} nu mai e activ: nu e o instrucțiune permanentă (pct. 13).",
-                    $"The standing order to {Place(country, true)} is no longer active: not a standing instruction (13).");
+                    $"Ordinul permanent către {Place(country)} nu mai e activ: nu e o instrucțiune permanentă (pct. 13){alsoRo}",
+                    $"The standing order to {Place(country, true)} is no longer active: not a standing instruction (13){alsoEn}");
             else if (depository)
                 f.Clear(RuleIds.CrsStandingOrder, country, "StandingOrders",
                     $"Ordin permanent către {Place(country)} dintr-un cont de depozit{ProductNote(account)}: exceptat la CRS " +
-                    "(pct. 12 lit. d; contul curent e cont de depozit, Sec. VIII.C pct. 2).",
+                    $"(pct. 12 lit. d; contul curent e cont de depozit, Sec. VIII.C pct. 2){alsoRo}",
                     $"Standing order to {Place(country, true)} from a depository account ({ProductEn(account)}): excepted under CRS " +
-                    "(12(d); a current account is a depository account, VIII.C(2)).");
+                    $"(12(d); a current account is a depository account, VIII.C(2)){alsoEn}");
+            else if (!Jurisdictions.IsCrsReportable(country))
+                NotReportable(f, RuleIds.CrsStandingOrder, country, "StandingOrders",
+                    Jurisdictions.IsUnitedStates(country) ? "Ordin permanent către un cont" : "Ordin permanent",
+                    Jurisdictions.IsUnitedStates(country) ? "Standing order to an account" : "Standing order");
             else
             {
                 var basis = AccountStatus.IsCrsPreexisting(account.OpenedOn) ? RuleBasis.Verified : RuleBasis.Interpretation;
@@ -248,6 +250,15 @@ internal static class CrsIndicia
                 f.Hit(RuleIds.CrsInCareOf, country, field, ro, en, basis);
             }
         }
+    }
+
+    // "; în plus, SUA nu e jurisdicție CRS raportabilă (...)." after a guide exception, or "." for a reportable jurisdiction.
+    private static (string Ro, string En) AlsoNotReportable(string country)
+    {
+        if (Jurisdictions.IsCrsReportable(country)) return (".", ".");
+        var (why, whyEn) = Jurisdictions.WhyNotCrsReportable(country);
+        return ($"; în plus, {why} (interpretare: listele ANAF nu sunt în sursele noastre).",
+            $"; besides, {whyEn} (interpretation: the ANAF lists are not in our sources).");
     }
 
     // The ANAF lists of reportable / non-reported jurisdictions and "the US is not a CRS jurisdiction" are not in the repo's

@@ -18,7 +18,9 @@ public sealed record EngineCase(string Id, string Title, RuleSubject Before, Rul
 
 /// <summary>
 /// R1's copy of the engine layer of docs/GOLDEN-CASES.md, on RuleSubject, with extra checks (source fields, phrases). The
-/// shared data is R5's GoldenCases.cs: GoldenDataEngineTests runs it through the registered engine and EvaluationService.
+/// shared data is R5's GoldenCases.cs: GoldenDataEngineTests runs it through the registered engine and EvaluationService;
+/// these may differ in data a card does not fix (balances, IBANs) but never in the decision, the hits or the regime
+/// (GoldenEngineTests.Engine_cases_never_contradict_the_canonical_golden_cases).
 /// </summary>
 internal static class EngineCases
 {
