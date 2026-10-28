@@ -1,0 +1,48 @@
+@using HackathonStarter.Features.Changes
+@inject IChangeService Changes
+@inject CurrentUser CurrentUser
+@* Records the upload of a document still on file unscanned: ChangeService runs the shield and code decides (ShieldAlert or clean).
+   OnScanned lets the page reload and show the verdict in place of this button. *@
+@if (_canWrite)
+{
+    <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Primary" Class="mt-2" Disabled="_busy" OnClick="ScanAsync"
+               StartIcon="@Icons.Material.Rounded.DocumentScanner">
+        @if (_busy)
+        {
+            <span class="app-spin mr-2"></span> @T("Scanning…")
+        }
+        else
+        {
+            @T("Record the upload and scan")
+        }
+    </MudButton>
+}
+@if (_error is not null)
+{
+    <MudText Typo="Typo.caption" Color="Color.Error" Class="d-block mt-1">@_error</MudText>
+}
+@code {
+    [Parameter, EditorRequired] public string ClientCode { get; set; } = "";
+    [Parameter, EditorRequired] public int DocumentId { get; set; }
+    [Parameter] public EventCallback OnScanned { get; set; }
+
+    private bool _canWrite;
+    private bool _busy;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync() =>
+        _canWrite = (await CurrentUser.GetAsync()).Role is Roles.Admin or Roles.Member; // ChangeService checks it again
+
+    private async Task ScanAsync()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            await Changes.RecordAsync(new ChangeRequest(ClientCode, ChangeKind.DocumentUploaded, "online", DocumentId: DocumentId));
+            await OnScanned.InvokeAsync();
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+}
