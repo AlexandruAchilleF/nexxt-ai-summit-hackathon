@@ -39,8 +39,8 @@ internal static class SelfCertRules
 
         if (missing.Count == 0 && !sc.FormFieldsKnown)
             f.Clear(RuleIds.SelfCertValid, "", "SelfCertification",
-                "Autocertificarea are semnătură / confirmare, dată și jurisdicții. Numele, adresa și data nașterii din formular nu au ajuns la motor: le verifică operatorul pe document (Sec. IV.B pct. 3).",
-                "The self-certification has a signature / confirmation, a date and jurisdictions. The form's name, address and date of birth did not reach the engine: the operator checks them on the document (IV.B(3)).",
+                "Autocertificarea are dată și jurisdicții. Semnătura sau confirmarea, numele, adresa și data nașterii din formular nu au ajuns la motor: le verifică operatorul pe document (Sec. IV.B pct. 3).",
+                "The self-certification has a date and jurisdictions. The form's signature or confirmation, name, address and date of birth did not reach the engine: the operator checks them on the document (IV.B(3)).",
                 RuleBasis.Policy);
         else if (missing.Count == 0)
             f.Clear(RuleIds.SelfCertValid, "", "SelfCertification",
@@ -87,8 +87,18 @@ internal static class SelfCertRules
             return;
         }
 
-        // No TIN: reason C is enough; A / B only if the jurisdiction does not issue TINs to everyone (VII.A pct. 3 a) iv)).
-        // R3's OECD sheets first; our table only where R3 has no answer yet.
+        // Guide p. 38: a US resident's self-certification includes the US TIN (Form W-9); no reason replaces it.
+        if (Jurisdictions.IsUnitedStates(country))
+        {
+            f.Hit(RuleIds.TinMissing, country, "SelfCertification/Tin",
+                "Lipsește TIN-ul SUA: declarația unui rezident SUA trebuie să includă TIN-ul din SUA (de exemplu formularul W-9; ghid p. 38). Motivele A, B și C nu îl înlocuiesc.",
+                "The US TIN is missing: a US resident's self-certification must include the US TIN (e.g. Form W-9; guide p. 38). Reasons A, B and C do not replace it.");
+            return;
+        }
+
+        // No TIN: guide p. 37, the form is unreliable when the OECD sheet says the jurisdiction issues TINs to all residents,
+        // whatever the reason. Otherwise reason C (p. 53: domestic law does not require the TIN) or A / B where the sheet says
+        // it does not issue them to everyone. R3's OECD sheets first; our table only where R3 has no answer yet.
         var issuesToAll = tins.IssuesTinToAllResidents(country) ?? Jurisdictions.IssuesTinToAll(country);
         var hasExplanation = !string.IsNullOrWhiteSpace(residence.NoTinExplanation);
         switch (residence.NoTinReason)
@@ -98,10 +108,6 @@ internal static class SelfCertRules
                     $"Lipsește TIN-ul pentru {place} și nu e dat niciun motiv (A, B sau C).",
                     $"The TIN for {placeEn} is missing and no reason (A, B or C) is given.");
                 break;
-            case NoTinReason.C_NotRequired:
-                Accepted(f, country, $"Fără TIN pentru {place}, motiv C: TIN-ul nu e cerut de legea internă (Sec. I.D).",
-                    $"No TIN for {placeEn}, reason C: domestic law does not require it (I.D).");
-                break;
             case NoTinReason.B_UnableToObtain when !hasExplanation:
                 f.Hit(RuleIds.TinMissing, country, "SelfCertification/Tin",
                     $"Fără TIN pentru {place}, motiv B, dar fără explicația cerută de formular.",
@@ -109,8 +115,14 @@ internal static class SelfCertRules
                 break;
             case var _ when issuesToAll == true:
                 f.Hit(RuleIds.TinMissing, country, "SelfCertification/Tin",
-                    $"Fără TIN pentru {place}, deși fișa OCDE spune că {place} emite TIN tuturor persoanelor fizice: banca are motive să știe că autocertificarea e nesigură (Sec. VII.A pct. 3 lit. a) pct. (iv)).",
-                    $"No TIN for {placeEn}, although the OECD sheet says {placeEn} issues TINs to all individuals: the bank has reason to know the self-certification is unreliable (VII.A(3)(a)(iv)).");
+                    $"Fără TIN pentru {place}, deși fișa OCDE spune că {place} emite TIN tuturor persoanelor fizice: banca are motive să știe că autocertificarea e nesigură (Sec. VII.A pct. 3 lit. a) pct. (iv); ghid p. 37).",
+                    $"No TIN for {placeEn}, although the OECD sheet says {placeEn} issues TINs to all individuals: the bank has reason to know the self-certification is unreliable (VII.A(3)(a)(iv); guide p. 37).");
+                break;
+            case NoTinReason.C_NotRequired:
+                Accepted(f, country,
+                    $"Fără TIN pentru {place}, motiv C: clientul declară că legea din {place} nu cere colectarea TIN-ului (ghid p. 53). Motorul nu cunoaște legea acelei țări: confirmă operatorul.",
+                    $"No TIN for {placeEn}, reason C: the client states that the law of {placeEn} does not require collecting the TIN (guide p. 53). The engine does not know that country's law: the operator confirms.",
+                    RuleBasis.Interpretation);
                 break;
             case var _ when issuesToAll == false:
                 var letter = residence.NoTinReason == NoTinReason.A_CountryDoesNotIssue ? "A" : "B";
@@ -156,10 +168,16 @@ internal static class SelfCertRules
                 $"Dosarul băncii are o adresă actuală în {Place(country)}, dar autocertificarea nu declară {Place(country)}: testul de rezonabilitate nu trece (ghid p. 36, exemplul 1).",
                 $"The bank's file has a current address in {Place(country, true)}, but the self-certification does not declare {Place(country, true)}: the reasonableness test fails (guide p. 36, example 1).");
 
-        var usOnFile = client.Citizenships.Any(Jurisdictions.IsUnitedStates) || Jurisdictions.IsUnitedStates(client.BirthCountry);
-        if (usOnFile && !sc.DeclaresUsPerson && !declared.Contains(Jurisdictions.UnitedStates))
+        // IGA Annex I: citizenship on file has no exception and contradicts the form (VI.A); a US place of birth needs the
+        // documents of II.B.4 lit. a.
+        if (sc.DeclaresUsPerson || declared.Contains(Jurisdictions.UnitedStates)) return;
+        if (client.Citizenships.Any(Jurisdictions.IsUnitedStates))
             f.Hit(RuleIds.FatcaChange, Jurisdictions.UnitedStates, "SelfCertification",
-                "Dosarul are cetățenie SUA sau locul nașterii în SUA, dar autocertificarea nu declară statut de persoană SUA: pentru a înlătura indiciul e nevoie de documentele din IGA Anexa I, II.B.4.",
-                "The file shows US citizenship or a US place of birth, but the self-certification does not declare US person status: removing the indicium needs the documents in IGA Annex I, II.B.4.");
+                "Dosarul are cetățenie SUA, dar autocertificarea nu declară statut de persoană SUA: banca nu se poate baza pe un formular contrazis de dosar (IGA Anexa I, VI.A).",
+                "The file shows US citizenship, but the self-certification does not declare US person status: the bank may not rely on a form its file contradicts (IGA Annex I, VI.A).");
+        else if (Jurisdictions.IsUnitedStates(client.BirthCountry))
+            f.Hit(RuleIds.FatcaChange, Jurisdictions.UnitedStates, "SelfCertification",
+                "Dosarul are locul nașterii în SUA, dar autocertificarea nu declară statut de persoană SUA: e nevoie și de un act de identitate non-SUA și de certificatul de pierdere a cetățeniei SUA sau o explicație rezonabilă (IGA Anexa I, II.B.4 lit. a).",
+                "The file shows a US place of birth, but the self-certification does not declare US person status: a non-US ID and the certificate of loss of US nationality or a reasonable explanation are also needed (IGA Annex I, II.B.4(a)).");
     }
 }

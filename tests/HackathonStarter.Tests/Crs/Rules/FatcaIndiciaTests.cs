@@ -121,7 +121,14 @@ public class FatcaIndiciaTests
     {
         var after = RoResident().WithAccounts(Account(AccountType.Depository, FatcaPreexisting, balance: 42_300m))
             .WithOnlyAddress(AddressKind.InCareOf, "US");
-        Assert.Equal(RuleBasis.Verified, HitOf(Run(after), RuleIds.FatcaInCareOf).Basis);
+        // The old Romanian address is still on file, not current: "sole address" read as current only (Q6), our reading.
+        var hit = HitOf(Run(after), RuleIds.FatcaInCareOf);
+        Assert.Equal(RuleBasis.Interpretation, hit.Basis);
+        Assert.Contains("interpretare de design", hit.ExplanationRo);
+        Assert.DoesNotContain("Cont nou FATCA", hit.ExplanationRo);
+
+        var nothingOld = after with { Addresses = [.. after.Addresses.Where(a => a.IsCurrent)] };
+        Assert.Equal(RuleBasis.Verified, HitOf(Run(nothingOld), RuleIds.FatcaInCareOf).Basis);
     }
 
     [Theory]
@@ -161,5 +168,131 @@ public class FatcaIndiciaTests
         var o = Run(RoResident().WithAccounts(account));
         Assert.Equal(RuleBasis.Interpretation, HitOf(o, RuleIds.FatcaStandingOrder).Basis);
         Assert.Equal(RuleBasis.Verified, Assert.Single(o.Indicia, h => h.RuleId == RuleIds.CrsStandingOrder).Basis);
+    }
+
+    // A new "not a US person" self-certification, against IGA Annex I as published by the US Treasury: III.B.2 for new
+    // accounts, II.B.3-4 for preexisting ones, VI.A for a form the file contradicts.
+    private static readonly SubjectSelfCertification NotUsPerson = SelfCert(ChangeAt, new SubjectTaxResidence("RO", "1900101400004"));
+
+    public static TheoryData<string, string> NeedsDocumentsWhenPreexisting => new()
+    {
+        { "address", RuleIds.FatcaAddress }, { "us-only-phone", RuleIds.FatcaPhone }, { "order", RuleIds.FatcaStandingOrder },
+    };
+
+    private static RuleSubject WithUsLink(RuleSubject s, string link, DateOnly openedOn) => link switch
+    {
+        "address" => s.WithAccounts(Account(AccountType.Depository, openedOn)).MovedTo("US"),
+        "us-only-phone" => s.WithAccounts(Account(AccountType.Depository, openedOn)).ReplacePhone("+12025550143", "US"),
+        "order" => s.WithAccounts(Account(AccountType.Depository, openedOn).WithOrder("073909523/4417209358", "US")),
+        "phone-next-to-ro" => s.WithAccounts(Account(AccountType.Depository, openedOn)).WithPhone("+13125550147", "US"),
+        "power-of-attorney" => s.WithAccounts(Account(AccountType.Depository, openedOn)).WithPowerOfAttorney("Daniel Ionescu", "US"),
+        _ => throw new ArgumentOutOfRangeException(nameof(link)),
+    };
+
+    [Theory]
+    [MemberData(nameof(NeedsDocumentsWhenPreexisting))]
+    public void The_form_from_account_opening_never_covers_a_fatca_indicium(string link, string ruleId)
+    {
+        var client = WithUsLink(RoResident(), link, new DateOnly(2019, 3, 14));
+
+        Assert.Equal(Decision.FatcaAlert, Engine.EvaluateCurrent(client).Decision);
+        var o = Engine.EvaluateCurrent(client, ChangeAt); // its only form was signed in 2019, before the change
+        Assert.Equal(Decision.FatcaAlert, o.Decision);
+        Assert.Equal(Coverage.None, HitOf(o, ruleId).CoveredBy);
+    }
+
+    [Theory]
+    [MemberData(nameof(NeedsDocumentsWhenPreexisting))]
+    public void On_a_new_account_a_new_not_us_person_form_covers_the_indicium_as_our_reading(string link, string ruleId)
+    {
+        var client = WithUsLink(RoResident(), link, new DateOnly(2019, 3, 14)).WithSelfCert(NotUsPerson);
+
+        var o = Engine.EvaluateCurrent(client, ChangeAt);
+
+        Assert.Equal(Decision.Compliant, o.Decision);
+        var hit = HitOf(o, ruleId);
+        Assert.Equal((Coverage.SelfCertification, RuleBasis.Interpretation), (hit.CoveredBy, hit.Basis));
+        Assert.Contains("III.B.2", hit.ExplanationRo);
+        Assert.DoesNotContain("US", o.ReportableFor);
+        Assert.Equal(RuleBasis.Interpretation, Assert.Single(o.Cleared, c => c.RuleId == RuleIds.FatcaChange).Basis);
+        // Without the date the engine cannot tell the form is new, so it keeps the alert.
+        Assert.Equal(Decision.FatcaAlert, Engine.EvaluateCurrent(client).Decision);
+    }
+
+    [Theory]
+    [MemberData(nameof(NeedsDocumentsWhenPreexisting))]
+    public void On_a_preexisting_account_the_form_alone_is_not_enough_for_address_us_only_phone_or_order(string link, string ruleId)
+    {
+        var client = WithUsLink(RoResident(), link, FatcaPreexisting).WithSelfCert(NotUsPerson);
+
+        var o = Engine.EvaluateCurrent(client, ChangeAt);
+
+        Assert.Equal(Decision.FatcaAlert, o.Decision);
+        var hit = HitOf(o, ruleId);
+        Assert.Equal(Coverage.None, hit.CoveredBy);
+        Assert.Contains("II.B.4 lit. b-c", hit.ExplanationRo);
+        Assert.Contains("II.B.4(b)-(c)", hit.Explanation);
+        Assert.DoesNotContain(o.Cleared, c => c.RuleId == RuleIds.FatcaChange);
+        Assert.Contains("Cont preexistent", o.ExplanationRo);
+    }
+
+    [Theory]
+    [InlineData("phone-next-to-ro", RuleIds.FatcaPhone, true)]
+    [InlineData("phone-next-to-ro", RuleIds.FatcaPhone, false)]
+    [InlineData("power-of-attorney", RuleIds.FatcaPowerOfAttorney, true)]
+    [InlineData("power-of-attorney", RuleIds.FatcaPowerOfAttorney, false)]
+    public void Lit_d_indicia_are_covered_by_the_new_form_alone_on_any_account(string link, string ruleId, bool preexisting)
+    {
+        var opened = preexisting ? FatcaPreexisting : new DateOnly(2019, 3, 14);
+        var client = WithUsLink(RoResident(), link, opened).WithSelfCert(NotUsPerson);
+
+        var o = Engine.EvaluateCurrent(client, ChangeAt);
+
+        Assert.Equal(Decision.Compliant, o.Decision);
+        var hit = HitOf(o, ruleId);
+        Assert.Equal(Coverage.SelfCertification, hit.CoveredBy);
+        Assert.Equal(preexisting ? RuleBasis.Verified : RuleBasis.Interpretation, hit.Basis); // the indicium's own basis
+        Assert.Contains("II.B.4 lit. d", hit.ExplanationRo);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Us_citizenship_or_birthplace_on_file_is_never_covered_by_a_not_us_person_form(bool preexisting)
+    {
+        var account = Account(AccountType.Depository, preexisting ? FatcaPreexisting : new DateOnly(2019, 3, 14));
+
+        var citizen = Engine.EvaluateCurrent(RoResident().WithAccounts(account).WithCitizenships("RO", "US").WithSelfCert(NotUsPerson), ChangeAt);
+        Assert.Equal(Decision.FatcaAlert, citizen.Decision);
+        Assert.Contains("VI.A", HitOf(citizen, RuleIds.FatcaCitizenship).ExplanationRo);
+
+        var born = Engine.EvaluateCurrent(RoResident().WithAccounts(account).BornIn("US").WithSelfCert(NotUsPerson), ChangeAt);
+        Assert.Equal(Decision.FatcaAlert, born.Decision);
+        Assert.Contains("II.B.4 lit. a", HitOf(born, RuleIds.FatcaBirthPlace).ExplanationRo);
+    }
+
+    [Fact]
+    public void A_form_signed_the_day_the_change_became_known_is_new_and_one_from_the_day_before_is_not()
+    {
+        var client = WithUsLink(RoResident(), "power-of-attorney", new DateOnly(2019, 3, 14));
+        RuleOutcome SignedOn(DateTime at) =>
+            Engine.EvaluateCurrent(client.WithSelfCert(SelfCert(at, new SubjectTaxResidence("RO", "1900101400004"))), ChangeAt);
+
+        Assert.Equal(Decision.Compliant, SignedOn(ChangeAt.Date).Decision); // a date on a form has no time
+        Assert.Equal(Decision.FatcaAlert, SignedOn(ChangeAt.Date.AddDays(-1)).Decision);
+    }
+
+    [Fact]
+    public void Golden_14_closes_on_a_new_not_us_person_form_through_the_shared_contract()
+    {
+        var c = EngineCases.Get("14");
+        ICrsRuleEngine engine = new CrsRuleEngine();
+        var answered = Snapshots.From(c.After.WithSelfCert(NotUsPerson));
+
+        Assert.Equal(Decision.FatcaAlert, engine.Evaluate(Snapshots.From(c.Before), Snapshots.From(c.After), Features.Changes.ChangeKind.PhoneAdded).Decision);
+        Assert.Equal(Decision.FatcaAlert, engine.EvaluateCurrent(answered).Decision);
+        var o = engine.EvaluateCurrent(answered, ChangeAt);
+        Assert.Equal(Decision.Compliant, o.Decision);
+        Assert.DoesNotContain("US", o.ReportableFor);
     }
 }

@@ -133,7 +133,8 @@ internal static class CrsIndicia
                 var (why, whyEn) = Jurisdictions.WhyNotCrsReportable(country);
                 f.Clear(RuleIds.CrsStandingOrder, country, "StandingOrders",
                     $"Ordin permanent către un cont din SUA: {why}" + (depository ? "; în plus, e dintr-un cont de depozit." : "."),
-                    $"Standing order to a US account: {whyEn}" + (depository ? "; besides, it is from a depository account." : "."));
+                    $"Standing order to a US account: {whyEn}" + (depository ? "; besides, it is from a depository account." : "."),
+                    RuleBasis.Interpretation);
             }
             else if (!Jurisdictions.IsCrsReportable(country))
                 NotReportable(f, RuleIds.CrsStandingOrder, country, "StandingOrders", "Ordin permanent", "Standing order");
@@ -143,7 +144,7 @@ internal static class CrsIndicia
                     $"The standing order to {Place(country, true)} is no longer active: not a standing instruction (13).");
             else if (depository)
                 f.Clear(RuleIds.CrsStandingOrder, country, "StandingOrders",
-                    $"Ordin permanent către {Place(country)} dintr-un cont de depozit ({ProductRo(account)}): exceptat la CRS " +
+                    $"Ordin permanent către {Place(country)} dintr-un cont de depozit{ProductNote(account)}: exceptat la CRS " +
                     "(pct. 12 lit. d; contul curent e cont de depozit, Sec. VIII.C pct. 2).",
                     $"Standing order to {Place(country, true)} from a depository account ({ProductEn(account)}): excepted under CRS " +
                     "(12(d); a current account is a depository account, VIII.C(2)).");
@@ -221,11 +222,17 @@ internal static class CrsIndicia
         }
     }
 
+    // The ANAF lists of reportable / non-reported jurisdictions and "the US is not a CRS jurisdiction" are not in the repo's
+    // sources (PLAN glossary: NEVERIFICAT), so a rule cleared on them is our reading.
     private static void NotReportable(Findings f, string ruleId, string country, string field, string whatRo, string whatEn)
     {
         var (why, whyEn) = Jurisdictions.WhyNotCrsReportable(country);
-        f.Clear(ruleId, country, field, $"{whatRo} în {Place(country)}: {why}.", $"{whatEn} in {Place(country, true)}: {whyEn}.");
+        f.Clear(ruleId, country, field, $"{whatRo} în {Place(country)}: {why}.", $"{whatEn} in {Place(country, true)}: {whyEn}.",
+            RuleBasis.Interpretation);
     }
+
+    // The product name next to the type ("cont de depozit (Cont curent)"), or nothing when the snapshot has no name.
+    private static string ProductNote(SubjectAccount a) => a.Product is { Length: > 0 } p ? $" ({p})" : "";
 
     private static string ProductRo(SubjectAccount a) => a.Product is { Length: > 0 } p ? p : a.Type switch
     {

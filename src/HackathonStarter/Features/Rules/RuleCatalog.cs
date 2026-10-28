@@ -84,11 +84,9 @@ public static class RuleCatalog
             "The bank's records (outside the self-certification) show the holder as tax resident in a reportable jurisdiction."),
 
         Rule(RuleIds.CrsAddress, Regime.Crs, "Adresă de reședință într-o jurisdicție raportabilă",
-            "Adresă de reședință actuală (inclusiv căsuță poștală) într-o jurisdicție raportabilă. Adresa unui " +
-            "prestator de servicii nu contează când există și alte adrese.",
+            "Adresă de reședință actuală (inclusiv căsuță poștală) într-o jurisdicție raportabilă.",
             "29", "Residence address in a reportable jurisdiction", $"{CpfIndicia} lit. b); pct. 13", RuleBasis.Verified,
-            "Current residence address (including a post office box) in a reportable jurisdiction. A service provider's " +
-            "address does not count when there are other addresses."),
+            "Current residence address (including a post office box) in a reportable jurisdiction."),
 
         Rule(RuleIds.CrsMailing, Regime.Crs, "Adresă de corespondență într-o jurisdicție raportabilă",
             "Adresă de corespondență actuală (inclusiv căsuță poștală) într-o jurisdicție raportabilă.",
@@ -96,12 +94,12 @@ public static class RuleCatalog
             "Current mailing address (including a post office box) in a reportable jurisdiction."),
 
         Rule(RuleIds.CrsPhone, Regime.Crs, "Telefon într-o jurisdicție raportabilă, fără telefon în România",
-            "Unul sau mai multe telefoane actuale dintr-o jurisdicție raportabilă și niciun telefon în România. " +
-            "Telefonul străin lângă unul românesc nu e indiciu.",
+            "Unul sau mai multe telefoane dintr-o jurisdicție raportabilă și niciun telefon în România. Telefonul străin " +
+            "lângă unul românesc nu e indiciu. Motorul citește doar telefoanele actuale (lectura noastră).",
             "29", "Phone in a reportable jurisdiction, no Romanian phone", $"{CpfIndicia} lit. c); pct. 13",
             RuleBasis.Verified,
-            "One or more current phone numbers in a reportable jurisdiction and no phone number in Romania. A foreign phone " +
-            "next to a Romanian one is not an indicium."),
+            "One or more phone numbers in a reportable jurisdiction and no phone number in Romania. A foreign phone next to " +
+            "a Romanian one is not an indicium. The engine reads only current phones (our reading)."),
 
         Rule(RuleIds.CrsStandingOrder, Regime.Crs, "Ordin permanent către o jurisdicție raportabilă",
             "Instrucțiune permanentă activă de transfer către un cont dintr-o jurisdicție raportabilă, cu excepția celor " +
@@ -167,17 +165,20 @@ public static class RuleCatalog
             "lower value account, a non-US in-care-of address or a hold-mail instruction is not an indicium."),
 
         Rule(RuleIds.FatcaChange, Regime.Fatca, "FATCA: schimbare de situație",
-            "Schimbarea dă motive să știe că autocertificarea e incorectă: autocertificare nouă (cetățean / rezident SUA " +
-            "sau nu); fără ea, contul e raportabil SUA. Acordul nu dă un termen și nu are varianta «explicație».",
-            "38", "FATCA change in circumstances", "IGA Anexa I, Sec. III.B.2; Sec. II.B.4", RuleBasis.Verified,
-            "The change gives reason to know the self-certification is incorrect: new self-certification (US citizen / " +
-            "resident or not); without it, the account is a US reportable account. The agreement sets no deadline and has " +
-            "no 'reasonable explanation' route."),
+            "Schimbarea dă motive să știe că autocertificarea e incorectă. Cont nou: autocertificare nouă validă care " +
+            "stabilește dacă titularul e persoană SUA; fără ea, contul e raportabil SUA. Cont preexistent: raportabil SUA, " +
+            "în afară de excepțiile din II.B.4 (autocertificare «nu sunt persoană SUA» și, după indiciu, documente). " +
+            "Cetățenia SUA la dosar nu are excepție. Acordul nu dă un termen.",
+            "38", "FATCA change in circumstances", "IGA Anexa I, Sec. III.B.2; Sec. II.B.3-4; Sec. VI.A", RuleBasis.Verified,
+            "The change gives reason to know the self-certification is incorrect. New account: a new valid " +
+            "self-certification that establishes whether the holder is a US person; without it, the account is US " +
+            "reportable. Preexisting account: US reportable, except under II.B.4 (a \"not a US person\" self-certification " +
+            "and, depending on the indicium, documents). US citizenship on file has no exception. The agreement sets no deadline."),
 
         Rule(RuleIds.FatcaScopeAllAccounts, Regime.Fatca, "FATCA: verificăm toate conturile",
             "Banca nu aplică pragurile de 50.000 USD (conturi preexistente și conturi de depozit noi): toate conturile " +
             "persoanelor fizice sunt verificate.",
-            "31, 38", "FATCA: every account is reviewed", "IGA Anexa I, Sec. II.A; Sec. III.A", RuleBasis.Policy,
+            "25", "FATCA: every account is reviewed", "IGA Anexa I, Sec. II.A; Sec. III.A", RuleBasis.Policy,
             "The bank does not apply the USD 50,000 thresholds (preexisting accounts and new depository accounts): every " +
             "individual account is reviewed."),
 
@@ -196,12 +197,14 @@ public static class RuleCatalog
             "reason to clarify."),
 
         Rule(RuleIds.TinMissing, Regime.Crs, "TIN lipsă",
-            "TIN lipsă acceptat doar cu motiv (A/B/C). Fără TIN, deși jurisdicția emite TIN tuturor persoanelor fizice " +
-            "(fișa OCDE): banca are motive să știe că autocertificarea e nesigură.",
-            "37, 48, 53", "Missing TIN", "CPF Anexa 1, Sec. VII.A pct. 3 lit. a) pct. (iv); Sec. I.D pct. 1-4",
+            "TIN lipsă acceptat doar cu motiv (A/B/C, formularul de la p. 53). Fără TIN, deși jurisdicția emite TIN tuturor " +
+            "rezidenților (fișa OCDE), orice motiv: banca are motive să știe că autocertificarea e nesigură (p. 37). " +
+            "TIN-ul SUA al unui rezident SUA nu poate lipsi (p. 38).",
+            "37, 38, 48, 53", "Missing TIN", "CPF Anexa 1, Sec. VII.A pct. 3 lit. a) pct. (iv); Sec. I.D pct. 1-4",
             RuleBasis.Verified,
-            "A missing TIN is accepted only with a reason (A/B/C). No TIN although the jurisdiction issues TINs to all " +
-            "individuals (OECD sheet): the bank has reason to know the self-certification is unreliable."),
+            "A missing TIN is accepted only with a reason (A/B/C, the form on p. 53). No TIN although the jurisdiction issues " +
+            "TINs to all residents (OECD sheet), whatever the reason: the bank has reason to know the self-certification is " +
+            "unreliable (p. 37). A US resident's US TIN cannot be missing (p. 38)."),
 
         Rule(RuleIds.SelfCertConsistent, Regime.Crs, "Autocertificare consecventă cu dosarul",
             "Jurisdicțiile din indicii sunt declarate în autocertificarea validă: contul e raportabil pentru fiecare " +

@@ -96,10 +96,28 @@ public class SelfCertRulesTests
     }
 
     [Fact]
-    public void Reason_c_is_accepted_for_any_jurisdiction()
+    public void Reason_c_is_our_reading_and_never_beats_a_jurisdiction_that_issues_tins_to_everyone()
     {
-        var o = Run(Form(new SubjectTaxResidence("DE", null, NoTinReason.C_NotRequired)));
-        Assert.Equal(Decision.Compliant, o.Decision);
+        // Guide p. 53: reason C is the client's statement about the other country's law; the engine cannot check it.
+        var austria = Assert.Single(Run(Form(new SubjectTaxResidence("AT", null, NoTinReason.C_NotRequired))).Indicia);
+        Assert.Equal((Coverage.SelfCertification, RuleBasis.Interpretation), (austria.CoveredBy, austria.Basis));
+
+        // Guide p. 37: no TIN although the OECD sheet says everyone gets one, whatever the reason.
+        var germany = Run(Form(new SubjectTaxResidence("DE", null, NoTinReason.C_NotRequired)));
+        Assert.Equal(Decision.Clarification, germany.Decision);
+        Assert.Contains("p. 37", Assert.Single(germany.Uncovered).ExplanationRo);
+    }
+
+    [Theory]
+    [InlineData(NoTinReason.None)]
+    [InlineData(NoTinReason.A_CountryDoesNotIssue)]
+    [InlineData(NoTinReason.C_NotRequired)]
+    public void A_us_residence_without_the_us_tin_is_never_accepted(NoTinReason reason)
+    {
+        var o = Run(Form(new SubjectTaxResidence("RO", "1900101400004"), new SubjectTaxResidence("US", null, reason, "Nu am.")));
+        var hit = Assert.Single(o.Uncovered, h => h.RuleId == RuleIds.TinMissing);
+        Assert.Equal("US", hit.Jurisdiction);
+        Assert.Contains("p. 38", hit.ExplanationRo);
     }
 
     [Fact]

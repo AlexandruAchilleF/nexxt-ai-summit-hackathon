@@ -93,9 +93,59 @@ internal static class FatcaIndicia
             return;
         }
 
-        Hit(f, RuleIds.FatcaInCareOf, field, scope.FatcaBasis,
-            $"Adresă «în grija» / «păstrare corespondență» în {Place(address.Country)}, singura adresă actuală: indiciu FATCA (lit. g), în orice țară.",
-            $"In-care-of / hold-mail address in {Place(address.Country, true)}, the only current address: FATCA indicium (g), in any country.");
+        // Old, non-current addresses are not "the sole address on file" (GOLDEN-CASES Q6): our reading, as for CRS-IND-CO.
+        var oldOnFile = s.Addresses.Any(a => !a.IsCurrent);
+        var ro = $"Adresă «în grija» / «păstrare corespondență» în {Place(address.Country)}, singura adresă actuală: indiciu FATCA (lit. g), în orice țară.";
+        var en = $"In-care-of / hold-mail address in {Place(address.Country, true)}, the only current address: FATCA indicium (g), in any country.";
+        if (oldOnFile)
+        {
+            ro += " Adresele vechi, care nu mai sunt actuale, nu au fost luate în calcul (interpretare de design).";
+            en += " Old addresses that are no longer current were not counted (design interpretation).";
+        }
+        if (!scope.FatcaPreexisting) (ro, en) = (ro + NewFatcaRo, en + NewFatcaEn);
+        f.Hit(RuleIds.FatcaInCareOf, Us, field, ro, en, oldOnFile ? RuleBasis.Interpretation : scope.FatcaBasis);
+    }
+
+    /// <summary>
+    /// Whether a new "not a US person" self-certification covers a FATCA hit (IGA Annex I; text checked on the treaty as
+    /// published by the US Treasury). New account: III.B.2 asks for a new valid self-certification. Preexisting account:
+    /// II.B.3 makes it US reportable unless II.B.4 applies: lit. d (power of attorney, in-care-of / hold mail, a US phone
+    /// next to a non-US one) takes the self-certification alone; lit. b-c (address, US-only phones, standing order) also
+    /// documentary evidence; lit. a (place of birth) also a non-US ID and a certificate of loss of nationality or an
+    /// explanation. Citizenship on file has no exception, and VI.A forbids relying on a form the file contradicts. The
+    /// engine has no documents as input, so it never covers what needs them. Basis is null when the hit keeps its own.
+    /// </summary>
+    public static (bool Covers, RuleBasis? Basis, string Ro, string En) CoveredByDenial(RuleHit hit, RuleSubject s, AccountScope scope)
+    {
+        switch (hit.RuleId)
+        {
+            case RuleIds.FatcaCitizenship:
+                return (false, null,
+                    "dosarul băncii îl identifică drept cetățean sau rezident SUA, iar banca nu se poate baza pe o autocertificare pe care are motive să o știe incorectă (IGA Anexa I, VI.A); Acordul nu are o excepție pentru lit. a).",
+                    "the bank's records identify the holder as a US citizen or resident, and the bank may not rely on a self-certification it has reason to know is incorrect (IGA Annex I, VI.A); the agreement has no exception for (a).");
+            case RuleIds.FatcaBirthPlace:
+                return (false, null,
+                    "la locul nașterii în SUA, Acordul cere și un act de identitate non-SUA, plus certificatul de pierdere a cetățeniei SUA sau o explicație rezonabilă (IGA Anexa I, II.B.4 lit. a)" +
+                    (scope.FatcaPreexisting ? "." : "; pe un cont nou cerem aceleași documente (interpretare)."),
+                    "for a US place of birth the agreement also asks for a non-US ID and the certificate of loss of US nationality or a reasonable explanation (IGA Annex I, II.B.4(a))" +
+                    (scope.FatcaPreexisting ? "." : "; on a new account we ask for the same documents (interpretation)."));
+            case RuleIds.FatcaPowerOfAttorney or RuleIds.FatcaInCareOf:
+                return (true, null,
+                    "pentru acest indiciu autocertificarea ajunge (IGA Anexa I, II.B.4 lit. d; III.B.2).",
+                    "for this indicium the self-certification is enough (IGA Annex I, II.B.4(d); III.B.2).");
+            case RuleIds.FatcaPhone when s.Phones.Any(p => p.IsCurrent && p.Country.Length > 0 && !Jurisdictions.IsUnitedStates(p.Country)):
+                return (true, null,
+                    "există și un telefon din afara SUA, deci autocertificarea ajunge (IGA Anexa I, II.B.4 lit. d; III.B.2).",
+                    "there is also a non-US phone, so the self-certification is enough (IGA Annex I, II.B.4(d); III.B.2).");
+            default:
+                return scope.FatcaPreexisting
+                    ? (false, null,
+                        "pe un cont preexistent, pentru acest indiciu Acordul cere și documente justificative care stabilesc statutul non-SUA (IGA Anexa I, II.B.4 lit. b-c).",
+                        "on a preexisting account the agreement also asks for documentary evidence of non-US status for this indicium (IGA Annex I, II.B.4(b)-(c)).")
+                    : (true, RuleBasis.Interpretation,
+                        "cont nou: Acordul cere o autocertificare nouă validă (IGA Anexa I, III.B.2); că indiciul nu o face nesigură e lectura noastră, o confirmă operatorul.",
+                        "new account: the agreement asks for a new valid self-certification (IGA Annex I, III.B.2); that the indicium does not make it unreliable is our reading, the operator confirms it.");
+        }
     }
 
     private const string NewFatcaRo =

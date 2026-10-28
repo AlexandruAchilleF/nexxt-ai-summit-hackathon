@@ -11,6 +11,9 @@ public sealed partial class CrsRuleEngine
 
     public RuleOutcome EvaluateCurrent(ClientSnapshot client) => EvaluateCurrent(SubjectMapper.From(client));
 
+    public RuleOutcome EvaluateCurrent(ClientSnapshot client, DateTime changeKnownAt) =>
+        EvaluateCurrent(SubjectMapper.From(client), changeKnownAt);
+
     public RuleOutcome EvaluateSelfCertification(ClientSnapshot client, SelfCertificationSnapshot selfCertification) =>
         EvaluateSelfCertification(SubjectMapper.From(client), SubjectMapper.From(selfCertification));
 }

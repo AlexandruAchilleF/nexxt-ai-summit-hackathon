@@ -18,19 +18,36 @@ public sealed partial class CrsRuleEngine(ITinFormat? tinFormat = null) : ICrsRu
 
     /// <summary>Evaluates the whole client after the change (PLAN 8.3); before only says which indicia are new.</summary>
     public RuleOutcome Evaluate(RuleSubject before, RuleSubject after, RuleChange change) =>
-        Run(after, change, Detect(before, AccountScope.Of(before)).Hits.Select(h => (h.RuleId, h.Jurisdiction)).ToHashSet());
+        Run(after, change, Detect(before, AccountScope.Of(before)).Hits.Select(h => (h.RuleId, h.Jurisdiction)).ToHashSet(), null);
 
-    /// <summary>The client's current state with no change (re-evaluation before closing, the agent's tool, metrics).</summary>
-    public RuleOutcome EvaluateCurrent(RuleSubject client) => Run(client, new RuleChange(""), []);
+    /// <summary>The client's current state with no change (the agent's tool, metrics). Only a US-person form covers FATCA.</summary>
+    public RuleOutcome EvaluateCurrent(RuleSubject client) => Run(client, new RuleChange(""), [], null);
 
-    private static RuleOutcome Run(RuleSubject after, RuleChange change, HashSet<(string RuleId, string Jurisdiction)> earlier)
+    /// <summary>
+    /// The current state of a client whose change the bank has known since <paramref name="changeKnownAt"/> (re-evaluation
+    /// before closing a case). A self-certification signed that day or later is a new one, so a "not a US person" form can
+    /// cover a FATCA indicium where the agreement allows it (<see cref="FatcaIndicia.CoveredByDenial"/>).
+    /// </summary>
+    public RuleOutcome EvaluateCurrent(RuleSubject client, DateTime changeKnownAt) => Run(client, new RuleChange(""), [], changeKnownAt);
+
+    private static RuleOutcome Run(RuleSubject after, RuleChange change, HashSet<(string RuleId, string Jurisdiction)> earlier,
+        DateTime? changeKnownAt)
     {
         var scope = AccountScope.Of(after);
         var found = Detect(after, scope);
 
         var sc = after.CurrentSelfCertification;
-        var hits = found.Hits.Select(h => Cover(h, after, sc, earlier.Contains((h.RuleId, h.Jurisdiction)))).ToList();
+        // By day: a form signed the day the change became known answers it (the date on a form has no time).
+        var renewed = sc is not null && changeKnownAt is { } knownAt && sc.SignedAt.Date >= knownAt.Date;
+        var hits = found.Hits.Select(h => Cover(h, after, sc, renewed, scope, earlier.Contains((h.RuleId, h.Jurisdiction)))).ToList();
         var cleared = found.ClearedWithoutHits().ToList();
+
+        var fatca = hits.Where(h => h.Regime == Regime.Fatca).ToList();
+        if (renewed && !DeclaresUs(sc!) && fatca.Count > 0 && fatca.All(h => h.CoveredBy == Coverage.SelfCertification))
+            cleared.Add(Entry(RuleIds.FatcaChange, Jurisdictions.UnitedStates, "SelfCertification",
+                $"Autocertificarea nouă din {sc!.SignedAt:yyyy-MM-dd} spune că titularul nu e persoană SUA și acoperă indiciile SUA: contul nu e raportabil SUA (IGA Anexa I, III.B.2; II.B.4).",
+                $"The new self-certification of {sc.SignedAt:yyyy-MM-dd} says the holder is not a US person and covers the US indicia: the account is not US reportable (IGA Annex I, III.B.2; II.B.4).",
+                fatca.All(h => h.Basis == RuleBasis.Verified) ? RuleBasis.Verified : RuleBasis.Interpretation));
 
         foreach (var declared in hits.Where(h => h.CoveredBy == Coverage.SelfCertification && h.Regime == Regime.Crs)
                      .Select(h => h.Jurisdiction).Distinct())
@@ -78,9 +95,14 @@ public sealed partial class CrsRuleEngine(ITinFormat? tinFormat = null) : ICrsRu
         return f;
     }
 
+    private static bool DeclaresUs(SubjectSelfCertification sc) =>
+        sc.DeclaresUsPerson || sc.Residences.Any(r => Jurisdictions.IsUnitedStates(r.Country));
+
     // CRS: a jurisdiction declared in the current valid self-certification covers it (reportable); an accepted explanation
-    // covers it (not reportable). FATCA: only a self-certification declaring US status covers it; explanations never do.
-    private static RuleHit Cover(RuleHit hit, RuleSubject s, SubjectSelfCertification? sc, bool existedBefore)
+    // covers it (not reportable). FATCA: a self-certification declaring US status covers it (reportable); a new one saying
+    // "not a US person" only where the agreement allows (renewed, FatcaIndicia.CoveredByDenial); explanations never do.
+    private static RuleHit Cover(RuleHit hit, RuleSubject s, SubjectSelfCertification? sc, bool renewed, AccountScope scope,
+        bool existedBefore)
     {
         var (ro, en) = (hit.ExplanationRo, hit.Explanation);
         if (existedBefore)
@@ -89,13 +111,30 @@ public sealed partial class CrsRuleEngine(ITinFormat? tinFormat = null) : ICrsRu
         var declared = sc?.Residences.Select(r => Jurisdictions.Normalize(r.Country)).ToHashSet() ?? [];
         if (hit.Regime == Regime.Fatca)
         {
-            if (sc is not null && (sc.DeclaresUsPerson || declared.Contains(Jurisdictions.UnitedStates)))
+            if (sc is not null && DeclaresUs(sc))
                 return hit with
                 {
                     CoveredBy = Coverage.SelfCertification,
                     ExplanationRo = ro + $" Acoperit: autocertificarea din {sc.SignedAt:yyyy-MM-dd} declară statut de persoană SUA (cont raportabil SUA).",
                     Explanation = en + $" Covered: the self-certification of {sc.SignedAt:yyyy-MM-dd} declares US person status (US reportable account).",
                 };
+            if (sc is not null && renewed)
+            {
+                var (covers, basis, whyRo, whyEn) = FatcaIndicia.CoveredByDenial(hit, s, scope);
+                return covers
+                    ? hit with
+                    {
+                        CoveredBy = Coverage.SelfCertification,
+                        Basis = basis ?? hit.Basis,
+                        ExplanationRo = ro + $" Acoperit: autocertificarea nouă din {sc.SignedAt:yyyy-MM-dd} spune că titularul nu e persoană SUA; {whyRo}",
+                        Explanation = en + $" Covered: the new self-certification of {sc.SignedAt:yyyy-MM-dd} says the holder is not a US person; {whyEn}",
+                    }
+                    : hit with
+                    {
+                        ExplanationRo = ro + $" Autocertificarea nouă din {sc.SignedAt:yyyy-MM-dd} spune că titularul nu e persoană SUA, dar nu ajunge singură: {whyRo}",
+                        Explanation = en + $" The new self-certification of {sc.SignedAt:yyyy-MM-dd} says the holder is not a US person, but it is not enough alone: {whyEn}",
+                    };
+            }
             return hit with { Explanation = en, ExplanationRo = ro };
         }
 
@@ -131,8 +170,7 @@ public sealed partial class CrsRuleEngine(ITinFormat? tinFormat = null) : ICrsRu
     {
         if (sc is null) return [];
         var declared = sc.Residences.Select(r => Jurisdictions.Normalize(r.Country)).Where(Jurisdictions.IsCrsReportable);
-        var us = sc.DeclaresUsPerson || sc.Residences.Any(r => Jurisdictions.IsUnitedStates(r.Country))
-            ? [Jurisdictions.UnitedStates] : Array.Empty<string>();
+        var us = DeclaresUs(sc) ? [Jurisdictions.UnitedStates] : Array.Empty<string>();
         return [.. declared.Concat(us).Distinct()];
     }
 
@@ -169,14 +207,14 @@ public sealed partial class CrsRuleEngine(ITinFormat? tinFormat = null) : ICrsRu
         var accepted = List(hits.Where(h => h.CoveredBy != Coverage.None));
         var reportableRo = reportable.Count > 0 ? $" Raportabil pentru: {string.Join(", ", reportable)}." : "";
         var reportableEn = reportable.Count > 0 ? $" Reportable for: {string.Join(", ", reportable)}." : "";
-        const string deadlineRo = " Termenul îl calculează fluxul de cazuri, nu motorul.";
-        const string deadlineEn = " The case workflow computes the deadline, not the engine.";
+        const string deadlineRo = " Motorul nu calculează termene.";
+        const string deadlineEn = " The engine computes no deadline.";
 
         return decision switch
         {
             Decision.FatcaAlert => (
-                $"Alertă FATCA pe autocertificare: {open}. Formularul nu declară legătura cu SUA din dosar; pentru a înlătura indiciul, documentele din IGA Anexa I, II.B.4.",
-                $"FATCA alert on the self-certification: {open}. The form does not declare the US link on file; to remove the indicium, the documents in IGA Annex I, II.B.4."),
+                $"Alertă FATCA pe autocertificare: {open}. Formularul nu declară legătura cu SUA din dosar (IGA Anexa I, II.B.4 și VI.A).",
+                $"FATCA alert on the self-certification: {open}. The form does not declare the US link on file (IGA Annex I, II.B.4 and VI.A)."),
             Decision.Clarification => (
                 $"Autocertificarea nu poate fi acceptată așa: {open}. Se cere clientului corectarea (TIN, motiv sau formular nou).{deadlineRo}",
                 $"The self-certification cannot be accepted as it is: {open}. The client is asked for a correction (TIN, reason or a new form).{deadlineEn}"),
@@ -184,8 +222,8 @@ public sealed partial class CrsRuleEngine(ITinFormat? tinFormat = null) : ICrsRu
                 $"Autocertificare acceptată. Fără TIN, cu motiv acceptat și înregistrat: {accepted}.{reportableRo}",
                 $"Self-certification accepted. No TIN, with an accepted and recorded reason: {accepted}.{reportableEn}"),
             _ => (
-                $"Autocertificare acceptată: completă și consecventă cu dosarul.{reportableRo}",
-                $"Self-certification accepted: complete and consistent with the file.{reportableEn}"),
+                $"Autocertificare acceptată: codul nu a găsit nicio problemă (validitate, TIN, consecvență cu dosarul).{reportableRo}",
+                $"Self-certification accepted: code found no problem (validity, TIN, consistency with the file).{reportableEn}"),
         };
     }
 
@@ -217,15 +255,21 @@ public sealed partial class CrsRuleEngine(ITinFormat? tinFormat = null) : ICrsRu
         };
         var crsRo = openCrs.Count > 0 ? $"Clarificare CRS: {List(openCrs)} {NotCoveredRo(openCrs.Count)} de autocertificarea actuală. {crsRouteRo}" : "";
         var crsEn = openCrs.Count > 0 ? $"CRS clarification: {List(openCrs)} {NotCoveredEn(openCrs.Count)} by the current self-certification. {crsRouteEn}" : "";
+        // IGA Annex I: new account, a new valid self-certification (III.B.2); preexisting, US reportable unless II.B.4 applies.
+        var (fatcaRouteRo, fatcaRouteEn) = scope.FatcaPreexisting
+            ? ("Cont preexistent: contul e raportabil SUA, dacă banca nu obține ce cere IGA Anexa I, II.B.4 pentru fiecare indiciu (autocertificare «nu sunt persoană SUA» și, după indiciu, documente justificative).",
+               "Preexisting account: the account is US reportable unless the bank obtains what IGA Annex I, II.B.4 asks for each indicium (a \"not a US person\" self-certification and, depending on the indicium, documentary evidence).")
+            : ("Cont nou: se cere o autocertificare nouă validă care stabilește dacă titularul e persoană SUA (IGA Anexa I, III.B.2); fără ea, contul e raportabil SUA.",
+               "New account: a new valid self-certification is needed that establishes whether the holder is a US person (IGA Annex I, III.B.2); without it, the account is US reportable.");
         const string deadlineRo = " Termenul îl calculează fluxul de cazuri, nu motorul.";
         const string deadlineEn = " The case workflow computes the deadline, not the engine.";
 
         return decision switch
         {
             Decision.FatcaAlert => (
-                $"Alertă FATCA: {List(openFatca)} {NotCoveredRo(openFatca.Count)}. Se cere autocertificare nouă (persoană SUA sau nu); pentru a înlătura indiciul, documentele din IGA Anexa I, II.B.4. Fără autocertificare, contul e raportabil SUA; acordul nu dă un termen." +
+                $"Alertă FATCA: {List(openFatca)} {NotCoveredRo(openFatca.Count)}. {fatcaRouteRo} Acordul nu dă un termen." +
                 (crsRo.Length > 0 ? " " + crsRo : "") + reportableRo,
-                $"FATCA alert: {List(openFatca)} {NotCoveredEn(openFatca.Count)}. A new self-certification is needed (US person or not); to remove the indicium, the documents in IGA Annex I, II.B.4. Without it, the account is US reportable; the agreement sets no deadline." +
+                $"FATCA alert: {List(openFatca)} {NotCoveredEn(openFatca.Count)}. {fatcaRouteEn} The agreement sets no deadline." +
                 (crsEn.Length > 0 ? " " + crsEn : "") + reportableEn),
             Decision.Clarification => (crsRo + deadlineRo + reportableRo, crsEn + deadlineEn + reportableEn),
             Decision.Compliant => (
