@@ -166,6 +166,26 @@ public class AgentRunnerTests
     }
 
     [Fact]
+    public async Task Tool_calls_after_a_proposal_in_the_same_batch_do_not_run()
+    {
+        var agent = new NotesAgent();
+        var model = new FakeChatClient().CallTools(("publish", new { }), ("addNote", new { }), ("publish", new { })).Reply("proposed");
+        await using var host = await TestHost.CreateAsync(model, extraAgents: agent);
+
+        var run = await host.RunAsync("notes-agent", "Publish, then note it");
+
+        Assert.Equal(0, agent.Notes);
+        Assert.Equal(RunStatus.AwaitingApproval, run.Status);
+        Assert.Single(run.Steps, s => s.Kind == StepKind.Approval);
+        Assert.DoesNotContain(run.Steps, s => s.Kind is StepKind.ToolCall or StepKind.ToolResult);
+        // Every call of the batch gets a result (providers require one), saying why it did not run.
+        var results = model.Calls[1].Single(m => m.Role == ChatRole.Tool).Contents.OfType<FunctionResultContent>().ToList();
+        Assert.Equal(["call_1", "call_2", "call_3"], results.Select(r => r.CallId));
+        Assert.Contains("awaiting_human_approval", results[0].Result?.ToString());
+        Assert.All(results.Skip(1), r => Assert.Contains("not_executed", r.Result?.ToString()));
+    }
+
+    [Fact]
     public async Task A_json_mode_proposal_gets_one_last_turn_then_the_run_ends()
     {
         var model = new FakeChatClient()

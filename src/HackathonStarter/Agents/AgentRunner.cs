@@ -219,6 +219,12 @@ public class AgentRunner(
             var results = new List<AIContent>();
             foreach (var call in calls)
             {
+                if (proposed)
+                {
+                    // The rest of a batch never runs once an action awaits approval; each call still gets its result.
+                    results.Add(new FunctionResultContent(call.CallId, NotExecuted));
+                    continue;
+                }
                 var args = Unmask(ToJsonArgs(call.Arguments ?? new Dictionary<string, object?>()), vault);
                 var result = await InvokeToolAsync(tools, call.Name, args, call.CallId, ctx, w, ct);
                 proposed |= result == AwaitingApproval;
@@ -284,6 +290,10 @@ public class AgentRunner(
     /// <summary>What the model gets back for a proposed action. Seeing it, the live loops give the model one last turn, without tools.</summary>
     private const string AwaitingApproval =
         """{"status":"awaiting_human_approval","message":"This action needs human approval and has NOT been executed. Tell the user what you propose and that they can approve it below. Do not call more tools."}""";
+
+    /// <summary>What the model gets back for the calls of a batch that come after a proposal.</summary>
+    private const string NotExecuted =
+        """{"status":"not_executed","message":"This call was NOT executed because an earlier action in the same batch is awaiting human approval. Do not call more tools."}""";
 
     /// <summary>Shown when the model ends its last turn after a proposal without any text.</summary>
     private const string ProposedAnswer = "The proposed action needs human approval before it runs.";
