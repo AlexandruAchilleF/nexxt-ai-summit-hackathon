@@ -52,11 +52,29 @@ public class ChangeService(
         Validate(request);
 
         await Writer.WaitAsync();
-        try { return await RecordLockedAsync(request, "user:" + user.Id); }
+        try { return await RecordLockedAsync(request, "user:" + user.Id, systemCases: null); }
         finally { Writer.Release(); }
     }
 
-    private async Task<ChangeResult> RecordLockedAsync(ChangeRequest request, string actor)
+    /// <summary>
+    /// RecordAsync with no signed-in user, for a system writer (the startup seed, ChangeHistorySeed): the same validation,
+    /// lock and decisions; <paramref name="actor"/> ("system:seed") goes to the audit log. Not on IChangeService, so pages
+    /// and agent tools cannot skip the role check; the caller builds this service with a CaseService.
+    /// </summary>
+    internal async Task<ChangeResult> RecordAsSystemAsync(ChangeRequest request, string actor)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (!actor.StartsWith("system", StringComparison.Ordinal))
+            throw new ArgumentException($"A system actor starts with \"system\", not '{actor}'.", nameof(actor));
+        var systemCases = cases as CaseService ?? throw new InvalidOperationException("The system path needs CaseService.");
+        Validate(request);
+
+        await Writer.WaitAsync();
+        try { return await RecordLockedAsync(request, actor, systemCases); }
+        finally { Writer.Release(); }
+    }
+
+    private async Task<ChangeResult> RecordLockedAsync(ChangeRequest request, string actor, CaseService? systemCases)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var client = await ClientService.Full(db).AsTracking().FirstOrDefaultAsync(c => c.Code == request.ClientCode)
@@ -131,7 +149,7 @@ public class ChangeService(
         int? caseId = answered?.Id;
         if (outcome.Uncovered.Any())
         {
-            var opened = await cases.OpenAsync(change, outcome);
+            var opened = systemCases is null ? await cases.OpenAsync(change, outcome) : await systemCases.OpenAsSystemAsync(change, outcome, actor);
             (resultCase, caseId) = (opened.Code, opened.Id);
         }
 
@@ -181,7 +199,11 @@ public class ChangeService(
             case ChangeKind.AddressChanged:
             {
                 var address = r.Address!;
-                var replaced = client.Addresses.Where(a => a.IsCurrent && a.Kind == address.Kind).ToList();
+                // Design choice (golden case 12): an in-care-of or hold-mail address replaces every current address, since the
+                // bank then has only that address: what CRS-IND-CO ("no other address", p. 29 f) and FATCA-IND-CO ("the only
+                // address", p. 31) describe. A residence or mailing address replaces only the current ones of its kind.
+                var replacesAll = address.Kind is AddressKind.InCareOf or AddressKind.HoldMail;
+                var replaced = client.Addresses.Where(a => a.IsCurrent && (replacesAll || a.Kind == address.Kind)).ToList();
                 replaced.ForEach(a => a.IsCurrent = false);
                 client.Addresses.Add(NewAddress(address, today));
                 // GOLDEN-CASES I3: one AddressChanged event may also carry the phone that replaces the current ones (Maria).
@@ -191,6 +213,7 @@ public class ChangeService(
                     new { address = AddressValue(client.Addresses[^1]), phone = r.Phone is null ? null : PhoneValue(client.Phones[^1]) });
             }
             case ChangeKind.AddressAdded:
+                // Never replaces, a c/o neither: the bank keeps the client's other addresses.
                 client.Addresses.Add(NewAddress(r.Address!, today));
                 return new Applied(null, new { address = AddressValue(client.Addresses[^1]) });
             case ChangeKind.PhoneAdded:

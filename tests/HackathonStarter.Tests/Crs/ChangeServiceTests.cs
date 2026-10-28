@@ -83,9 +83,67 @@ public class ChangeServiceTests
         Assert.Equal(["DE"], after.CurrentAddresses.Select(a => a.Country));
         var client = await LoadAsync(host, "CL-0001");
         Assert.False(client.Phones.Single(p => p.Country == "RO").IsCurrent);
-        Assert.Contains("+498945217730", result.Change.NewValueJson);
+        Assert.DoesNotContain("+498945217730", result.Change.NewValueJson); // stored masked, like the RO phone (PLAN 13.1)
+        Assert.Contains("[PHONE-", result.Change.NewValueJson);
         Assert.Contains("Leopoldstrasse 12", result.Change.NewValueJson);
         Assert.Equal("New address in Munich and a German phone that replaces the RO phone", result.Change.Summary);
+    }
+
+    [Theory]
+    [InlineData(AddressKind.InCareOf)]
+    [InlineData(AddressKind.HoldMail)]
+    public async Task An_in_care_of_or_hold_mail_address_change_replaces_every_current_address(AddressKind kind)
+    {
+        // Golden case 12, design choice: the bank then has only the c/o address, which is what CRS-IND-CO ("no other
+        // address", p. 29 f) and FATCA-IND-CO ("the only address", p. 31) describe.
+        await using var host = await CreateAsync();
+        var client = await host.SeedClientAsync("CL-0012", new DateOnly(2011, 5, 16));
+        await using (var db = await host.DbAsync())
+        {
+            var residence = await db.Addresses.SingleAsync(a => a.ClientId == client.Id);
+            (residence.Line, residence.City) = ("Str. Horea 5", "400174 Cluj-Napoca");
+            db.Addresses.Add(new Address { ClientId = client.Id, Kind = AddressKind.Mailing, Line = "CP 12", City = "400174 Cluj-Napoca", Country = "RO" });
+            await db.SaveChangesAsync();
+        }
+        host.Engine.OnEvaluate = (_, after, _) => after.CurrentAddresses.Count() == 1 && after.CurrentAddresses.Single().Kind == kind
+            ? Outcome([Hit("CRS-IND-CO", "IT")])
+            : Outcome([]);
+
+        var result = await host.As(Member).Changes.RecordAsync(new ChangeRequest("CL-0012", ChangeKind.AddressChanged, "post",
+            Address: new AddressSnapshot(kind, "c/o Studio Legale Bianchi, Via Roma 10", "10121 Torino", "IT")));
+
+        var (before, after, _) = Assert.Single(host.Engine.ChangeCalls);
+        Assert.Equal([AddressKind.Residence, AddressKind.Mailing], before.CurrentAddresses.Select(a => a.Kind).Order());
+        var only = Assert.Single(after.CurrentAddresses);
+        Assert.Equal((kind, "10121 Torino", "IT"), (only.Kind, only.City, only.Country));
+        var saved = await LoadAsync(host, "CL-0012");
+        Assert.Equal(3, saved.Addresses.Count); // the Cluj addresses stay on file, not current
+        Assert.Equal([kind], saved.Addresses.Where(a => a.IsCurrent).Select(a => a.Kind));
+        Assert.Contains("Cluj-Napoca", result.Change.OldValueJson);
+        Assert.Equal($"{kind} address changed: now in IT", result.Change.Summary);
+
+        // The card's case: a preexisting account, DL-PRE-YEAR = the later of 31.12.2026 and +90 days (p. 29).
+        var item = (await host.As(Viewer).Cases.GetAsync(result.CaseCode!))!;
+        Assert.Equal(["CRS-IND-CO:IT"], item.Indicia.Select(i => $"{i.RuleId}:{i.Jurisdiction}"));
+        Assert.Equal(("DL-PRE-YEAR", true, Utc("2027-01-26T07:00:00")), (item.DeadlineRuleId, item.IsPreexisting, item.DueAt));
+    }
+
+    [Fact]
+    public async Task A_residence_or_mailing_change_replaces_only_its_kind_and_an_added_address_replaces_none()
+    {
+        await using var host = await CreateAsync();
+        await host.SeedClientAsync("CL-0012", NewAccount);
+        var changes = host.As(Member).Changes;
+
+        await changes.RecordAsync(new ChangeRequest("CL-0012", ChangeKind.AddressAdded, "online", Address: new AddressSnapshot(AddressKind.Mailing, "CP 12", "Cluj-Napoca", "RO")));
+        await changes.RecordAsync(new ChangeRequest("CL-0012", ChangeKind.AddressAdded, "online", Address: new AddressSnapshot(AddressKind.InCareOf, "c/o Studio Legale Bianchi", "Torino", "IT")));
+        await changes.RecordAsync(new ChangeRequest("CL-0012", ChangeKind.AddressChanged, "online", Address: new AddressSnapshot(AddressKind.Mailing, "Via Roma 10", "Torino", "IT")));
+        await changes.RecordAsync(new ChangeRequest("CL-0012", ChangeKind.AddressChanged, "online", Address: new AddressSnapshot(AddressKind.Residence, "Str. Horea 5", "Cluj-Napoca", "RO")));
+
+        var client = await LoadAsync(host, "CL-0012");
+        Assert.Equal(5, client.Addresses.Count);
+        Assert.Equal([(AddressKind.Residence, "Cluj-Napoca"), (AddressKind.Mailing, "Torino"), (AddressKind.InCareOf, "Torino")],
+            client.Addresses.Where(a => a.IsCurrent).Select(a => (a.Kind, a.City)).Order());
     }
 
     [Fact]

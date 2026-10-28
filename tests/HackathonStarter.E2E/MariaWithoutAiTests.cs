@@ -63,10 +63,12 @@ public class MariaWithoutAiTests(AppFixture app)
         // Navigate to case detail page.
         var openCaseButton = page.GetByRole(AriaRole.Link, new() { Name = "Open case" });
         var caseUrl = await openCaseButton.GetAttributeAsync("href");
+        // The seeded change history opens cases first, so Maria's code is read from the link.
+        var caseCode = caseUrl!.Split('/')[^1];
         await page.GotoAsync($"{app.BaseUrl}{caseUrl}", new() { WaitUntil = WaitUntilState.NetworkIdle });
 
         // Verify case detail page loaded.
-        await Assertions.Expect(page.GetByRole(AriaRole.Heading, new() { Name = "Case CRS-2026-0001" })).ToBeVisibleAsync();
+        await Assertions.Expect(page.GetByRole(AriaRole.Heading, new() { Name = $"Case {caseCode}" })).ToBeVisibleAsync();
 
         // Verify deadline information is shown.
         await Assertions.Expect(page.GetByText("days to the deadline")).ToBeVisibleAsync();
@@ -104,6 +106,8 @@ public class MariaWithoutAiTests(AppFixture app)
         await mariaButton.ClickAsync();
 
         await Assertions.Expect(page.GetByText("Clarification needed")).ToBeVisibleAsync(new() { Timeout = 15_000 });
+        // The seeded change history opens cases first, so Maria's code is read from the link.
+        var caseCode = (await page.GetByRole(AriaRole.Link, new() { Name = "Open case" }).GetAttributeAsync("href"))!.Split('/')[^1];
 
         // Navigate to cases page.
         await app.GoAsync(page, "/cases");
@@ -111,8 +115,8 @@ public class MariaWithoutAiTests(AppFixture app)
         // Verify the cases page loaded.
         await Assertions.Expect(page.GetByRole(AriaRole.Heading, new() { Name = "Cases" })).ToBeVisibleAsync();
 
-        // Verify case CRS-2026-0001 is listed (may be newly created or from a previous test setup).
-        var caseRow = page.GetByText("CRS-2026-0001", new() { Exact = true }).First;
+        // Verify Maria's case is listed (may be newly created or from a previous test setup).
+        var caseRow = page.GetByText(caseCode, new() { Exact = true }).First;
         await Assertions.Expect(caseRow).ToBeVisibleAsync(new() { Timeout = 15_000 });
     }
 
@@ -170,10 +174,12 @@ public class MariaWithoutAiTests(AppFixture app)
         // Navigate to case.
         var openCaseButton = page.GetByRole(AriaRole.Link, new() { Name = "Open case" });
         var caseUrl = await openCaseButton.GetAttributeAsync("href");
+        // The seeded change history opens cases first, so Maria's code is read from the link.
+        var caseCode = caseUrl!.Split('/')[^1];
         await page.GotoAsync($"{app.BaseUrl}{caseUrl}", new() { WaitUntil = WaitUntilState.NetworkIdle });
 
-        // Case should show CRS-2026-0001.
-        await Assertions.Expect(page.GetByRole(AriaRole.Heading, new() { Name = "Case CRS-2026-0001" })).ToBeVisibleAsync();
+        // Case should show Maria's case code.
+        await Assertions.Expect(page.GetByRole(AriaRole.Heading, new() { Name = $"Case {caseCode}" })).ToBeVisibleAsync();
 
         // First, draft and approve a request to move the case to AwaitingClient status.
         var draftButton = page.GetByRole(AriaRole.Button, new() { Name = "Draft request" });
@@ -219,7 +225,7 @@ public class MariaWithoutAiTests(AppFixture app)
         await registerResponseButton.ClickAsync();
 
         // Wait and verify response is recorded (no error thrown).
-        await Assertions.Expect(page.GetByRole(AriaRole.Heading, new() { Name = "Case CRS-2026-0001" })).ToBeVisibleAsync(new() { Timeout = 5_000 });
+        await Assertions.Expect(page.GetByRole(AriaRole.Heading, new() { Name = $"Case {caseCode}" })).ToBeVisibleAsync(new() { Timeout = 5_000 });
 
         // The response should be visible now.
         await Assertions.Expect(page.GetByText("NewSelfCertification")).ToBeVisibleAsync();

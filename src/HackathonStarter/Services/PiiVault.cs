@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.RegularExpressions;
 using HackathonStarter.Features.Finance;
 
@@ -8,7 +9,8 @@ namespace HackathonStarter.Services;
 /// "Plata din RO49AAAA1B31007593840000 pentru ion@x.ro" → "Plata din [IBAN_1] pentru [EMAIL_1]".
 /// The same value always gets the same placeholder within one vault (one agent run), so the model can
 /// still reason about it ("send to [IBAN_1]"). Detectors are validated (checksums), to avoid masking
-/// random numbers: CNP (Romanian personal numeric code), IBAN, payment card (Luhn), email, phone.
+/// random numbers: CNP (Romanian personal numeric code), IBAN, payment card (Luhn), email, phone (Romanian, or
+/// international with a "+" / "00" prefix).
 ///
 /// <see cref="ForStorage"/> makes a vault for data at rest (run history, recordings, exports): its placeholders
 /// look like [IBAN-1] and are never restored, so nothing stored can be turned back into personal data, and they
@@ -55,6 +57,10 @@ public partial class PiiVault
         text = CnpRegex().Replace(text, m => IsValidCnp(m.Value) ? Token("CNP", m.Value) : m.Value);
         text = CardRegex().Replace(text, m => IsLuhnValid(m.Value) ? Token("CARD", m.Value) : m.Value);
         text = PhoneRegex().Replace(text, m => Token("PHONE", m.Value));
+        text = InternationalPhoneRegex().Replace(text, MaskInternationalPhone);
+        // Digits after a "+" that the phone pattern left (an amount to it, "+1900515400013.50") are checked as CNP and card.
+        text = CnpAfterPlusRegex().Replace(text, m => IsValidCnp(m.Value) ? Token("CNP", m.Value) : m.Value);
+        text = CardAfterPlusRegex().Replace(text, m => IsLuhnValid(m.Value) ? Token("CARD", m.Value) : m.Value);
         return text;
     }
 
@@ -78,6 +84,130 @@ public partial class PiiVault
             if (cut < 0) return m.Value;
             candidate = candidate[..cut];
         }
+    }
+
+    /// <summary>
+    /// A country code and 6 to 12 more digits, so 7 to 15 after the prefix (E.164). The pattern may also take what
+    /// follows ("+49 89 4521 7730 2 ori", "+43 1 5134567 0049 89 4521 7730"), so keep only the space-separated parts
+    /// that belong to the number: none that would go over 15 digits (except an extension joined by a dash or dot,
+    /// "7730-1234"), after 10 digits only a pair that continues pairs ("+380 44 123 45 67"), and none that starts
+    /// another "00" number. The rest is scanned again. Over 15 digits with only card characters and a valid Luhn
+    /// check is a card, as before phones were detected: CardRegex takes "+4111111111111111", this its JSON escape.
+    /// A JSON-escaped "+" is kept as "+" (valid JSON too), so a number gets the same placeholder in the request
+    /// and in the saved arguments of a tool call.
+    /// </summary>
+    private string MaskInternationalPhone(Match m)
+    {
+        // The rest of a match is scanned as its own text, as Regex.Replace on a copy of it would, but in a loop over
+        // positions in the match: a long run of numbers is one match, and a copy per number grew with its square.
+        var run = m.Value;
+        var output = new StringBuilder(run.Length);
+        var scans = new Stack<(int Pos, int End, Match Next)>();
+        var (start, number, end) = (0, m.Groups["number"].Index - m.Index, run.Length);
+        while (true)
+        {
+            var rest = MaskFirstNumber(run, start, number, end, output);
+            if (rest < end) scans.Push((rest, end, InternationalPhoneRegex().Match(run, rest, end - rest)));
+            while (true)
+            {
+                if (scans.Count == 0) return output.ToString();
+                var (pos, scanEnd, next) = scans.Pop();
+                if (!next.Success)
+                {
+                    output.Append(run, pos, scanEnd - pos);
+                    continue;
+                }
+                output.Append(run, pos, next.Index - pos);
+                scans.Push((next.Index + next.Length, scanEnd, next.NextMatch()));
+                (start, number, end) = (next.Index, next.Groups["number"].Index, next.Index + next.Length);
+                break;
+            }
+        }
+    }
+
+    /// <summary>Masks the first number of the match run[start..end), whose number group starts at numberStart, and returns where the rest begins.</summary>
+    private int MaskFirstNumber(string run, int start, int numberStart, int end, StringBuilder output)
+    {
+        var prefix = run.AsSpan(start, numberStart - start);
+        var number = run.AsSpan(numberStart, end - numberStart);
+        if (Digits(number, max: 20) is > 15 and < 20 && IsLuhnValid(number.ToString()) && !number.ContainsAnyExcept("0123456789 -   "))
+        {
+            output.Append(prefix).Append(Token("CARD", number.ToString()));
+            return end;
+        }
+
+        var (kept, previous, cut) = (0, 0, 0);
+        int partStart = 0;
+        for (int i = 0; i <= number.Length; i++)
+        {
+            if (i == number.Length || IsPhoneSeparator(number[i]))
+            {
+                if (i > partStart)
+                {
+                    var part = number[partStart..i];
+                    var digits = Digits(part);
+                    if (kept >= 10 && (digits > 2 || previous > 2)) break;
+                    if (part is ['0', '0', >= '1' and <= '9', ..] && Digits(number[partStart..], max: 9) - 2 >= 7) break;
+                    if (kept + digits > 15)
+                    {
+                        if (part.IndexOfAny('-', '.') >= 0) (kept, cut) = (kept + digits, i);
+                        break;
+                    }
+                    (kept, previous, cut) = (kept + digits, digits, i);
+                }
+                partStart = i + 1;
+            }
+        }
+        if (kept < 7)
+        {
+            // Not a phone ("+12"): keep its first part and scan the rest, which may hold one ("+12 0049 89 4521 7730").
+            var first = FindFirstPhoneSeparator(number);
+            output.Append(run, start, numberStart + first - start);
+            return numberStart + first;
+        }
+        var phone = (prefix[0] == '\\' ? "+" : prefix.ToString()) + number[..cut].ToString();
+        output.Append(Token("PHONE", phone));
+        return numberStart + cut;
+    }
+
+    /// <summary>Digits of a phone part, without the trunk "(0)" that is not dialled from abroad ("+49 (0)151 …").</summary>
+    private static int Digits(ReadOnlySpan<char> part)
+    {
+        var digits = 0;
+        foreach (var c in part) if (char.IsAsciiDigit(c)) digits++;
+        return digits - (part.IndexOf("(0)") >= 0 ? 1 : 0);
+    }
+
+    /// <summary>Digits of the space-separated parts of a text, counted until <paramref name="max"/>: only a few are ever needed.</summary>
+    private static int Digits(ReadOnlySpan<char> text, int max)
+    {
+        var digits = 0;
+        int start = 0;
+        for (int i = 0; i <= text.Length; i++)
+        {
+            if (i == text.Length || IsPhoneSeparator(text[i]))
+            {
+                if (i > start)
+                {
+                    if ((digits += Digits(text[start..i])) >= max) break;
+                }
+                start = i + 1;
+            }
+        }
+        return digits;
+    }
+
+    /// <summary>Check if character is a phone separator: space, non-breaking space (U+00A0), or narrow non-breaking space (U+202F).</summary>
+    private static bool IsPhoneSeparator(char c) => c is ' ' or ' ' or ' ';
+
+    /// <summary>Find first occurrence of a phone separator.</summary>
+    private static int FindFirstPhoneSeparator(ReadOnlySpan<char> text)
+    {
+        for (int i = 0; i < text.Length; i++)
+        {
+            if (IsPhoneSeparator(text[i])) return i;
+        }
+        return text.Length;
     }
 
     private string Token(string type, string value)
@@ -122,15 +252,34 @@ public partial class PiiVault
     [GeneratedRegex(@"\b[A-Za-z]{2}\d{2}(?:[ ]?[A-Za-z0-9]{4}){2,7}(?:[ ]?[A-Za-z0-9]{1,4})?\b")]
     private static partial Regex IbanRegex();
 
-    [GeneratedRegex(@"\b(?:\d[ -]?){12,18}\d\b")]
+    // Card and CNP never follow a "+" that InternationalPhoneRegex takes as a prefix: "+4915144201187" is a phone even
+    // if its digits pass the Luhn or CNP check. After such a "+" only a run too long for a phone (16 to 19 digits) is
+    // a card ("+4111111111111111"). A "+" after a word is no prefix: "Card+4111111111111111", "q=CNP+1900515400013".
+    [GeneratedRegex(@"(?<!(?<![\w+]|\w-)\+)\b(?:\d[ -]?){12,18}\d\b|(?<=(?<![\w+]|\w-)\+)(?:\d[ -]?){15,18}\d\b")]
     private static partial Regex CardRegex();
 
-    [GeneratedRegex(@"\b[1-9]\d{12}\b")]
+    [GeneratedRegex(@"(?<!(?<![\w+]|\w-)\+)\b[1-9]\d{12}\b")]
     private static partial Regex CnpRegex();
+
+    [GeneratedRegex(@"(?<=\+|\\u002[Bb])[1-9]\d{12}\b")]
+    private static partial Regex CnpAfterPlusRegex();
+
+    [GeneratedRegex(@"(?<=\+|\\u002[Bb])(?:\d[ -]?){12,18}\d\b")]
+    private static partial Regex CardAfterPlusRegex();
 
     // Romanian mobile/landline numbers: +40 / 0040 / 0 prefix, optional separators.
     [GeneratedRegex(@"(?<![\d\w])(?:\+40|0040|0)\s?[237]\d{2}[\s.-]?\d{3}[\s.-]?\d{3}(?!\d)")]
     private static partial Regex PhoneRegex();
+
+    // International numbers: "+" / "00" (or the JSON escape of "+" that RunStore.Json writes), a country code, then
+    // digit groups split by single spaces, dashes or dots, with an optional "(212)" / "(0)" area code. Never inside a
+    // longer token, after a decimal point of a lone 0 ("0.0049…", "0,0049…"; "1001,0049…" and "1,+49…" are CSV rows), in
+    // a space-separated IBAN ("DE89 3704 0044 …") or an amount ("+1.234.567", "+1234567.89", "+1234567,89"). After a
+    // comma, more than 2 digits, or a number of 10+ digits before it, is a CSV field, not decimals: "+498945217730,1985",
+    // "+498945217730,35", "+1 (212) 555-0147,35".
+    // No atomic group: when the last part runs into a word ("+1 212 555 0147 9am") the match ends at the part before.
+    [GeneratedRegex(@"(?<![\w+]|\w-)(?:\+|\\u002[Bb]|(?<!(?<!\d)0[.,]|\b[A-Za-z]{2}\d{2}(?: [A-Za-z0-9]{4}){0,7} )00)(?!\d{1,3}(?:\.\d{3})+(?![\d.])|\d+\.\d{1,2}(?![\d.]))(?<number>[1-9]\d*(?:(?:[.-]|[ \u00A0\u202F]{1,2})?\(\d{1,4}\)(?:[.-]|[ \u00A0\u202F]{1,2})?\d+)?(?:(?:[.-]|[ \u00A0\u202F]{1,2})\d+)*)(?!\w|(?<!\d(?:[ \u00A0\u202F.()-]{0,2}\d){9}),\d{1,2}(?!\d))")]
+    private static partial Regex InternationalPhoneRegex();
 
     [GeneratedRegex(@"\[(?:EMAIL|IBAN|CARD|CNP|PHONE)_\d+\]")]
     private static partial Regex TokenRegex();

@@ -29,7 +29,6 @@ public static partial class Lang
         ro["Caught, missed and false alarms on the golden cases and the synthetic clients."] = "Prinse, ratate și alarme false pe cazurile-etalon și pe clienții sintetici.";
         ro["Channel"] = "Canal";
         ro["Change received, case opened"] = "Schimbarea primită, caz deschis";
-        ro["Checked, does not apply"] = "Verificat, nu se aplică";
         ro["Closed on"] = "Închis pe";
         ro["Confirmed via"] = "Confirmat prin";
         ro["Clarification needed"] = "Clarificare necesară";
@@ -37,11 +36,9 @@ public static partial class Lang
         ro["Client answered"] = "Client răspuns";
         ro["Client {0}"] = "Clientul {0}";
         ro["Close case"] = "Închide caz";
-        ro["Closed"] = "Închis";
         ro["Closed or expired"] = "Închis sau expirat";
         ro["closed on {0}"] = "închis pe {0}";
         ro["Coming in the next phase"] = "Vine în faza următoare";
-        ro["Compliant"] = "Conform";
         ro["Confirmed in the app"] = "Confirmat în aplicație";
         ro["CRS"] = "CRS";
         ro["CRS and FATCA"] = "CRS și FATCA";
@@ -66,9 +63,7 @@ public static partial class Lang
         ro["Every step, rule and human decision in a hash chain."] = "Fiecare pas, fiecare regulă și fiecare decizie umană, într-un lanț de hash-uri.";
         ro["Evidence"] = "Dovezi";
         ro["expired on {0}"] = "expirat pe {0}";
-        ro["Expired"] = "Expirat";
         ro["FATCA"] = "FATCA";
-        ro["FATCA alert"] = "Alertă FATCA";
         ro["First request"] = "Prima cerere";
         ro["Follow-up request"] = "Cerere de urmărire";
         ro["From the bank's data"] = "Din datele băncii";
@@ -90,7 +85,6 @@ public static partial class Lang
         ro["Move the demo date forward"] = "Mută data demo înainte";
         ro["New change"] = "Modificare nouă";
         ro["New self-certification"] = "Autocertificare nouă";
-        ro["No case"] = "Fără caz";
         ro["No cases"] = "Nicio caz";
         ro["No deadline"] = "Fără termen";
         ro["No page in the guide was found for this rule."] = "Nu s-a găsit nicio pagină în ghid pentru această regulă.";
@@ -101,7 +95,6 @@ public static partial class Lang
         ro["Not on the guide's list: a person decides"] = "Nu este pe lista din ghid: o persoană decide";
         ro["on day {0}, {1}"] = "în ziua {0}, {1}";
         ro["Online"] = "Online";
-        ro["Open"] = "Deschis";
         ro["Other answer"] = "Alt răspuns";
         ro["Outcome"] = "Rezultat";
         ro["Our reading where the guide is silent or ambiguous."] = "Interpretarea noastră, acolo unde ghidul tace sau e ambiguu.";
@@ -141,7 +134,6 @@ public static partial class Lang
         ro["Reset the demo date"] = "Resetează data demo";
         ro["Response"] = "Răspuns";
         ro["Response kind"] = "Tip răspuns";
-        ro["Response received"] = "Răspuns primit";
         ro["Rule engine {0}"] = "Motorul de reguli {0}";
         ro["Save request"] = "Salvează cerere";
         ro["Sent"] = "Trimis";
