@@ -80,8 +80,16 @@ public sealed class EvaluationService(
     {
         var start = Stopwatch.GetTimestamp();
         var versions = new SortedSet<string>(StringComparer.Ordinal);
-        var goldenRows = golden.Select(c => { ct.ThrowIfCancellationRequested(); return Golden(c, versions); }).ToList();
-        var syntheticRows = synthetic.Select(s => { ct.ThrowIfCancellationRequested(); return Synthetic(s, versions); }).ToList();
+        var goldenRows = golden.Select(c => { ct.ThrowIfCancellationRequested(); return Golden(c, versions) with
+        {
+            ExpectedIndicia = c.ExpectedIndicia.Count > 0 ? [.. c.ExpectedIndicia.Select(h => Key(h.RuleId, h.Jurisdiction, h.CoveredBy))] : c.ExpectedHits,
+            ExpectedCleared = c.ExpectedClearedRules.Count > 0 ? [.. c.ExpectedClearedRules.Select(h => Key(h.RuleId, h.Jurisdiction, Coverage.None))] : c.ExpectedCleared,
+        }; }).ToList();
+        var syntheticRows = synthetic.Select(s => { ct.ThrowIfCancellationRequested(); return Synthetic(s, versions) with
+        {
+            ExpectedIndicia = [.. s.ExpectedHits.Select(h => Key(h.RuleId, h.Jurisdiction, Coverage.None))],
+            ExpectedCleared = [.. s.ExpectedCleared.Select(h => Key(h.RuleId, h.Jurisdiction, Coverage.None))],
+        }; }).ToList();
         var version = string.Join(", ", versions);
         var (goldenTotals, syntheticTotals) = (CoverageTotals.Of(goldenRows), CoverageTotals.Of(syntheticRows));
         return new SpecCoverage(SpecSource(versions, version, goldenTotals, syntheticTotals), version, goldenRows, goldenTotals,

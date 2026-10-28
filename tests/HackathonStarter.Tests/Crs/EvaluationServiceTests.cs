@@ -5,6 +5,7 @@ using HackathonStarter.Features.Evaluation;
 using HackathonStarter.Features.Rules;
 using HackathonStarter.Features.Shield;
 using HackathonStarter.Features.Synthetic;
+using HackathonStarter.Services;
 using Microsoft.Extensions.Configuration;
 
 namespace HackathonStarter.Tests.Crs;
@@ -191,6 +192,39 @@ public class EvaluationServiceTests
         Assert.Equal(generated, noCase.Select(r => (r.Id, r.Label!, r.LabelEn!, r.Expected)));
         Assert.NotEqual(oracle.Select(r => r.Actual), noCase.Select(r => r.Actual));
     }
+
+    [Fact]
+    public async Task The_expected_rules_on_each_row_come_from_the_data_not_from_the_engine()
+    {
+        var spec = (await Service(new NoCaseEngine("test")).RunAsync()).Spec;
+
+        Assert.Equal(["CRS-IND-ADDR:DE", "CRS-IND-PHONE:DE"], Row(spec, "4").ExpectedIndicia.Order());
+        Assert.Equal(["CRS-IND-SO:DE"], Row(spec, "5a").ExpectedCleared);
+        Assert.Equal(["CRS-IND-ADDR:DE/SelfCertification"], Row(spec, "9").ExpectedIndicia);
+        var generated = SyntheticSnapshots.Create().ToDictionary(s => s.Code);
+        Assert.All(spec.Synthetic, r => Assert.Equal(
+            (generated[r.Id].ExpectedHits.Count, generated[r.Id].ExpectedCleared.Count), (r.ExpectedIndicia.Count, r.ExpectedCleared.Count)));
+    }
+
+    [Fact]
+    public void The_time_saved_is_compared_only_when_both_times_are_a_result()
+    {
+        SourceNote real = new(EvaluationSource.Real, "", ""), unavailable = new(EvaluationSource.Unavailable, "", "");
+
+        var both = new EfficiencyReport(real, 4.5, real, 22.5m);
+        Assert.Equal(18m, both.SavedMinutesPerCase);
+        Assert.Equal(EvaluationSource.Real, both.Saved.Source);
+        Assert.Equal(-2.5m, new EfficiencyReport(real, 25, real, 22.5m).SavedMinutesPerCase);
+
+        var agentMissing = new EfficiencyReport(unavailable, 4.5, real, 22.5m);
+        Assert.Null(agentMissing.SavedMinutesPerCase);
+        Assert.Equal(EvaluationSource.Unavailable, agentMissing.Saved.Source);
+        Assert.Null(new EfficiencyReport(real, 4.5, unavailable, null).SavedMinutesPerCase);
+    }
+
+    [Fact]
+    public void Every_golden_title_has_a_Romanian_translation_for_metrics() =>
+        Assert.All(GoldenCases.All, c => Assert.True(Lang.Translations.ContainsKey(c.Title), c.Title));
 
     [Fact]
     public async Task A_shield_that_sees_nothing_misses_every_kind_of_concealment()
