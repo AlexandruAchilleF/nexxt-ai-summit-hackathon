@@ -29,7 +29,7 @@ public class AppTests(AppFixture app)
         await app.GoAsync(page, path);
 
         await Assertions.Expect(page.GetByRole(AriaRole.Heading, new() { Name = heading, Exact = true }).First).ToBeVisibleAsync(); // the app bar repeats the title
-        await Assertions.Expect(page.Locator("footer.app-footer").GetByRole(AriaRole.Link, new() { Name = "Privacy policy" })).ToBeVisibleAsync();
+        await Assertions.Expect(page.Locator("footer.app-footer").GetByRole(AriaRole.Link, new() { Name = "Data and privacy" })).ToBeVisibleAsync();
     }
 
     [Theory]
@@ -42,8 +42,8 @@ public class AppTests(AppFixture app)
         var page = await app.NewPageAsync();
         await app.GoAsync(page, path);
 
-        await Assertions.Expect(page.GetByRole(AriaRole.Heading, new() { Name = heading, Exact = true }).First).ToBeVisibleAsync(); // the footer has a "Contact" column
-        await Assertions.Expect(page.Locator("footer.lp-footer").GetByRole(AriaRole.Link, new() { Name = "Privacy policy" })).ToBeVisibleAsync();
+        await Assertions.Expect(page.GetByRole(AriaRole.Heading, new() { Name = heading, Exact = true }).First).ToBeVisibleAsync();
+        await Assertions.Expect(page.Locator("footer.lp-footer").GetByRole(AriaRole.Link, new() { Name = "Data and privacy" })).ToBeVisibleAsync();
         await Assertions.Expect(page.Locator(".app-topbar")).ToHaveCountAsync(0); // no app shell
     }
 
