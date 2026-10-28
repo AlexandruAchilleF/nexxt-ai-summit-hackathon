@@ -151,4 +151,84 @@ public class MariaWithoutAiTests(AppFixture app)
         // Dashboard should be accessible.
         await Assertions.Expect(page.GetByRole(AriaRole.Heading, new() { Name = "Each change to client data becomes a decision" })).ToBeVisibleAsync();
     }
+
+    [Fact]
+    public async Task Golden_case_4_register_response_with_self_certification()
+    {
+        var page = await app.NewPageAsync(user: "admin", lang: "en");
+
+        // Apply Maria scenario to create the case.
+        await app.GoAsync(page, "/changes/new");
+        var demoScenarioSection = page.Locator(".app-list");
+        var mariaButton = demoScenarioSection.GetByText("Maria", new() { Exact = false }).First;
+        await mariaButton.ClickAsync();
+
+        // Wait for decision and verify.
+        await Assertions.Expect(page.GetByText("Clarification needed")).ToBeVisibleAsync(new() { Timeout = 15_000 });
+
+        // Navigate to case.
+        var openCaseButton = page.GetByRole(AriaRole.Link, new() { Name = "Open case" });
+        var caseUrl = await openCaseButton.GetAttributeAsync("href");
+        await page.GotoAsync($"{app.BaseUrl}{caseUrl}", new() { WaitUntil = WaitUntilState.NetworkIdle });
+
+        // Case should show CRS-2026-0001.
+        await Assertions.Expect(page.GetByRole(AriaRole.Heading, new() { Name = "Case CRS-2026-0001" })).ToBeVisibleAsync();
+
+        // First, draft and approve a request to move the case to AwaitingClient status.
+        var draftButton = page.GetByRole(AriaRole.Button, new() { Name = "Draft request" });
+        await draftButton.ClickAsync();
+
+        var messageField = page.GetByLabel("Message to client");
+        await messageField.FillAsync("Please provide documentation.");
+
+        var saveButton = page.GetByRole(AriaRole.Button, new() { Name = "Save request" });
+        await saveButton.ClickAsync();
+
+        // Approve the request.
+        var approveButton = page.GetByRole(AriaRole.Button, new() { Name = "Approve" });
+        await approveButton.ClickAsync();
+
+        // Now the response form should be visible. Register response with new self-certification.
+        var registerButton = page.GetByRole(AriaRole.Button, new() { Name = "Register response" });
+        await registerButton.ClickAsync();
+
+        // The form should show with response kind already selected as NewSelfCertification.
+        // Fill the residence country.
+        var residenceSelect = page.GetByRole(AriaRole.Combobox, new() { Name = "Residence country" });
+        await residenceSelect.ClickAsync();
+        var germanyOption = page.GetByRole(AriaRole.Option, new() { Name = "Germany" });
+        await germanyOption.ClickAsync();
+
+        // Fill TIN.
+        var tinField = page.GetByLabel("TIN");
+        await tinField.FillAsync("86095174223");
+
+        // Fill signed date - click to open date picker and type the date.
+        var dateField = page.GetByLabel("Signed date");
+        await dateField.ClickAsync();
+        // The date picker should open; type the date.
+        await page.Keyboard.TypeAsync("01/22/2027");
+
+        // Channel is online by default, fill summary.
+        var summaryField = page.GetByLabel("Summary");
+        await summaryField.FillAsync("New self-certification for Germany residence.");
+
+        // Register the response.
+        var registerResponseButton = page.GetByRole(AriaRole.Button, new() { Name = "Register" }).Last;
+        await registerResponseButton.ClickAsync();
+
+        // Wait and verify response is recorded (no error thrown).
+        await Assertions.Expect(page.GetByRole(AriaRole.Heading, new() { Name = "Case CRS-2026-0001" })).ToBeVisibleAsync(new() { Timeout = 5_000 });
+
+        // The response should be visible now.
+        await Assertions.Expect(page.GetByText("NewSelfCertification")).ToBeVisibleAsync();
+
+        // Close the case should now be available and work.
+        var closeButton = page.GetByRole(AriaRole.Button, new() { Name = "Close case" });
+        await closeButton.ClickAsync();
+
+        // Verify case is closed - check the pill with exact match.
+        var closedPill = page.GetByText("Closed", new() { Exact = true }).First;
+        await Assertions.Expect(closedPill).ToBeVisibleAsync();
+    }
 }

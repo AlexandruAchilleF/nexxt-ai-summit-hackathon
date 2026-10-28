@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using HackathonStarter.Agents;
 using HackathonStarter.Features.Cases;
+using HackathonStarter.Features.Sentinel.Screens;
 
 namespace HackathonStarter.Features.Sentinel;
 
@@ -49,5 +50,7 @@ public class CrsSentinelAgent : ToolAgent
 public static class SentinelSetup
 {
     public static IServiceCollection AddSentinel(this IServiceCollection services) =>
-        services.AddSingleton<AgentDefinition, CrsSentinelAgent>();
+        services
+            .AddSingleton<AgentDefinition, CrsSentinelAgent>()
+            .AddScoped<IGetLatestSelfCertificationQuery, GetLatestSelfCertificationQuery>();
 }

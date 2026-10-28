@@ -1,7 +1,11 @@
 @page "/cases/{Code}"
 @inject ICaseService CaseService
+@inject IChangeService ChangeService
+@inject IGetLatestSelfCertificationQuery GetLatestSelfCertification
 @inject ISimClock SimClock
 @inject CurrentUser CurrentUser
+
+@using HackathonStarter.Features.Sentinel.Screens
 
 <PageTitle>@T("Case {0}", Code) · @SiteConfig.Name</PageTitle>
 
@@ -471,12 +475,36 @@ else
         {
             if (_case is null) return;
 
+            int? selfCertificationId = null;
+
+            // For NewSelfCertification, first record the self-certification change.
+            if (_responseKind == ResponseKind.NewSelfCertification)
+            {
+                var selfCertRequest = new ChangeRequest(
+                    _case.ClientCode,
+                    ChangeKind.SelfCertSubmitted,
+                    _channel,
+                    SelfCertification: new SelfCertificationSnapshot(
+                        _signedDate ?? SimClock.UtcNow,
+                        [new TaxResidenceSnapshot(_residenceCountry, _tin, NoTinReason.C_NotRequired, null)],
+                        false
+                    ),
+                    CaseCode: _case.Code
+                );
+
+                await ChangeService.RecordAsync(selfCertRequest);
+
+                // After recording the change, get the ID of the latest self-certification.
+                selfCertificationId = await GetLatestSelfCertification.GetLatestIdAsync(_case.ClientCode);
+            }
+
             var response = new NewResponse(
                 Kind: _responseKind,
                 Category: ExplanationCategory.None,
                 Channel: _channel,
                 Summary: _responseSummary,
-                HasDocumentaryEvidence: false
+                HasDocumentaryEvidence: false,
+                SelfCertificationId: selfCertificationId
             );
 
             await CaseService.RegisterResponseAsync(_case.Code, response);
@@ -534,7 +562,22 @@ else
         try
         {
             if (_case is null) return;
-            await CaseService.CloseAsync(_case.Code, ConfirmationChannel.Online);
+
+            // Use the channel from the last response if available.
+            var channel = ConfirmationChannel.Online;
+            if (_case.Responses.Count > 0)
+            {
+                var lastResponse = _case.Responses[^1];
+                channel = lastResponse.Channel switch
+                {
+                    "inperson" => ConfirmationChannel.InPerson,
+                    "remote" => ConfirmationChannel.Remote,
+                    "online" => ConfirmationChannel.Online,
+                    _ => ConfirmationChannel.Online,
+                };
+            }
+
+            await CaseService.CloseAsync(_case.Code, channel);
             _case = await CaseService.GetAsync(_case.Code);
             StateHasChanged();
         }
