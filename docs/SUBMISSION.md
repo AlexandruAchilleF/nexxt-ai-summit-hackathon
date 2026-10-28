@@ -66,7 +66,7 @@ Sfaturi:
 | „TIN valid.” | „Format valid.” |
 | „Orice actualizare pornește un termen.” | „Fiecare actualizare trebuie evaluată; doar cele relevante fiscal pornesc termenul.” |
 | „Termenul e mereu 90 de zile.” | „90 de zile la conturile noi; la cele preexistente, cea mai târzie dintre sfârșitul anului și 90 de zile.” |
-| Reținerea FATCA de 30% | Nu apare în ghid: nu o spunem. |
+| Reținerea FATCA de 30% | Nu o spunem în pitch. La întrebări: cu acordul FATCA Model 1, o bancă conformă nu e supusă reținerii; ea apare doar după o neconformare semnificativă nerezolvată în 18 luni (acordul, art. 4(1) și 5(2)(b)). |
 
 ## Întrebări probabile ale juriului (cu răspunsul)
 
@@ -77,7 +77,7 @@ Sfaturi:
 | De ce nu ChatGPT? | Un chatbot dă o părere și poate răspunde diferit la același dosar. Aici regulile sunt cod, cu pagina din ghid, iar termenul e urmărit pe fiecare caz. |
 | Raiffeisen nu are deja asta? | Semnalul la modificarea datelor poate exista. Noi acoperim ce urmează după el: dovezi, cerere, răspuns, termen, închidere cu dovadă. (Răspunsul mentorului: de completat.) |
 | De ce ordinul permanent către Germania nu e indiciu, dar cel către SUA este? | La CRS, ordinele permanente din conturile de depozit sunt excluse (ghidul, p. 29); la FATCA excepția nu există (p. 31). |
-| De ce termenul Mariei e 90 de zile? | Contul ei e cont nou (deschis după 2016): 90 de zile de la pierderea valabilității (p. 35–36). La un cont preexistent, termenul e cea mai târzie dintre sfârșitul anului și 90 de zile (p. 29; interpretarea noastră, aliniată la Comentariul OCDE). |
+| De ce termenul Mariei e 90 de zile? | Contul ei e cont nou (deschis după 2016): 90 de zile de la pierderea valabilității (p. 35–36). La un cont preexistent, termenul e cea mai târzie dintre sfârșitul anului și 90 de zile (p. 29; Codul de procedură fiscală, Anexa nr. 2 pct. 1). |
 | Cum verificăm că merge? | `/metrics` rulează toate cazurile-etalon cu rezultatul scris înainte; `/changes/new` răspunde la „și dacă…?” pe loc; `dotnet test` rulează aceleași cazuri. |
 | Merge cu date reale, sensibile? | Da: mascare înainte de model, model care poate rula la bancă, temei legal (Legea 207/2015, Acordul FATCA), retenție configurabilă. |
 | Ce e real și ce e simulat? | Reale: regulile, termenele, scutul, verificarea formatului TIN (local și prin TIN on Europa, live sau replay `TargetClient`; TIN on Europa verifică doar structura și sintaxa), bucla cu aprobări. Sintetice: clienții, documentele, răspunsurile clientului. Nefăcute: integrarea cu core banking, trimiterea mesajelor. |
