@@ -157,6 +157,7 @@ public static class SiteConfig
         new("Dashboard", "/dashboard", Icons.Material.Rounded.SpaceDashboard),
         new("Cases", "/cases", Icons.Material.Rounded.AssignmentLate, "CRS"),
         new("New change", "/changes/new", Icons.Material.Rounded.EditNote, "CRS"),
+        new("Clients", "/clients", Icons.Material.Rounded.People, "CRS"),
         new("Audit log", "/audit", Icons.Material.Rounded.VerifiedUser, "CRS"),
         new("Metrics", "/metrics", Icons.Material.Rounded.Insights, "CRS"),
         // Assistant, Arena, Scenarios, Items and Calculators stay reachable by URL (E2E tests and the Docker CI check use them).

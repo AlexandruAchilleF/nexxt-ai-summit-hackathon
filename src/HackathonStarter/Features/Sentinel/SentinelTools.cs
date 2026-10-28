@@ -260,7 +260,8 @@ public sealed class SentinelTools(IServiceProvider services)
                 EvidenceId = e.Id, Verified = false, Label = SentinelWording.SignalLabel,
                 Note = "The quote is not in the visible text: no signal was saved. Do not use this quote.",
             };
-        var s = await Cases.AddSignalAsync(new NewSignal(c.ClientCode, c.Code, description.Trim(), e.Id));
+        // A free text from the model: saved masked, like an escalation reason (the quote is the verified evidence).
+        var s = await Cases.AddSignalAsync(new NewSignal(c.ClientCode, c.Code, PiiVault.ForStorage().Mask(description.Trim()), e.Id));
         return new { s.Id, EvidenceId = e.Id, e.Quote, Verified = true, Label = SentinelWording.SignalLabel, s.Description, e.Page };
     }
 
@@ -274,6 +275,25 @@ public sealed class SentinelTools(IServiceProvider services)
         if (await FindCaseAsync(caseCode) is not { } c) return NoCase(caseCode);
         if (await services.GetRequiredService<IShieldedDocuments>().GetAsync(documentId) is not { } doc) return Error($"No document {documentId}.");
         if (doc.ClientId != c.ClientId) return NotTheClients("Document", documentId, c);
+
+        // Pressing "Verify" again (e.g. after registerResponse failed) must not record the same document a second time, whatever
+        // a second reading would give: the self-certification already recorded from it is the answer, and no model is called.
+        var client = await Clients.GetAsync(c.ClientCode);
+        if (client?.SelfCertifications
+                .Where(s => s.DocumentId == doc.DocumentId && s.Status == SelfCertStatus.Valid && SentinelWording.Utc(s.ReceivedAt) >= SentinelWording.Utc(c.OpenedAt))
+                .OrderByDescending(s => s.Id).FirstOrDefault() is { } already)
+            return new
+            {
+                CaseCode = c.Code, doc.DocumentId, doc.FileName, Source = "recorded", ShieldVerdict = doc.Result.Verdict.ToString(),
+                Jurisdictions = already.Residences.Select(r => new
+                {
+                    r.Country, r.Tin, NoTinReason = r.Tin is null ? r.NoTinReason.ToString() : null, r.NoTinExplanation, Verified = true,
+                    Note = "Recorded earlier from this document, every quote verified then.",
+                }),
+                Complete = true, Missing = Array.Empty<string>(), Recorded = true, AlreadyRecorded = true, SelfCertificationId = already.Id,
+                Outcome = Outcome(services.GetRequiredService<ICrsRuleEngine>().EvaluateSelfCertification(ClientSnapshot.From(client), SelfCertificationSnapshot.From(already))),
+                Next = "Already recorded: check each TIN with checkTin, then registerResponse with this documentId and selfCertificationId, then evaluateRules.",
+            };
 
         var pages = doc.VisiblePages;
         var vault = new PiiVault(); // personal data is masked before the model, like in every agent run
@@ -383,7 +403,7 @@ public sealed class SentinelTools(IServiceProvider services)
             selfCertificationId = owner?.SelfCertifications
                 .Where(s => s.Status == SelfCertStatus.Valid && SentinelWording.Utc(s.ReceivedAt) >= SentinelWording.Utc(c.OpenedAt))
                 .OrderByDescending(s => s.ReceivedAt).ThenByDescending(s => s.Id).Select(s => s.Id).FirstOrDefault() ?? 0;
-        var r = await Cases.RegisterResponseAsync(c.Code, new NewResponse(k, cat, channel.Trim(), summary.Trim(),
+        var r = await Cases.RegisterResponseAsync(c.Code, new NewResponse(k, cat, channel.Trim(), PiiVault.ForStorage().Mask((summary ?? "").Trim()),
             documentId > 0 ? documentId : null, SelfCertificationId: selfCertificationId > 0 ? selfCertificationId : null));
         var toPerson = k == ResponseKind.Other || cat == ExplanationCategory.Other;
         return new
@@ -427,7 +447,7 @@ public sealed class SentinelTools(IServiceProvider services)
     {
         var code = Arg(args, "caseCode") ?? "?";
         var channel = Arg(args, "channel") ?? "email";
-        var line = int.TryParse(Arg(args, "requestId"), out var id) ? LetterFirstLine(code, id) : null;
+        var line = int.TryParse(Arg(args, "requestId"), out var id) ? LetterFirstLine(id) : null;
         return line is null
             ? Lang.T("Send the request for case {0} by {1}", code, channel)
             : Lang.T("Send the request for case {0} by {1}: {2}", code, channel, line);
@@ -440,20 +460,11 @@ public sealed class SentinelTools(IServiceProvider services)
         return Lang.T("Close case {0} (channel: {1}); the code re-evaluates the rules first", code, channel);
     }
 
-    private string? LetterFirstLine(string caseCode, int requestId)
-    {
-        if (_firstLines.TryGetValue(requestId, out var line)) return line;
-        try
-        {
-            // Drafted in an earlier run: the approval card is built synchronously by the runner.
-            var c = Cases.GetAsync(caseCode).GetAwaiter().GetResult();
-            return FirstLine(c?.Requests.FirstOrDefault(r => r.Id == requestId)?.Body);
-        }
-        catch (Exception)
-        {
-            return null; // the card still shows the case and the channel
-        }
-    }
+    /// <summary>
+    /// The first line of a letter drafted in this run. A letter from an earlier run is not read here: the runner builds the
+    /// card synchronously, and blocking on the database there could deadlock; the card then shows the case and the channel.
+    /// </summary>
+    private string? LetterFirstLine(int requestId) => _firstLines.TryGetValue(requestId, out var line) ? line : null;
 
     private static string? FirstLine(string? body)
     {

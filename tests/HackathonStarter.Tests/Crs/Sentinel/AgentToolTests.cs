@@ -274,9 +274,18 @@ public class AgentToolTests
         var world = new MariaWorld();
         await using var host = await world.HostAsync();
         var tools = ((ToolAgent)host.Agent("crs-sentinel")).Tools(new ToolContext(Config.SiteConfig.Users[0], [], host.Services)).ToList();
-        await world.Cases.DraftRequestAsync(MariaWorld.CaseCode, "ro", "\nVă rugăm să ne confirmați rezidența fiscală.\nRestul scrisorii.");
+        // A letter drafted in an earlier run: the card shows the case and the channel only (no blocking database read).
+        await world.Cases.DraftRequestAsync(MariaWorld.CaseCode, "ro", "Scrisoare dintr-o rulare anterioară.");
+        var earlier = tools.Single(t => t.Name == "sendClientRequest").Summarize!(Args(new { caseCode = MariaWorld.CaseCode, requestId = 1, channel = "email" }));
+        Assert.Equal("Send the request for case CRS-2026-0001 by email", earlier);
 
-        var send = tools.Single(t => t.Name == "sendClientRequest").Summarize!(Args(new { caseCode = MariaWorld.CaseCode, requestId = 1, channel = "email" }));
+        var draft = tools.Single(t => t.Name == "draftClientRequest").Function;
+        await draft.InvokeAsync(new Microsoft.Extensions.AI.AIFunctionArguments(new Dictionary<string, object?>
+        {
+            ["caseCode"] = MariaWorld.CaseCode, ["body"] = "\nVă rugăm să ne confirmați rezidența fiscală.\nRestul scrisorii.",
+        }) { Services = host.Services });
+
+        var send = tools.Single(t => t.Name == "sendClientRequest").Summarize!(Args(new { caseCode = MariaWorld.CaseCode, requestId = 2, channel = "email" }));
         var close = tools.Single(t => t.Name == "closeCase").Summarize!(Args(new { caseCode = MariaWorld.CaseCode }));
 
         Assert.Contains(MariaWorld.CaseCode, send);
