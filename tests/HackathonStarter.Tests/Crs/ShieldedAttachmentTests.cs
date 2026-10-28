@@ -56,6 +56,41 @@ public class ShieldedAttachmentTests
     }
 
     [Fact]
+    public async Task A_pdf_renamed_to_txt_still_goes_through_the_shield()
+    {
+        var pdf = TestPdf.Build(new TestPage(
+            new TestText("Extras de cont Victor Neagu"),
+            new TestText(Injection, Size: 1, R: 255, G: 255, B: 255, Y: 700)));
+
+        var (file, hidden) = await ShieldedAttachment.ReadAsync(_shield, new MemoryStream(pdf), "extras.txt");
+
+        Assert.Equal(1, hidden);
+        Assert.DoesNotContain("instructiunile", file.Text);
+    }
+
+    [Theory]
+    [InlineData("pagina.html")]
+    [InlineData("date.xml")]
+    public async Task Markup_that_can_hide_text_is_refused(string fileName)
+    {
+        var bytes = Encoding.UTF8.GetBytes("<p>Extras</p><p style=\"display:none\">" + Injection + "</p>");
+
+        await Assert.ThrowsAsync<NotSupportedException>(() => ShieldedAttachment.ReadAsync(_shield, new MemoryStream(bytes), fileName));
+    }
+
+    [Fact]
+    public async Task Comments_and_invisible_characters_in_text_never_reach_the_model()
+    {
+        var bytes = Encoding.UTF8.GetBytes("Extras de cont\n<!-- " + Injection + " -->\nSold\u200B final\u2060 18450,00 RON");
+
+        var (file, hidden) = await ShieldedAttachment.ReadAsync(_shield, new MemoryStream(bytes), "nota.md");
+
+        Assert.Equal(3, hidden);
+        Assert.DoesNotContain("instructiunile", file.Text);
+        Assert.Equal("Extras de cont\n\nSold final 18450,00 RON", file.Text);
+    }
+
+    [Fact]
     public async Task A_pdf_with_only_hidden_text_is_refused()
     {
         var pdf = TestPdf.Build(new TestPage(new TestText(Injection, Size: 1, R: 255, G: 255, B: 255, Y: 700)));
