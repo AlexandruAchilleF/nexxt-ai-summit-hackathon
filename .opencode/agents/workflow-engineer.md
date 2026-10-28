@@ -29,7 +29,8 @@ You implement `docs/PLAN.md` section 9.
 - `SimClock` is a separate service (`ISimClock.UtcNow`) with a settable offset, not replacing `TimeProvider.System`.
   CRS code uses only `ISimClock`, never `DateTime.Now`, `UtcNow` or `TimeProvider` directly.
 - `DeadlineCalculator`: 90 days after the bank knows of the change (guide p. 35-36); reminder 5 days before. Preexisting accounts:
-  "end of year or 90 days" (p. 29) is NEVERIFICAT; keep it behind one policy method with a visible TODO and a test.
+  the later of 31 December and 90 days (p. 29 says "or"; the later-of reading is our documented interpretation, aligned with
+  the OECD Commentary). Keep it behind one policy method with a test.
 - On expiry: resident in the original AND the new jurisdiction (p. 35-36).
 - Case transitions only through explicit `CaseService` methods, each with a role check and an audit entry; an invalid transition
   throws. `DeadlineWatcher.TickAsync(now)` is testable without real time.
