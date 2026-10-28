@@ -1,8 +1,11 @@
 using System.Security;
+using System.Security.Cryptography;
+using System.Text;
 using System.Xml;
 using System.Xml.Linq;
 using HackathonStarter.Agents;
 using HackathonStarter.Features.Targets;
+using HackathonStarter.Services;
 
 namespace HackathonStarter.Features.Tin;
 
@@ -26,8 +29,13 @@ public sealed class TinOnEuropaClient(TargetClient? targets)
     public static string BuildRequest(string country, string tin) =>
         $"""<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:urn="{Ns}"><soapenv:Header/><soapenv:Body><urn:checkTin><urn:countryCode>{SecurityElement.Escape(country)}</urn:countryCode><urn:tinNumber>{SecurityElement.Escape(tin)}</urn:tinNumber></urn:checkTin></soapenv:Body></soapenv:Envelope>""";
 
-    /// <summary>What TargetClient sends, and the key of its recordings.</summary>
-    public static IReadOnlyList<ChatTurn> Conversation(string country, string tin) => [new("user", BuildRequest(country, tin))];
+    /// <summary>
+    /// The key of TargetClient's recordings; only the last turn is sent ({{text}}). Recordings mask the TIN (a CNP becomes
+    /// [CNP-1]), so the first turn holds a full SHA-256 fingerprint of country and TIN to bind replay to the request.
+    /// This deterministic fingerprint is pseudonymous, not anonymous: candidate TINs can be linked by hashing them.
+    /// </summary>
+    public static IReadOnlyList<ChatTurn> Conversation(string country, string tin) =>
+        [new("user", $"fingerprint {Fingerprint(country, tin)}"), new("user", BuildRequest(country, tin))];
 
     /// <summary>The answer, or null for anything that is not a checkTinResponse with both flags (a SOAP fault, garbage).</summary>
     public static TinOnEuropaAnswer? Parse(string xml) =>
@@ -42,8 +50,8 @@ public sealed class TinOnEuropaClient(TargetClient? targets)
         if (targets?.Find(Target) is null) return (null, TargetSource.Unavailable, $"Targets:{Target} is not configured");
         var reply = await targets.SendAsync(Target, Conversation(country, tin), ct);
         if (reply.Source == TargetSource.Unavailable) return (null, reply.Source, reply.Error);
-        // Recordings are keyed by the masked request: two CNPs (or two card-like TINs) share a key, so replay only an
-        // answer that echoes this exact country and TIN.
+        // Replay only an answer that echoes this country and TIN (masked the way recordings mask it; the key's
+        // fingerprint tells two masked TINs apart).
         var forThisTin = reply.Source == TargetSource.Live || IsAbout(reply.Text, country, tin);
         return forThisTin && Parse(reply.Text) is { } answer
             ? (answer, reply.Source, reply.Error)
@@ -57,7 +65,11 @@ public sealed class TinOnEuropaClient(TargetClient? targets)
     }
 
     private static bool IsAbout(string xml, string country, string tin) =>
-        Response(xml) is { } r && Value(r, "countryCode") == country && Value(r, "tinNumber") == tin;
+        Response(xml) is { } r && Value(r, "countryCode") == country
+        && Value(r, "tinNumber") is { } echoed && (echoed == tin || echoed == PiiVault.ForStorage().Mask(tin));
+
+    private static string Fingerprint(string country, string tin) =>
+        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes($"{country}:{tin}")));
 
     private static string? Value(XElement response, string name) => response.Element(XName.Get(name, Ns))?.Value;
 

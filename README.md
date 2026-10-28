@@ -180,10 +180,10 @@ cheamă uneltele reale (§11).
 | Piesa | Ce garantează |
 | --- | --- |
 | `HiddenTextShield` (PdfPig, literă cu literă) | Textul alb, microscopic, din afara paginii sau invizibil e scos **înainte** să ajungă la model; documentul primește semnal roșu |
-| `EvidenceVerifier` | Un citat există în textul vizibil al paginii indicate. Un citat inventat sau luat din textul ascuns apare „citat negăsit” |
+| `EvidenceVerifier` | Un citat există în textul vizibil al paginii indicate. Un citat inventat apare „citat negăsit”; unul care există doar în textul ascuns e respins cu semnal roșu („doar în textul ascuns”) |
 | `TinFormat` + TIN on Europa | Formatul TIN pe țară (DE, IT, AT, ES, FR, US, RO); pentru statele UE, verificare la serviciul Comisiei Europene, care confirmă tot doar structura și sintaxa. Spunem „format valid”, niciodată „TIN valid” |
 | `AuditLog` | Fiecare pas e o intrare cu `Hash = SHA-256(hash-ul anterior + conținut)`; „Verifică” găsește exact intrarea modificată |
-| `PiiVault` | CNP, IBAN, card, e-mail și telefoane (românești și internaționale, cu `+` sau `00`) sunt mascate înainte de model; uneltele lucrează cu valorile reale; ce se salvează rămâne mascat |
+| `PiiVault` | CNP, IBAN, card, e-mail și telefoane (românești și internaționale, cu `+` sau `00`) sunt mascate înainte de model; uneltele lucrează cu valorile reale; rulările, prompturile și rezultatele uneltelor se salvează mascate (citatele din documentele clientului se păstrează la caz, ca parte din dosar) |
 | Verificări pe răspuns (`Features/Checks`) | `pii-leak` (fără date personale scăpate); în `CrsChecks`: `evidence-quoted` (citatele sunt printre rezultatele uneltelor), `signals-never-alert`, `rule-cited` (fiecare indiciu are regula și pagina), `no-tin-valid-claim`. Pe `main`, agentul CRS are active `pii-leak` și `evidence-quoted` (#44); celelalte trei sunt oprite, decizia R4 |
 
 ### Modelele și fallback-ul

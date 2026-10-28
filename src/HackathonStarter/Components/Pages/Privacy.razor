@@ -64,6 +64,7 @@
                 <tr><td>@T("Recorded runs (demo fallback)")</td><td>@T(PrivacySettings.CurrentValue.RedactRecordings ? "Masked like the run history." : "Not masked (Privacy:RedactRecordings = false): use synthetic data only.")</td></tr>
                 <tr><td>@T("Exports (tests, reports)")</td><td>@T("Built from the masked history and downloadable only after a person approves them.")</td></tr>
                 <tr><td>@T("Uploaded documents")</td><td>@T("Kept in memory for the current conversation only. Passages an agent reads from them become part of the run history, masked like the rest.")</td></tr>
+                <tr><td>@T("Case evidence")</td><td>@T("Quotes from the client's documents are stored with the case as written, not masked, and marked verified or not: they are part of the bank's case file. Agent runs, prompts and tool results are stored masked.")</td></tr>
                 <tr><td>@T("Audit log (hash chain)")</td><td>@T("Every change received, rule applied, case transition and human decision, with personal data masked like the run history. Each entry holds the SHA-256 hash of the previous one, so an edited entry is found on verification.")</td></tr>
             </tbody>
         </MudSimpleTable>
@@ -152,7 +153,7 @@
             </MudSimpleTable>
             @if (_targets.Any(t => t.Name.Equals(TinOnEuropaClient.Target, StringComparison.OrdinalIgnoreCase)))
             {
-                <MudText Typo="Typo.body2" Class="mud-text-secondary mt-2">@T("TIN on Europa (European Commission), for EU states only: the app sends the country code and the TIN. The answer says whether the structure and the syntax are correct (validStructure, validSyntax), not whether the TIN was issued, so the app only says 'format valid'. If the service does not answer, a recorded answer to the same request is used, otherwise only the local format rules. Recordings keep the TIN as sent: in this demo every TIN is synthetic.")</MudText>
+                <MudText Typo="Typo.body2" Class="mud-text-secondary mt-2">@T("TIN on Europa (European Commission), for EU states only: the app sends the country code and the TIN. The answer says whether the structure and the syntax are correct (validStructure, validSyntax), not whether the TIN was issued, so the app only says 'format valid'. If the service does not answer, a recorded answer to the same request is used, otherwise only the local format rules. Recordings mask TINs that match a CNP or card number; other TINs are kept as sent. They also store a deterministic SHA-256 fingerprint of country and TIN to bind replay to the request. This fingerprint is pseudonymous, not anonymous: candidate TINs can be linked by hashing them. In this demo every TIN is synthetic.")</MudText>
             }
         </MudPaper>
     }
