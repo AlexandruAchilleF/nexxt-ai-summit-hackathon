@@ -1,6 +1,7 @@
 using System.ClientModel;
 using System.ClientModel.Primitives;
 using System.Diagnostics;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using HackathonStarter.Agents;
@@ -40,10 +41,16 @@ public class TargetOptions
     public string? Agent { get; set; }
     /// <summary>
     /// Http targets: request body; {{message}} = last user message, {{messages}} = the conversation
-    /// [{role, content}], both inserted as JSON. Default fits this app's own /api/agents/{name}?stream=false.
+    /// [{role, content}], both inserted as JSON; {{text}} = last user message as-is (a SOAP envelope, say).
+    /// Default fits this app's own /api/agents/{name}?stream=false.
     /// </summary>
     public string RequestTemplate { get; set; } = """{"messages": {{messages}}}""";
-    /// <summary>Http targets: dotted path to the answer in the JSON response ("answer", "choices.0.message.content").</summary>
+    /// <summary>Http targets: Content-Type of the request body ("text/xml; charset=utf-8" for SOAP).</summary>
+    public string ContentType { get; set; } = "application/json";
+    /// <summary>
+    /// Http targets: dotted path to the answer in the JSON response ("answer", "choices.0.message.content");
+    /// empty = the whole response body, untouched (XML, plain text).
+    /// </summary>
     public string ResponsePath { get; set; } = "answer";
     /// <summary>Http targets: header carrying ApiKey ("Authorization" sends "Bearer &lt;key&gt;").</summary>
     public string AuthHeader { get; set; } = "Authorization";
@@ -128,9 +135,12 @@ public class TargetClient(
         if (string.IsNullOrEmpty(t.Endpoint)) throw new InvalidOperationException("Http targets need an Endpoint.");
         var body = t.RequestTemplate
             .Replace("{{messages}}", JsonSerializer.Serialize(conversation.Select(c => new { role = c.Role, content = c.Content }), Web))
-            .Replace("{{message}}", JsonSerializer.Serialize(conversation.LastOrDefault(c => c.Role == "user")?.Content ?? ""));
+            .Replace("{{message}}", JsonSerializer.Serialize(conversation.LastOrDefault(c => c.Role == "user")?.Content ?? ""))
+            .Replace("{{text}}", conversation.LastOrDefault(c => c.Role == "user")?.Content ?? "");
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, t.Endpoint) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
+        var contentType = MediaTypeHeaderValue.Parse(t.ContentType);
+        contentType.CharSet ??= "utf-8";
+        using var request = new HttpRequestMessage(HttpMethod.Post, t.Endpoint) { Content = new StringContent(body, Encoding.UTF8, contentType) };
         if (!string.IsNullOrEmpty(t.ApiKey))
             request.Headers.TryAddWithoutValidation(t.AuthHeader, t.AuthHeader.Equals("Authorization", StringComparison.OrdinalIgnoreCase) ? $"Bearer {t.ApiKey}" : t.ApiKey);
         foreach (var (key, value) in t.Headers) request.Headers.TryAddWithoutValidation(key, value);
@@ -155,9 +165,10 @@ public class TargetClient(
         return string.Join("\n\n", run.Steps.Where(s => s.Kind == StepKind.Text && !string.IsNullOrWhiteSpace(s.Text)).Select(s => s.Text));
     }
 
-    /// <summary>"choices.0.message.content" → the value at that path (strings as-is, anything else as JSON).</summary>
+    /// <summary>"choices.0.message.content" → the value at that path (strings as-is, anything else as JSON); "" → all of it.</summary>
     public static string ReadPath(string json, string path)
     {
+        if (string.IsNullOrEmpty(path)) return json;
         using var doc = JsonDocument.Parse(json);
         var node = doc.RootElement;
         foreach (var part in path.Split('.', StringSplitOptions.RemoveEmptyEntries))

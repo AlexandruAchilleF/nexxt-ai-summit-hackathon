@@ -1,3 +1,6 @@
+using HackathonStarter.Features.Targets;
+using HackathonStarter.Services;
+
 namespace HackathonStarter.Features.Tin;
 
 public enum TinCheckSource { NotChecked, LocalRules, TinOnEuropaLive, TinOnEuropaReplay }
@@ -16,6 +19,22 @@ public record TinCheck(string Country, string Normalized, bool FormatValid, TinC
         : Source == TinCheckSource.NotChecked ? TinFormatStatus.Unsupported
         : FormatValid ? TinFormatStatus.Valid
         : TinFormatStatus.Invalid;
+
+    /// <summary>For the UI: always says where the answer came from, and "format valid", never "TIN valid".</summary>
+    public string Label => Status switch
+    {
+        TinFormatStatus.Valid => "format valid" + Via,
+        TinFormatStatus.Invalid => "format invalid" + Via,
+        TinFormatStatus.Missing => Lang.Pick("TIN lipsă", "TIN missing"),
+        _ => Lang.Pick($"fără regulă de format pentru {Country}", $"no format rule for {Country}"),
+    };
+
+    private string Via => Source switch
+    {
+        TinCheckSource.TinOnEuropaLive => Lang.Pick(" · verificat live la Comisia Europeană", " · verified live at the European Commission"),
+        TinCheckSource.TinOnEuropaReplay => Lang.Pick(" · înregistrare TIN on Europa", " · TIN on Europa recording"),
+        _ => Lang.Pick(" · reguli locale", " · local rules"),
+    };
 }
 
 public enum TinFormatStatus { Valid, Invalid, Missing, Unsupported }
@@ -38,11 +57,29 @@ public interface ITinValidator
     Task<TinCheck> CheckAsync(string country, string tin, CancellationToken ct = default);
 }
 
-/// <summary>Phase 0 placeholder: the format only (no live call yet). R3 adds TIN on Europa.</summary>
-public sealed class TinValidator(ITinFormat format) : ITinValidator
+/// <summary>
+/// Local format rules, and for EU states the European Commission's answer (live, else recorded), which wins. Falls back to
+/// the local rules when the service is down. Writes nothing to the audit log: the caller knows the case and the actor.
+/// </summary>
+public sealed class TinValidator(ITinFormat format, TinOnEuropaClient europa) : ITinValidator
 {
-    public Task<TinCheck> CheckAsync(string country, string tin, CancellationToken ct = default) =>
-        Task.FromResult(format.Check(country, tin));
+    private const string CommissionSource = "TIN on Europa (European Commission)";
+
+    public async Task<TinCheck> CheckAsync(string country, string tin, CancellationToken ct = default)
+    {
+        var local = format.Check(country, tin);
+        if (local.Status == TinFormatStatus.Missing || !TinOnEuropaClient.EuCountries.Contains(local.Country)) return local;
+
+        var (answer, source, error) = await europa.CheckAsync(local.Country, local.Normalized, ct);
+        if (answer is null) return local with { Note = $"{local.Note}. TIN on Europa unavailable: {error}" };
+
+        var valid = answer.ValidStructure && answer.ValidSyntax;
+        var note = local.Source == TinCheckSource.LocalRules && local.FormatValid != valid
+            ? $"{CommissionSource}. Local rules say format {(local.FormatValid ? "valid" : "invalid")}."
+            : CommissionSource;
+        return new(local.Country, local.Normalized, valid,
+            source == TargetSource.Live ? TinCheckSource.TinOnEuropaLive : TinCheckSource.TinOnEuropaReplay, note);
+    }
 }
 
 public static class TinSetup
@@ -50,6 +87,8 @@ public static class TinSetup
     public static IServiceCollection AddTin(this IServiceCollection services)
     {
         services.AddSingleton<ITinFormat, TinFormat>();
+        // TIN on Europa is optional: without TargetClient (or Targets:tin-on-europa) the local rules answer alone.
+        services.AddSingleton(sp => new TinOnEuropaClient(sp.GetService<TargetClient>()));
         services.AddSingleton<ITinValidator, TinValidator>();
         return services;
     }
