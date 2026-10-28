@@ -235,7 +235,20 @@ internal static partial class SentinelMock
             caseCode = code, kind = "NewSelfCertification", category = "None", channel = "online", documentId,
             selfCertificationId = x.Int("selfCertificationId") ?? 0, summary,
         });
-        if (registered.Str("error") is { } failed)
+        var failed = registered.Str("error");
+        if (failed is not null && TextMatch.ContainsAny(failed, "date of receipt"))
+        {
+            // Code refused it (guide p. 34): say why in the UI language, never "Compliant".
+            var signed = x.Arr("fields").FirstOrDefault(f => f.Str("field") == "signatureDate");
+            var dated = signed.ValueKind == JsonValueKind.Object && signed.Date("value") is { } d ? Day(d) : null;
+            await m.SayAsync(Join(
+                L($"Cazul {code}: autocertificarea primită ({form.Str("fileName")}) este datată {dated ?? "-"}, după data la care a fost primită. Ghidul (p. 34) cere ca autocertificarea să fie datată cel mai târziu cu data primirii, așa că codul a refuzat înregistrarea răspunsului.",
+                  $"Case {code}: the self-certification received ({form.Str("fileName")}) is dated {dated ?? "-"}, after the date it was received. The guide (p. 34) requires it to be dated at the latest on the date of receipt, so code refused to register the response."),
+                L($"Cazul rămâne deschis ({StatusText(c.Str("status"))}) și nu propun închiderea. Un operator cere clientului o autocertificare datată corect.",
+                  $"The case stays open ({StatusText(c.Str("status"))}) and I do not propose closing it. An operator asks the client for a correctly dated self-certification.")));
+            return;
+        }
+        if (failed is not null)
         {
             await m.SayAsync(L($"Nu am putut înregistra răspunsul: {failed}", $"I could not register the response: {failed}"));
             return;

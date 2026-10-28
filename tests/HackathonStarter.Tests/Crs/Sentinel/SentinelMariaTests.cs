@@ -150,6 +150,39 @@ public class SentinelMariaTests
         Assert.True((await host.VerifyAuditAsync()).Ok);
     }
 
+    [Theory]
+    [InlineData("ro-RO", "este datată 21.01.2027", "datată cel mai târziu cu data primirii", "rămâne deschis")]
+    [InlineData("en-GB", "is dated 21 Jan 2027", "dated at the latest on the date of receipt", "stays open")]
+    public async Task Maria_answering_on_day_0_with_a_form_dated_day_85_is_refused_by_code_and_the_case_stays_open(string culture, string dated, string rule, string open)
+    {
+        using var _ = new UiLanguage(culture);
+        var (host, clock) = await RealWorld.CreateAsync();
+        await using var __ = host;
+        await host.RecordGoldenChangeAsync("4");
+        await host.DecideAsync(await host.RunAsync(SentinelTools.AgentName, SentinelActions.Analyze(CaseCode)), SentinelTools.SendClientRequest);
+
+        // Day 0: the form is delivered an hour later, but it is dated 21.01.2027 (guide p. 34: dated at the latest on the date of receipt).
+        clock.Advance(TimeSpan.FromHours(1));
+        await host.Get<IDemoScenarios>().DeliverResponseAsync(CaseCode);
+        var run2 = await host.RunAsync(SentinelTools.AgentName, SentinelActions.Verify(CaseCode));
+
+        Assert.Equal(RunStatus.Completed, run2.Status);
+        Assert.Equal(["getCase", "listDocuments", "extractSelfCertification", "checkTin", "registerResponse"], run2.ToolCalls());
+        Assert.Contains("guide p. 34", run2.Steps.Single(s => s is { Kind: StepKind.ToolResult, Tool: "registerResponse" }).Error);
+        Assert.DoesNotContain(run2.Steps, s => s.Kind == StepKind.Approval);
+        run2.ChecksPass();
+        var answer = run2.Answer();
+        Assert.Contains("p. 34", answer);
+        Assert.Contains(dated, answer);
+        Assert.Contains(rule, answer);
+        Assert.Contains(open, answer);
+        Assert.DoesNotContain("Compliant", answer);
+
+        var item = (await host.CaseAsync(CaseCode))!;
+        Assert.Equal(CaseStatus.AwaitingClient, item.Status);
+        Assert.Empty(item.Responses);
+    }
+
     [Fact]
     public async Task Maria_on_a_scripted_model_masks_the_phone_and_the_tools_get_it_back()
     {

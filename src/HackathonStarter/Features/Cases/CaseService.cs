@@ -546,6 +546,7 @@ public class CaseService(
                 var selfCert = await db.SelfCertifications.AsNoTracking().FirstOrDefaultAsync(s => s.Id == selfCertId)
                     ?? throw new KeyNotFoundException($"Self-certification {selfCertId} not found.");
                 RequireAnswerSelfCertification(item, selfCert);
+                RequireDatedByReceipt(item, selfCert.SignedAt, selfCert.ReceivedAt); // checked again at closing
             }
 
             var from = item.Status;
@@ -593,12 +594,9 @@ public class CaseService(
                 RequireAnswerSelfCertification(item, selfCert); // again: a later submission may have superseded it
             }
 
-            // Guide p. 34: the self-certification is dated at the latest on the date of receipt.
             var datedAt = selfCert?.SignedAt ?? response.ReceivedAt;
             var receivedAt = selfCert?.ReceivedAt ?? response.ReceivedAt;
-            if (datedAt > receivedAt)
-                throw new InvalidOperationException(
-                    $"Case {item.Code}: the self-certification is dated {datedAt:O}, after it was received ({receivedAt:O}); it must be dated at the latest on the date of receipt (guide p. 34).");
+            RequireDatedByReceipt(item, datedAt, receivedAt);
 
             var now = clock.UtcNow;
             var snapshot = ClientSnapshot.From(client);
@@ -675,6 +673,14 @@ public class CaseService(
         if (selfCert.ReceivedAt < item.OpenedAt)
             throw new InvalidOperationException(
                 $"Case {item.Code}: self-certification {selfCert.Id} was received before the case opened; the answer must be a new self-certification.");
+    }
+
+    // Guide p. 34: the self-certification is dated at the latest on the date of receipt.
+    private static void RequireDatedByReceipt(Case item, DateTime datedAt, DateTime receivedAt)
+    {
+        if (datedAt > receivedAt)
+            throw new InvalidOperationException(
+                $"Case {item.Code}: the self-certification is dated {datedAt:O}, after it was received ({receivedAt:O}); it must be dated at the latest on the date of receipt (guide p. 34).");
     }
 
     /// <summary>True for an accepted explanation, false for a self-certification; throws when the response is not enough.</summary>
