@@ -65,12 +65,11 @@ internal static partial class SentinelMock
             return;
         }
 
-        // Steps that write (evidence, signals, a draft, a self-certification, a response) run only when the message asks for
-        // them: a question about a case ("Ce mai așteptăm?", "De ce nu e caz?") only reads.
-        var prepare = action == SentinelActions.Action.Analyze
-            || (action == SentinelActions.Action.None && TextMatch.ContainsAny(m.Input, "pregat", "prepare", "analiz", "analy"));
-        var verify = action == SentinelActions.Action.Verify
-            || (action == SentinelActions.Action.None && TextMatch.ContainsAny(m.Input, "verific", "check", "a raspuns", "answered", "responded", "continu"));
+        // Steps that write (evidence, signals, a draft, a self-certification, a response) run only for the two buttons or a
+        // request in whole words; a question ("Ce conținut are autocertificarea?", "De ce nu e caz?") only reads.
+        var request = action == SentinelActions.Action.None && !m.Input.TrimEnd().EndsWith('?');
+        var prepare = action == SentinelActions.Action.Analyze || (request && HasPhrase(m.Input, PreparePhrases));
+        var verify = action == SentinelActions.Action.Verify || (request && HasPhrase(m.Input, VerifyPhrases));
 
         switch (status)
         {
@@ -452,6 +451,23 @@ internal static partial class SentinelMock
         if (taken == 0) return null;
         var end = start + words[taken - 1].Index + words[taken - 1].Length;
         return (string.Join(" ", words.Take(taken).Select(w => w.Value)), text[label.Index..end]);
+    }
+
+    private static readonly string[] PreparePhrases =
+        ["pregătește cazul", "pregătește dosarul", "analizează dosarul", "analizează cazul", "prepare the case", "analyze the file", "analyse the file"];
+
+    // "Maria a trimis autocertificarea nouă." is Ana's sentence in docs/PITCH.md S4.
+    private static readonly string[] VerifyPhrases =
+    [
+        "verifică răspunsul", "verifică autocertificarea", "a trimis autocertificarea", "continuă",
+        "check the answer", "check the self-certification", "sent the self-certification", "sent a new self-certification", "continue",
+    ];
+
+    /// <summary>A phrase in whole words, without case or diacritics: "continuă" is not in "conținut".</summary>
+    private static bool HasPhrase(string text, IEnumerable<string> phrases)
+    {
+        var words = $" {string.Join(' ', TextMatch.Words(text))} ";
+        return phrases.Any(p => words.Contains($" {string.Join(' ', TextMatch.Words(p))} ", StringComparison.Ordinal));
     }
 
     private static string Next(string action) =>

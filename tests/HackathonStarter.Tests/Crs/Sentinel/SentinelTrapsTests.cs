@@ -1,4 +1,8 @@
 using HackathonStarter.Agents;
+using HackathonStarter.Data;
+using HackathonStarter.Features.Changes;
+using HackathonStarter.Features.Evaluation;
+using Microsoft.EntityFrameworkCore;
 using HackathonStarter.Features.Cases;
 using HackathonStarter.Features.Sentinel.Demo;
 using HackathonStarter.Features.Clients;
@@ -206,5 +210,77 @@ public class SentinelGuardsTests
         var signal = Assert.Single((await host.CaseAsync(code))!.Signals);
         Assert.DoesNotContain("4521", signal.Description);
         Assert.Contains("[PHONE-1]", signal.Description);
+    }
+}
+
+/// <summary>Round 2 of the review of the fixes (PR #47): whole-word requests, questions never write, the upload marker.</summary>
+public class SentinelGuardsRound2Tests
+{
+    [Theory]
+    [InlineData("Ce conținut are autocertificarea pentru {0}?")]
+    [InlineData("Ce verificări a făcut codul pentru {0}?")]
+    [InlineData("A răspuns clientul la {0}?")]
+    [InlineData("Can you check what is missing for {0}?")]
+    [InlineData("Ce conținut are autocertificarea pentru {0}")]
+    public async Task A_question_with_a_keyword_inside_records_no_answer(string question)
+    {
+        using var _ = new UiLanguage("ro-RO");
+        var (host, clock) = await RealWorld.CreateAsync();
+        await using var __ = host;
+        var code = (await host.RecordGoldenChangeAsync("4")).CaseCode!;
+        await host.DecideAsync(await host.RunAsync(SentinelTools.AgentName, SentinelActions.Analyze(code)), SentinelTools.SendClientRequest);
+        clock.Advance(TimeSpan.FromDays(86));
+        await host.Get<IDemoScenarios>().DeliverResponseAsync(code);
+
+        var run = await host.RunAsync(SentinelTools.AgentName, string.Format(question, code));
+
+        Assert.DoesNotContain("extractSelfCertification", run.ToolCalls());
+        var item = (await host.CaseAsync(code))!;
+        Assert.Empty(item.Responses);
+        Assert.Equal(CaseStatus.AwaitingClient, item.Status); // unchanged (no tick ran)
+    }
+
+    [Fact]
+    public async Task Anas_sentence_from_the_pitch_reads_the_answer()
+    {
+        using var _ = new UiLanguage("ro-RO");
+        var (host, clock) = await RealWorld.CreateAsync();
+        await using var __ = host;
+        var code = (await host.RecordGoldenChangeAsync("4")).CaseCode!;
+        await host.DecideAsync(await host.RunAsync(SentinelTools.AgentName, SentinelActions.Analyze(code)), SentinelTools.SendClientRequest);
+        clock.Advance(TimeSpan.FromDays(86));
+        await host.Get<IDemoScenarios>().DeliverResponseAsync(code);
+
+        var run = await host.RunAsync(SentinelTools.AgentName, $"Case: {code}\n\nMaria a trimis autocertificarea nouă.");
+
+        Assert.Equal(RunStatus.AwaitingApproval, run.Status);
+        Assert.Equal(SentinelTools.CloseCase, Assert.Single(run.Steps, s => s.Kind == StepKind.Approval).Tool);
+    }
+
+    [Fact]
+    public async Task A_document_on_file_without_its_upload_change_gets_it_once()
+    {
+        var (host, _) = await RealWorld.CreateAsync();
+        await using var __ = host;
+        var code = (await host.RecordGoldenChangeAsync("4")).CaseCode!;
+        int documentId;
+        await using (var db = await host.Get<IDbContextFactory<AppDbContext>>().CreateDbContextAsync())
+        {
+            var maria = await db.Clients.SingleAsync(c => c.Code == "CL-0001");
+            var document = new ClientDocument
+            {
+                ClientId = maria.Id, Kind = DocumentKind.SelfCertForm, FileName = SyntheticPdfs.SelfCertMaria,
+                Content = SyntheticPdfs.Get(SyntheticPdfs.SelfCertMaria).Bytes, Pages = 1, UploadedAt = GoldenCases.ChangeMoment,
+            };
+            db.ClientDocuments.Add(document);
+            await db.SaveChangesAsync();
+            documentId = document.Id;
+        }
+
+        Assert.Equal(documentId, await host.Get<IDemoScenarios>().DeliverResponseAsync(code));
+        Assert.Equal(documentId, await host.Get<IDemoScenarios>().DeliverResponseAsync(code));
+
+        var uploads = (await host.Get<IChangeService>().ListAsync("CL-0001")).Where(e => e.Kind == ChangeKind.DocumentUploaded).ToList();
+        Assert.Equal($"{{\"documentId\":{documentId}}}", Assert.Single(uploads).NewValueJson);
     }
 }

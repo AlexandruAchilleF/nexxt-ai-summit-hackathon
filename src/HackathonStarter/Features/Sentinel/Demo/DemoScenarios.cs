@@ -69,7 +69,7 @@ public sealed class DemoScenarios(IDbContextFactory<AppDbContext> dbFactory, ICh
             if (existing is int id)
             {
                 // Delivered already: the same document, no second upload; its change too, unless recording it failed last time.
-                var marker = $"\"documentId\":{id}";
+                var marker = $"\"documentId\":{id}}}"; // the whole number: 3 is not 31
                 if (await db.ChangeEvents.AnyAsync(e => e.ClientId == c.ClientId && e.Kind == ChangeKind.DocumentUploaded && e.NewValueJson != null && e.NewValueJson.Contains(marker)))
                     return id;
                 await RecordUploadAsync(c, id, answer.FileName);

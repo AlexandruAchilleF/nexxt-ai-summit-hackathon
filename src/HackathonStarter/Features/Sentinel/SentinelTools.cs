@@ -276,6 +276,25 @@ public sealed class SentinelTools(IServiceProvider services)
         if (await services.GetRequiredService<IShieldedDocuments>().GetAsync(documentId) is not { } doc) return Error($"No document {documentId}.");
         if (doc.ClientId != c.ClientId) return NotTheClients("Document", documentId, c);
 
+        // Pressing "Verify" again (e.g. after registerResponse failed) must not record the same document a second time, whatever
+        // a second reading would give: the self-certification already recorded from it is the answer, and no model is called.
+        var client = await Clients.GetAsync(c.ClientCode);
+        if (client?.SelfCertifications
+                .Where(s => s.DocumentId == doc.DocumentId && s.Status == SelfCertStatus.Valid && SentinelWording.Utc(s.ReceivedAt) >= SentinelWording.Utc(c.OpenedAt))
+                .OrderByDescending(s => s.Id).FirstOrDefault() is { } already)
+            return new
+            {
+                CaseCode = c.Code, doc.DocumentId, doc.FileName, Source = "recorded", ShieldVerdict = doc.Result.Verdict.ToString(),
+                Jurisdictions = already.Residences.Select(r => new
+                {
+                    r.Country, r.Tin, NoTinReason = r.Tin is null ? r.NoTinReason.ToString() : null, r.NoTinExplanation, Verified = true,
+                    Note = "Recorded earlier from this document, every quote verified then.",
+                }),
+                Complete = true, Missing = Array.Empty<string>(), Recorded = true, AlreadyRecorded = true, SelfCertificationId = already.Id,
+                Outcome = Outcome(services.GetRequiredService<ICrsRuleEngine>().EvaluateSelfCertification(ClientSnapshot.From(client), SelfCertificationSnapshot.From(already))),
+                Next = "Already recorded: check each TIN with checkTin, then registerResponse with this documentId and selfCertificationId, then evaluateRules.",
+            };
+
         var pages = doc.VisiblePages;
         var vault = new PiiVault(); // personal data is masked before the model, like in every agent run
         var ai = await services.GetRequiredService<StructuredAi>().GenerateAsync(
@@ -284,17 +303,7 @@ public sealed class SentinelTools(IServiceProvider services)
 
         int? selfCertificationId = null;
         object? outcome = null;
-        // Pressing "Verify" again (e.g. after registerResponse failed) must not record the same document a second time.
-        var already = (await Clients.GetAsync(c.ClientCode))?.SelfCertifications
-            .Where(s => s.DocumentId == doc.DocumentId && s.Status == SelfCertStatus.Valid && SentinelWording.Utc(s.ReceivedAt) >= SentinelWording.Utc(c.OpenedAt))
-            .OrderByDescending(s => s.Id).FirstOrDefault();
-        if (check.Complete && already is not null)
-        {
-            selfCertificationId = already.Id;
-            outcome = Outcome(services.GetRequiredService<ICrsRuleEngine>().EvaluateSelfCertification(
-                ClientSnapshot.From((await Clients.GetAsync(c.ClientCode))!), SelfCertificationSnapshot.From(already)));
-        }
-        else if (check.Complete)
+        if (check.Complete)
         {
             var recorded = await services.GetRequiredService<IChangeService>().RecordAsync(new ChangeRequest(
                 c.ClientCode, ChangeKind.SelfCertSubmitted, "online", SelfCertification: check.Snapshot, DocumentId: doc.DocumentId, CaseCode: c.Code));
