@@ -1,0 +1,75 @@
+@*
+    What the rule engine (code) decided for one change: the decision, every indicium with its rule ID and guide page, and
+    the rules that were checked and do not apply, each with the reason. The model never wrote any of it.
+*@
+<div class="crs-outcome">
+    <div class="crs-outcome-head">
+        <span class="crs-status crs-status-lg"><Pill Tone="@CaseText.DecisionTone(Outcome.Decision)" Icon="@DecisionIcon">@CaseText.Decision(Outcome.Decision)</Pill></span>
+        @if (Outcome.Regime is { } regime)
+        {
+            <span class="crs-meta">@CaseText.Regime(regime)</span>
+        }
+    </div>
+
+    <p class="crs-outcome-why">@Pick(Outcome.ExplanationRo, Outcome.Explanation)</p>
+
+    @if (Outcome.Indicia.Count > 0)
+    {
+        <h3 class="crs-h3">@T("Indicia found")</h3>
+        @foreach (var hit in Outcome.Indicia)
+        {
+            <div class="@($"crs-law{(hit.CoveredBy == Coverage.None ? "" : " covered")}")">
+                <div class="crs-law-head">
+                    <span class="crs-rule-id">@hit.RuleId</span>
+                    <span class="crs-meta">@CaseText.Country(hit.Jurisdiction), <GuidePageRef Page="@hit.GuidePage" /></span>
+                </div>
+                @if (CaseText.RuleTitle(hit.RuleId) is { } title)
+                {
+                    <div class="crs-law-title">@title</div>
+                }
+                <div class="crs-law-text">@Pick(hit.ExplanationRo, hit.Explanation)</div>
+                <div class="crs-law-tags">
+                    <Pill Tone="@(hit.CoveredBy == Coverage.None ? "warning" : "success")">@CaseText.Coverage(hit.CoveredBy)</Pill>
+                    @if (hit.Basis != RuleBasis.Verified)
+                    {
+                        <Pill Title="@T("Our reading where the guide is silent or ambiguous.")">@(hit.Basis == RuleBasis.Policy ? T("Bank policy") : T("Interpretation"))</Pill>
+                    }
+                </div>
+            </div>
+        }
+    }
+
+    @if (Outcome.Cleared.Count > 0)
+    {
+        <h3 class="crs-h3">@T("Checked, does not apply")</h3>
+        <div class="crs-cleared">
+            @foreach (var c in Outcome.Cleared)
+            {
+                <div>
+                    <div class="crs-cleared-head">
+                        <span class="crs-rule-id">@c.RuleId</span>
+                        <span class="crs-meta">@(string.IsNullOrEmpty(c.Jurisdiction) ? "" : $"{CaseText.Country(c.Jurisdiction)}, ")<GuidePageRef Page="@c.GuidePage" /></span>
+                    </div>
+                    <div>@Pick(c.ExplanationRo, c.Explanation)</div>
+                </div>
+            }
+        </div>
+    }
+
+    @if (Outcome.ReportableFor.Count > 0)
+    {
+        <p class="crs-meta mt-3">@T("Reportable for: {0}", string.Join(", ", Outcome.ReportableFor.Select(CaseText.Country)))</p>
+    }
+    <p class="crs-meta mt-2">@T("Rule engine {0}", Outcome.EngineVersion)</p>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public RuleOutcome Outcome { get; set; } = default!;
+
+    private string DecisionIcon => Outcome.Decision switch
+    {
+        Decision.NoCase or Decision.Compliant => Icons.Material.Rounded.CheckCircle,
+        Decision.Clarification => Icons.Material.Rounded.HelpCenter,
+        _ => Icons.Material.Rounded.Report,
+    };
+}

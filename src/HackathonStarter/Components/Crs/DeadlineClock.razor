@@ -1,0 +1,170 @@
+@*
+    The legal clock of a case (docs/PLAN.md 15, docs/ui/macheta-caz.html): days left on the demo date, the deadline rule
+    with its guide page, and a ruler from the day the case opened to the due date with every event on it. All dates come
+    from the case (computed by code); this component only places them.
+*@
+<section class="@($"crs-clock crs-clock-{_state.ToString().ToLowerInvariant()}")" aria-label="@T("Legal deadline")" data-testid="deadline">
+    <div class="crs-clock-top">
+        <div class="crs-clock-lead" aria-live="polite">
+            @switch (_state)
+            {
+                case DeadlineState.OnTrack or DeadlineState.ReminderDue when _left == 0:
+                    <span class="crs-clock-word">@T("The deadline is today")</span>
+                    break;
+                case DeadlineState.OnTrack or DeadlineState.ReminderDue:
+                    <span class="crs-clock-num">@_left</span>
+                    <span class="crs-clock-unit">@CaseText.DaysUnit(_left) @T("to the deadline")</span>
+                    break;
+                case DeadlineState.Overdue:
+                    <span class="crs-clock-num">@(-_left)</span>
+                    <span class="crs-clock-unit">@CaseText.DaysUnit(-_left) @T("past the deadline")</span>
+                    break;
+                case DeadlineState.NoDeadline:
+                    <span class="crs-clock-word">@T("No deadline")</span>
+                    <span class="crs-clock-unit">
+                        @T("no legal deadline in the guide") (@CaseText.PageShort(PageOr("38")))
+                        <Pill Tone="warning" Icon="@Icons.Material.Rounded.HelpOutline" Title="@T("The guide gives no deadline for this case; we do not borrow the CRS 90 days.")">NEVERIFICAT</Pill>
+                    </span>
+                    break;
+                default:
+                    <span class="crs-clock-word">@(Case.Status == CaseStatus.Expired ? T("Expired") : T("Closed"))</span>
+                    @if (EndedAt is { } ended)
+                    {
+                        <span class="crs-clock-unit">@T("on day {0}, {1}", CaseText.DayOf(ended, Case.OpenedAt), Format.Date(ended))</span>
+                    }
+                    break;
+            }
+        </div>
+
+        <dl class="crs-clock-facts">
+            <div>
+                <dt>@T("Due date")</dt>
+                <dd data-testid="due-date">@(Case.DueAt is { } due ? Format.Date(due) : T("none in the guide"))</dd>
+            </div>
+            @if (Case.RemindAt is { } remind)
+            {
+                <div>
+                    <dt>@T("Reminder")</dt>
+                    <dd>@Format.Date(remind)@(Case.RemindedAt is not null ? $", {T("sent")}" : "")</dd>
+                </div>
+            }
+            <div>
+                <dt>@T("Today, on the demo date")</dt>
+                <dd>
+                    @Format.Date(Now)
+                    @if (_offsetDays > 0)
+                    {
+                        <span class="crs-nowrap">@T("(+{0} days)", _offsetDays)</span>
+                    }
+                </dd>
+            </div>
+            <div class="crs-fact-wide">
+                <dt>@T("Deadline rule")</dt>
+                <dd data-testid="deadline-rule" title="@RuleDescription">
+                    <span class="crs-rule-id">@Case.DeadlineRuleId</span>
+                    @if (CaseText.RuleTitle(Case.DeadlineRuleId) is { } title)
+                    {
+                        <span>, @title</span>
+                    }
+                    <span>, </span><GuidePageRef Page="@Case.DeadlineGuidePage" />
+                </dd>
+            </div>
+        </dl>
+    </div>
+
+    @if (Case.DueAt is { } dueAt && dueAt > Case.OpenedAt)
+    {
+        <div class="crs-ruler" role="img" aria-label="@RulerLabel(dueAt)">
+            <div class="crs-ruler-track"><div class="crs-ruler-used" style="@($"width:{Css(UsedPct(dueAt))}%")"></div></div>
+            @foreach (var m in _marks.Where(m => m.Kind != "now"))
+            {
+                <span class="@($"crs-ruler-mark crs-mark-{m.Kind}{(m.Planned ? " planned" : "")}")" style="@($"left:{Css(Pct(m.At, dueAt))}%")" title="@($"{T("Day {0}", m.Day)}: {m.Text}")"></span>
+            }
+            @if (Case.IsOpen)
+            {
+                <span class="crs-ruler-cursor" style="@($"left:{Css(Pct(Now, dueAt))}%")" title="@T("Today, on the demo date")"></span>
+            }
+            <div class="crs-ruler-days" aria-hidden="true">
+                @foreach (var d in Ticks(CaseText.DayOf(dueAt, Case.OpenedAt)))
+                {
+                    <span style="@($"left:{Css(d.Pct)}%")">@d.Day</span>
+                }
+            </div>
+        </div>
+    }
+
+    <ol class="crs-events">
+        @foreach (var m in _marks)
+        {
+            <li class="@($"crs-event-{m.Kind}{(m.Planned ? " planned" : "")}")">
+                <b>@T("Day {0}", m.Day)</b>
+                <span>@m.Text</span>
+            </li>
+        }
+    </ol>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public Case Case { get; set; } = default!;
+    /// <summary>The demo date (IDemoClock, or ISimClock when the demo clock is missing).</summary>
+    [Parameter, EditorRequired] public DateTime Now { get; set; }
+    [Parameter] public TimeSpan Offset { get; set; }
+
+    private sealed record Mark(DateTime At, int Day, string Text, string Kind, bool Planned = false);
+
+    private DeadlineState _state;
+    private int _left, _offsetDays;
+    private List<Mark> _marks = [];
+
+    private DateTime? EndedAt => Case.ClosedAt ?? Case.ExpiredAt;
+    private string PageOr(string fallback) => string.IsNullOrWhiteSpace(Case.DeadlineGuidePage) ? fallback : Case.DeadlineGuidePage;
+    private string? RuleDescription =>
+        RuleCatalog.Contains(Case.DeadlineRuleId) ? Pick(RuleCatalog.Get(Case.DeadlineRuleId).DescriptionRo, RuleCatalog.Get(Case.DeadlineRuleId).Description) : null;
+
+    protected override void OnParametersSet()
+    {
+        _state = CaseText.Deadline(Case, Now);
+        _left = Case.DueAt is { } due ? CaseText.DaysUntil(due, Now) : 0;
+        _offsetDays = CaseText.OffsetDays(Offset);
+        _marks = Marks();
+    }
+
+    /// <summary>Everything that happened on the case, plus what is still due, in date order.</summary>
+    private List<Mark> Marks()
+    {
+        var start = Case.OpenedAt;
+        Mark At(DateTime at, string text, string kind, bool planned = false) => new(at, CaseText.DayOf(at, start), text, kind, planned);
+
+        var marks = new List<Mark> { At(start, T("Change received, case opened"), "start") };
+        foreach (var r in Case.Requests.Where(r => r.ApprovedAt is not null))
+            marks.Add(At(r.ApprovedAt!.Value, r.ApprovedBy is { Length: > 0 } by ? T("Request approved by {0}", by) : T("Request approved"), "request"));
+        if (Case.RemindedAt is { } reminded) marks.Add(At(reminded, T("Reminder sent to the client"), "remind"));
+        else if (Case.RemindAt is { } remind && Case.IsOpen) marks.Add(At(remind, T("Reminder due"), "remind", planned: true));
+        if (Case.EscalatedAt is { } escalated) marks.Add(At(escalated, T("Escalated to the tax department"), "escalate"));
+        foreach (var r in Case.Responses) marks.Add(At(r.ReceivedAt, T("Client answered"), "response"));
+        if (Case.ClosedAt is { } closed) marks.Add(At(closed, T("Case closed"), "close"));
+        if (Case.ExpiredAt is { } expired) marks.Add(At(expired, T("Deadline passed, case expired"), "expire"));
+        if (Case.DueAt is { } due) marks.Add(At(due, T("Legal deadline"), "due", planned: Now < due));
+        if (Case.IsOpen) marks.Add(At(Now, T("Today, on the demo date"), "now"));
+        return [.. marks.OrderBy(m => m.At)];
+    }
+
+    private double Pct(DateTime at, DateTime due) =>
+        Math.Clamp((at - Case.OpenedAt).TotalSeconds / (due - Case.OpenedAt).TotalSeconds * 100, 0, 100);
+
+    private double UsedPct(DateTime due) => Pct(EndedAt ?? Now, due);
+
+    private static IEnumerable<(int Day, double Pct)> Ticks(int total)
+    {
+        if (total <= 0) yield break;
+        var step = total <= 120 ? 15 : total <= 240 ? 30 : 60;
+        for (var d = 0; d < total; d += step)
+            if (total - d >= step / 2 || d == 0) yield return (d, d * 100.0 / total);
+        yield return (total, 100);
+    }
+
+    private string RulerLabel(DateTime due) =>
+        T("Day {0} of {1}", Math.Max(0, CaseText.DayOf(EndedAt ?? Now, Case.OpenedAt)), CaseText.DayOf(due, Case.OpenedAt));
+
+    private static string Css(double value) => value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+}

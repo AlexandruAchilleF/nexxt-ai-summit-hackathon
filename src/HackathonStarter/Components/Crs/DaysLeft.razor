@@ -1,0 +1,29 @@
+@* Days left on the demo date for the queue: neutral on track, amber once the reminder date is reached, red when overdue. *@
+@switch (CaseText.Deadline(Case, Now))
+{
+    case DeadlineState.NoDeadline:
+        <span class="crs-nodeadline">
+            <span>@T("no legal deadline in the guide") (@CaseText.PageShort(string.IsNullOrWhiteSpace(Case.DeadlineGuidePage) ? "38" : Case.DeadlineGuidePage))</span>
+            <Pill Tone="warning" Title="@T("The guide gives no deadline for this case; we do not borrow the CRS 90 days.")">NEVERIFICAT</Pill>
+        </span>
+        break;
+    case DeadlineState.Overdue:
+        <Pill Tone="danger" Icon="@Icons.Material.Rounded.EventBusy">@T("{0} overdue", CaseText.Days(-Left))</Pill>
+        break;
+    case DeadlineState.ReminderDue:
+        <Pill Tone="warning" Icon="@Icons.Material.Rounded.NotificationsActive" Title="@T("Reminder date reached")">@CaseText.Days(Left)</Pill>
+        break;
+    case DeadlineState.OnTrack:
+        <Pill>@CaseText.Days(Left)</Pill>
+        break;
+    default:
+        <span class="mud-text-secondary">@(Case.ClosedAt is { } closed ? T("closed on {0}", Format.Date(closed)) : Case.ExpiredAt is { } expired ? T("expired on {0}", Format.Date(expired)) : "")</span>
+        break;
+}
+
+@code {
+    [Parameter, EditorRequired] public Case Case { get; set; } = default!;
+    [Parameter, EditorRequired] public DateTime Now { get; set; }
+
+    private int Left => Case.DueAt is { } due ? CaseText.DaysUntil(due, Now) : 0;
+}

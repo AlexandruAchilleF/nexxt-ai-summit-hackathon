@@ -1,0 +1,8 @@
+@* The case status in words, with an icon and a tone (never colour alone). Large = the case header. *@
+<span class="@(Large ? "crs-status crs-status-lg" : "crs-status")" data-testid="@TestId"><Pill Tone="@CaseText.StatusTone(Status)" Icon="@CaseText.StatusIcon(Status)">@CaseText.Status(Status)</Pill></span>
+
+@code {
+    [Parameter, EditorRequired] public CaseStatus Status { get; set; }
+    [Parameter] public bool Large { get; set; }
+    [Parameter] public string? TestId { get; set; }
+}
