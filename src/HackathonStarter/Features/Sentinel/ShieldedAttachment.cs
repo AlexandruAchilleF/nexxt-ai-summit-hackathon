@@ -54,6 +54,6 @@ public static partial class ShieldedAttachment
     private static partial Regex HtmlComment();
 
     // Zero-width, joiner, direction and soft-hyphen characters: invisible, but read by a model.
-    [GeneratedRegex(@"[­​-‏‪-‮⁠-⁤⁦-⁩﻿]")]
+    [GeneratedRegex(@"[\u00AD\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\uFEFF]")]
     private static partial Regex Invisible();
 }
