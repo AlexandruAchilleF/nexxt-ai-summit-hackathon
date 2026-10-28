@@ -3,6 +3,7 @@ using System.ClientModel.Primitives;
 using System.Collections.Concurrent;
 using Amazon;
 using Amazon.BedrockRuntime;
+using Amazon.Runtime.Credentials;
 using Anthropic;
 using Azure.AI.OpenAI;
 using Microsoft.Extensions.AI;
@@ -175,8 +176,10 @@ public class ChatClientProvider
                         .GetChatClient(o.Model)
                         .AsIChatClient(),
 
+                // Credentials are resolved here so that, without them, there is no client (straight to recordings/mocks,
+                // like a missing API key) instead of every call probing all AWS sources for seconds before failing.
                 "bedrock" =>
-                    new AmazonBedrockRuntimeClient(new AmazonBedrockRuntimeConfig
+                    new AmazonBedrockRuntimeClient(DefaultAWSCredentialsIdentityResolver.GetCredentials(), new AmazonBedrockRuntimeConfig
                         {
                             RegionEndpoint = RegionEndpoint.GetBySystemName(o.BedrockRegion),
                             // Fail fast: the agent fallback chain is our retry strategy.
