@@ -74,6 +74,10 @@ Maria are un cont nou (deschis după 1 ian. 2016) și se mută la München.
 Fără răspuns, la ziua 91 cazul trece în `Expired`, cu consecința din ghid (rezidentă în RO și în DE). Diagrama completă,
 cu toți participanții: [`docs/PLAN.md` §6.3](docs/PLAN.md#63-fluxul-mariei-traseul-din-video).
 
+Acesta e traseul-țintă. Pe `main`, pașii 1–3 și 6 sunt cod cu teste (`ChangeService`, `CrsRuleEngine`, `CaseService`,
+`DeadlineWatcher`), iar serviciile pentru dovezi, cerere, aprobare și închidere există în `CaseService`. Uneltele agentului
+de la pașii 4, 5, 7 și 8 și paginile de caz nu sunt încă pe `main`; starea exactă e în [§11](#11-stare).
+
 ### Capcanele (fără alarme false)
 
 | Modificarea | Rezultatul | De ce |
@@ -152,6 +156,9 @@ flowchart LR
   RE & CS & AG & OP & W --> AU
 ```
 
+Săgețile agentului sunt ținta din [`docs/PLAN.md` §13](docs/PLAN.md#13-agentul-crs-sentinel). Pe `main`,
+`CrsSentinelAgent` are o singură unealtă (`getCase`), iar mock-ul lui spune că agentul e în construcție (§11).
+
 - **Cod pur** (`Rules`, `Deadlines`, `Shield`, `Tin`, hashing-ul din `Audit`): fără EF, fără AI, fără HTTP. Primește un
   `ClientSnapshot` imutabil și întoarce un rezultat, deci se testează în milisecunde.
 - **Servicii** (`ChangeService`, `CaseService`, `ClientService`, `EvaluationService`): validare, roluri, tranzacții, jurnal.
@@ -170,8 +177,8 @@ flowchart LR
 | `EvidenceVerifier` | Un citat există în textul vizibil al paginii indicate. Un citat inventat sau luat din textul ascuns apare „citat negăsit” |
 | `TinFormat` + TIN on Europa | Formatul TIN pe țară (DE, IT, AT, ES, FR, US, RO); pentru statele UE, verificare la serviciul Comisiei Europene, care confirmă tot doar structura și sintaxa. Spunem „format valid”, niciodată „TIN valid” |
 | `AuditLog` | Fiecare pas e o intrare cu `Hash = SHA-256(hash-ul anterior + conținut)`; „Verifică” găsește exact intrarea modificată |
-| `PiiVault` | CNP, IBAN, telefon și e-mail sunt mascate înainte de model; uneltele lucrează cu valorile reale; ce se salvează rămâne mascat |
-| Verificări pe răspuns (`Features/Checks`) | Fără date personale scăpate, citatele sunt printre dovezile verificate, semnalele nu sunt prezentate ca alerte, fiecare indiciu are regula și pagina, fără „TIN valid” |
+| `PiiVault` | CNP, IBAN, card, e-mail și telefonul românesc sunt mascate înainte de model; uneltele lucrează cu valorile reale; ce se salvează rămâne mascat. Telefoanele străine: în PR #20 |
+| Verificări pe răspuns (`Features/Checks`) | Pe `main`, agentul CRS are `pii-leak` (fără date personale scăpate). În PR #20: citatele sunt printre rezultatele uneltelor, semnalele nu sunt prezentate ca alerte, fiecare indiciu are regula și pagina, fără „TIN valid” |
 
 ### Modelele și fallback-ul
 
@@ -179,9 +186,9 @@ flowchart LR
   În producție: o regiune UE sau un model pe serverele băncii (endpoint compatibil OpenAI).
 - Două profiluri: `extract` (Claude Haiku 5.5) pentru extrageri și clasificări mici; principal (Claude Sonnet 5.5) pentru
   agent și textul către client.
-- **Lanțul care nu pică:** live → înregistrare (`Recordings/crs-sentinel.json`) → mock. Mock-ul cheamă uneltele reale, deci
-  aplicația merge cap-coadă și fără internet sau chei. Replay-ul **nu** rulează uneltele: îl folosim doar pentru întrebări
-  care citesc (de exemplu „rezumă cazul”), niciodată pentru pași care schimbă date.
+- **Lanțul care nu pică:** live → înregistrare (`Recordings/crs-sentinel.json`, încă neînregistrată) → mock. Mock-ul
+  cheamă uneltele reale, deci aplicația merge și fără internet sau chei. Replay-ul **nu** rulează uneltele: îl folosim doar
+  pentru întrebări care citesc (de exemplu „rezumă cazul”), niciodată pentru pași care schimbă date.
 
 ## 7. Domeniul MVP
 
@@ -210,9 +217,12 @@ Metricile vin doar din rulări reale (`/metrics` și testele), prezentate separa
    implementate și testate”, nu „acuratețe 100%”.
 2. **Unde există incertitudine:** extragerea din PDF câmp cu câmp, procentul de citate verificate și respinse, scutul pe
    PDF-uri variate, semnalele care ar fi schimbat decizia (0 prin construcție, verificat la fiecare rulare).
-3. **Eficiența operațională:** timpul pe caz cu agentul față de timpul manual estimat de mentor.
+3. **Eficiența operațională:** timpul pe caz cu agentul, doar când se poate măsura dintr-o rulare. Azi `EvaluationService`
+   îl raportează „indisponibil”: rulările agentului nu sunt legate de cazuri. Nu îl comparăm cu un timp manual: nu avem o
+   estimare de la mentor.
 
-Cifrele se completează aici după prima rulare completă, cu data rulării. Nicio cifră fără rulare.
+`EvaluationService` e pe `main` (PR #29); pagina `/metrics` e încă goală. Cifrele se completează aici după prima rulare
+completă, cu commit-ul, data și modul (mock sau live). Nicio cifră fără rulare.
 
 ## 9. Confidențialitate
 
@@ -239,8 +249,11 @@ Cifrele se completează aici după prima rulare completă, cu data rulării. Nic
 tools/setup-dev.sh                              # o singură dată: .NET 10, build, Chromium pentru testele E2E
 dotnet run --project src/HackathonStarter       # http://localhost:5000, merge pe mock fără nicio cheie
 dotnet test tests/HackathonStarter.Tests        # teste unitare, fără rețea
-dotnet test tests/HackathonStarter.E2E          # teste în browser, pe aplicația pornită
+dotnet test tests/HackathonStarter.E2E          # teste în browser; pornesc singure aplicația
 ```
+
+Pe macOS, pasul Chromium din `tools/setup-dev.sh` pică (scriptul cheamă driverul `linux-x64`). După build, rulează:
+`tests/HackathonStarter.E2E/bin/Debug/net10.0/.playwright/node/darwin-arm64/node tests/HackathonStarter.E2E/bin/Debug/net10.0/.playwright/package/cli.js install chromium`.
 
 Sau deschide `HackathonStarter.slnx` în Visual Studio, Rider sau VS Code și pornește proiectul `HackathonStarter`.
 Baza de date SQLite se creează la pornire, cu datele demo. Utilizatori demo (meniul din bara de sus): Ana (operator,
@@ -257,17 +270,32 @@ IAM), niciodată din repo. În `appsettings.Local.json` (ignorat de git): `"AI":
 
 Lucrăm în paralel, pe module; fiecare PR intră doar cu CI verde (build cu 0 warnings, teste unitare și E2E).
 
-| Modul | Rol | Stare |
-| --- | --- | --- |
-| Planul, regulile verificate, paginile ghidului, cazurile-etalon (specificația) | toți | gata |
-| Contractele și entitățile (Faza 0) | integrator | de făcut |
-| `CrsRuleEngine`, `RuleCatalog` | R1 | de făcut |
-| Termene, `SimClock`, cazuri, `DeadlineWatcher` | R2 | de făcut |
-| Scut, `EvidenceVerifier`, TIN, jurnal | R3 | de făcut |
-| `CrsSentinelAgent`, mock, verificări | R4 | de făcut |
-| Provider Bedrock | R4 | în lucru (PR) |
-| Clienți sintetici, PDF-uri, `EvaluationService` | R5 | de făcut |
-| Interfața (după 22:00, împreună) | toți | de făcut |
+Starea de pe `main` la commit-ul `a75d5c9`, verificată în cod pe 28.10.2026, la 21:30: `dotnet build -warnaserror` fără
+warnings, testele unitare 839 din 839, E2E 21 trecute și 1 sărit (vezi „Jurnalul” mai jos).
+
+| Modul | Rol | Pe `main` | În lucru | Lipsește |
+| --- | --- | --- | --- | --- |
+| Documentația: planul, regulile verificate, paginile ghidului, cazurile-etalon, sursele, scenariul video, textul `/privacy` | toți | da (#1–#4, #6, #7, #10, #12, #14, #15, #19, #30, #33) | | |
+| Contractele și entitățile (Faza 0), `SimClock` | integrator | da (#13, #18) | | |
+| `CrsRuleEngine`, `RuleCatalog`, `GoldenEngineTests` | R1 | da (#16) | | |
+| `ChangeService`, `CaseService` (stările cazului), `DeadlineCalculator`, `DeadlineWatcher`, `SimClockControl` | R2 | da (#28) | | butoanele datei simulate în bara de sus |
+| `HiddenTextShield`, `EvidenceVerifier`, `TinFormat` + TIN on Europa, `AuditLog` | R3 | da (#23) | | |
+| Pagina `/privacy` (jurnal, TIN on Europa, Bedrock, retenție, temeiul legal) | R3 | da (#26) | | |
+| Provider Bedrock | R4 | da (#5) | | |
+| Runtime-ul agentului, verificările CRS pe răspuns, mascarea telefoanelor străine | R4 | | PR #20, deschis | |
+| `CrsSentinelAgent`: uneltele, system prompt-ul final, mock RO/EN, înregistrarea | R4 | doar scheletul, cu `getCase` | | uneltele de la §3 pașii 4, 5, 7, 8 |
+| Datele: 50 de clienți sintetici, PDF-urile cazurilor-etalon, cazurile-etalon transcrise, seed-ul | R5 | da (#8, #9, #11, #17, #21, #22, #25, #27, #31) | | seed-ul nu trece prin `ChangeService`, deci jurnalul e gol la pornire |
+| `EvaluationService` (cele trei feluri de cifre) | R5 | da (#29) | | |
+| Landing-ul și subsolurile | R5 | da (#24, #32) | | |
+
+**Paginile CRS, așa cum sunt acum pe `main`:**
+
+| Pagina | Ce arată |
+| --- | --- |
+| `/audit` | Lanțul de hash-uri, „Verifică” și „Tamper” (admin). La pornire jurnalul e gol, de aceea testul E2E pentru „Tamper” e sărit |
+| `/privacy` | Textul actualizat (#26) |
+| `/cases`, `/cases/{code}`, `/changes/new`, `/clients/{code}`, `/metrics` | Doar titlul și „Vine în faza următoare” |
+| `/dashboard` | Încă dashboard-ul template-ului (elemente demo), nu cazurile CRS |
 
 ## 12. Documentația
 
@@ -289,4 +317,6 @@ Am pornit de la template-ul .NET al echipei, scris înainte de hackathon (commit
 .NET 10, Blazor Server, MudBlazor, EF Core, Microsoft.Extensions.AI. De acolo vin runtime-ul de agenți (unelte, aprobări,
 rulări în fundal, înregistrări, mock), mascarea datelor personale, verificările deterministe, `TargetClient`, datele
 sintetice, PWA-ul și pipeline-ul de deploy. Tot ce ține de CRS e scris în timpul hackathonului, începând cu 28 octombrie
-2026. Documentația template-ului: [`docs/TEMPLATE.md`](docs/TEMPLATE.md).
+2026. [Rulebook-ul](https://nexxtsummit.com/rulebook) nu interzice codul scris înainte și cere doar ca lucrul pe temă să
+înceapă la startul oficial (28 oct., 09:00); organizatorii au confirmat pe 28 oct. Documentația template-ului:
+[`docs/TEMPLATE.md`](docs/TEMPLATE.md).
