@@ -377,8 +377,8 @@ public partial class RuleCitedCheck : Check
 /// Quotations in the answer: text between „ or “ and ”, “ or a straight quote, between ” and ”, or between straight
 /// double quotes, at least
 /// <see cref="MinLength"/> characters. One passes when, ignoring case, diacritics and extra whitespace, it is part
-/// of a verified quote or contains one. Verified quotes shorter than <see cref="MinLength"/> are ignored, so a
-/// one-word quote can't vouch for a whole sentence. Both sides must be in the same form (both real or both masked).
+/// of a verified quote; a quotation that adds words to a verified quote fails, because the document never says them.
+/// Both sides must be in the same form (both real or both masked).
 /// </summary>
 public partial class EvidenceQuotedCheck : Check
 {
@@ -414,7 +414,7 @@ public partial class EvidenceQuotedCheck : Check
             : Fail($"{unverified.Count} of {quotations.Count} quotation(s) are not among the {verified.Count} verified quote(s).", unverified.Select(Finding));
 
         bool IsVerified(string quotation) =>
-            verified.Any(v => v.Contains(quotation, StringComparison.Ordinal) || quotation.Contains(v, StringComparison.Ordinal));
+            verified.Any(v => v.Contains(quotation, StringComparison.Ordinal));
         CheckFinding Finding(Match m) => new("unverified quotation", Excerpt(subject.Text, m.Index, m.Length));
     }
 

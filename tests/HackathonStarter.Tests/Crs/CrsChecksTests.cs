@@ -230,7 +230,6 @@ public class CrsChecksTests
     [InlineData("Documentul spune „Adresa: Hauptstraße 12, 10115 Berlin”.")]
     [InlineData("Formularul arată „locul nasterii: munchen,\n   germania”.")] // case, diacritics, whitespace
     [InlineData("The form says “Hauptstraße 12, 10115 Berlin” and \"Rezidență fiscală: Germania\".")] // part of a verified quote
-    [InlineData("Pe pagina 2: „Rezidență fiscală: Germania (bifat)”.")] // contains a verified quote
     [InlineData("Documentul spune ”Adresa: Hauptstraße 12, 10115 Berlin”.")]
     [InlineData("Documentul spune „Adresa: Hauptstraße 12, 10115 Berlin\".")]
     public void Verified_quotations_pass(string text) =>
@@ -272,6 +271,12 @@ public class CrsChecksTests
         Assert.DoesNotContain("RO49AAAA1B31007593840000", finding.Excerpt);
         Assert.Contains("[IBAN-1]", finding.Excerpt);
     }
+
+    [Theory]
+    [InlineData("Documentul spune „Adresa: Hauptstraße 12, 10115 Berlin, valabilă din 2019”.")]
+    [InlineData("Pe pagina 2: „Rezidență fiscală: Germania (bifat)”.")]
+    public void A_quotation_that_adds_words_to_a_verified_quote_fails(string text) =>
+        Assert.Equal(CheckOutcome.Fail, Run("evidence-quoted", text, ToolResults).Outcome);
 
     [Fact]
     public void A_short_verified_quote_does_not_vouch_for_a_sentence()
