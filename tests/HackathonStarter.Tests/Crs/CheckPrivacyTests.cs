@@ -65,6 +65,30 @@ public class CheckPrivacyTests
     }
 
     [Theory]
+    [InlineData("Tel: +49\u00A089\u00A04521\u00A07730\u00A01985", "Tel: [PHONE_1]\u00A01985")] // a year after the number, as with spaces
+    [InlineData("Tel: +49\u202F89\u202F4521\u202F7730\u202F1985", "Tel: [PHONE_1]\u202F1985")] // narrow non-breaking spaces
+    [InlineData("+43\u00A01\u00A05134567\u00A00049\u00A089\u00A04521\u00A07730", "[PHONE_1]\u00A0[PHONE_2]")] // two numbers side by side
+    [InlineData("+380\u00A044\u00A0123\u00A045\u00A067\u00A02026", "[PHONE_1]\u00A02026")]
+    [InlineData("+380\u00A044\u00A0123\u00A045\u00A067\u00A01985", "+[CARD_1]")] // its 16 digits pass the Luhn check: a card, as with spaces
+    [InlineData("Tel: +1\u00A0(212)\u00A0555\u00A00147", "Tel: [PHONE_1]")]
+    [InlineData("Tel: +1\u00A0(212)\u00A0555\u00A00147\u00A01985", "Tel: [PHONE_1]\u00A01985")]
+    [InlineData("Maria,+49\u00A089\u00A04521\u00A07730,35", "Maria,[PHONE_1],35")]
+    [InlineData("Card +4111\u00A01111\u00A01111\u00A01111", "Card +[CARD_1]")] // over 15 digits with a valid Luhn check: a card
+    public void Groups_split_by_non_breaking_spaces_are_cut_like_groups_split_by_spaces(string text, string expected)
+    {
+        var vault = new PiiVault();
+
+        var masked = vault.Mask(text);
+
+        Assert.Equal(expected, masked);
+        Assert.Equal(text, vault.Unmask(masked));
+        Assert.Equal(expected.Replace('_', '-'), PiiVault.ForStorage().Mask(text));
+        Assert.Equal(new PiiVault().Mask(Spaces(text)), Spaces(masked));
+
+        static string Spaces(string s) => s.Replace('\u00A0', ' ').Replace('\u202F', ' ');
+    }
+
+    [Theory]
     [InlineData("q=CNP+1900515400013", "[CNP-1]")]
     [InlineData("Suma +1900515400013.50", "[CNP-1]")]
     [InlineData("Suma +378282246310005.50", "[CARD-1]")]
@@ -91,6 +115,7 @@ public class CheckPrivacyTests
     [Theory]
     [InlineData("Telefonul +49 89\n4521 7730 al Mariei este și el un indiciu.")] // a phone broken by a line break
     [InlineData("Telefonul \\u002B49 89 4521 7730 al Mariei este și el un indiciu.")] // the JSON escape of "+"
+    [InlineData("Telefonul +49\u00A089\u00A04521\u00A07730\u00A01985 al Mariei este și el un indiciu.")] // non-breaking spaces, then a year
     public void An_excerpt_never_shows_the_digits_of_a_phone(string answer)
     {
         var result = Assert.Single(new CheckEngine([new RuleCitedCheck()]).Evaluate(new CheckSubject(answer, "x"), ["rule-cited"]).Results);
