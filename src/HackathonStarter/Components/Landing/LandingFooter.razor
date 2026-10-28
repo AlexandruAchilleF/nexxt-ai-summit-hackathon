@@ -1,6 +1,6 @@
-@* Footer of the landing page and the public pages: app pages by nav group, then legal and contact. *@
+@* Footer of the landing page and the public pages: app pages by nav group, then /privacy (see AppFooter). *@
 <footer class="lp-footer">
-    <div class="lp-wrap lp-footer-grid" style="--cols:@(Groups.Length + 2)">
+    <div class="lp-wrap lp-footer-grid" style="--cols:@(Groups.Length + 1)">
         <div class="lp-footer-brand"><BrandLogo Compact="true" /></div>
         @foreach (var group in Groups)
         {
@@ -14,18 +14,10 @@
         }
         <div>
             <h3>@T("Legal")</h3>
-            <a href="/terms">@T("Terms and conditions")</a>
-            <a href="/privacy-policy">@T("Privacy policy")</a>
             <a href="/privacy">@T("Data and privacy")</a>
         </div>
-        <div>
-            <h3>@T("Contact")</h3>
-            <a href="/contact">@T("Contact")</a>
-            <a href="mailto:@SiteConfig.Legal.Email">@SiteConfig.Legal.Email</a>
-            <a href="mailto:@SiteConfig.Legal.SecurityEmail">@T("Report a vulnerability")</a>
-        </div>
     </div>
-    <p class="lp-wrap lp-footer-legal">© @DateTime.UtcNow.Year @SiteConfig.Legal.CompanyName · @SiteConfig.Legal.Address</p>
+    <p class="lp-wrap lp-footer-legal">© @DateTime.UtcNow.Year @SiteConfig.Legal.CompanyName</p>
 </footer>
 
 @code {

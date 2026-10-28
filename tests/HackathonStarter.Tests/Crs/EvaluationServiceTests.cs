@@ -5,7 +5,10 @@ using HackathonStarter.Features.Evaluation;
 using HackathonStarter.Features.Rules;
 using HackathonStarter.Features.Shield;
 using HackathonStarter.Features.Synthetic;
+using HackathonStarter.Features.Tin;
+using HackathonStarter.Services;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace HackathonStarter.Tests.Crs;
 
@@ -39,11 +42,9 @@ public class EvaluationServiceTests
             Assert.Equal(0, totals.FalseAlarms);
             Assert.Equal(totals.ActionsExpected, totals.Caught);
         }
-        // What the engine controls matches on every row; the deadline is IDeadlineCalculator's, so a golden row may still
-        // fail on it (case 2: no deadline from the guide, DL-NEW-90 from the calculator) and the report shows it.
         Assert.All(spec.Golden.Concat(spec.Synthetic).Where(r => r.Evaluated), r =>
             Assert.True(r.DecisionMatches && r.IndiciaMatch != false && r.ClearedMatch != false && r.ReportableMatches != false && r.Error is null, r.Id));
-        Assert.All(spec.Golden.Where(r => r.Status == CoverageStatus.Failed), r => Assert.False(r.Deadline?.Matches, r.Id));
+        Assert.Equal(spec.GoldenTotals.Evaluated, spec.GoldenTotals.Passed);
         Assert.Equal(spec.SyntheticTotals.Evaluated, spec.SyntheticTotals.Passed);
         Assert.Equal(GoldenCases.All.Count, spec.Golden.Count);
         Assert.Equal(GoldenCases.All.Count(c => c.HasInput && c.ExpectedDecision != Decision.ShieldAlert), spec.GoldenTotals.Evaluated);
@@ -58,6 +59,22 @@ public class EvaluationServiceTests
         Assert.True(fatca.Matches);
         Assert.Equal("FATCA-SC", fatca.Actual!.RuleId);
         Assert.Null(fatca.Actual.DueAt);
+        // A self-certification check alone opens a case without a deadline, as CaseService does (Î1).
+        var tinFormat = Row(spec, "2").Deadline!;
+        Assert.True(tinFormat.Matches);
+        Assert.Equal(("SC-TIN-FORMAT", (DateTime?)null), (tinFormat.Actual!.RuleId, tinFormat.Actual.DueAt));
+    }
+
+    [Fact]
+    public async Task The_registered_engine_passes_every_golden_case_and_every_synthetic_client()
+    {
+        var services = new ServiceCollection().AddRules().AddTin().BuildServiceProvider();
+        var spec = (await Service(services.GetRequiredService<ICrsRuleEngine>()).RunAsync()).Spec;
+
+        Assert.All(spec.Golden.Where(r => r.Evaluated), r => Assert.Equal(CoverageStatus.Passed, r.Status));
+        Assert.Equal((0, 0, 0), (spec.GoldenTotals.Failed, spec.GoldenTotals.Missed, spec.GoldenTotals.FalseAlarms));
+        Assert.Equal((0, 0, 0), (spec.SyntheticTotals.Failed, spec.SyntheticTotals.Missed, spec.SyntheticTotals.FalseAlarms));
+        Assert.Equal(50, spec.SyntheticTotals.Passed);
     }
 
     [Fact]
@@ -191,6 +208,39 @@ public class EvaluationServiceTests
         Assert.Equal(generated, noCase.Select(r => (r.Id, r.Label!, r.LabelEn!, r.Expected)));
         Assert.NotEqual(oracle.Select(r => r.Actual), noCase.Select(r => r.Actual));
     }
+
+    [Fact]
+    public async Task The_expected_rules_on_each_row_come_from_the_data_not_from_the_engine()
+    {
+        var spec = (await Service(new NoCaseEngine("test")).RunAsync()).Spec;
+
+        Assert.Equal(["CRS-IND-ADDR:DE", "CRS-IND-PHONE:DE"], Row(spec, "4").ExpectedIndicia.Order());
+        Assert.Equal(["CRS-IND-SO:DE"], Row(spec, "5a").ExpectedCleared);
+        Assert.Equal(["CRS-IND-ADDR:DE/SelfCertification"], Row(spec, "9").ExpectedIndicia);
+        var generated = SyntheticSnapshots.Create().ToDictionary(s => s.Code);
+        Assert.All(spec.Synthetic, r => Assert.Equal(
+            (generated[r.Id].ExpectedHits.Count, generated[r.Id].ExpectedCleared.Count), (r.ExpectedIndicia.Count, r.ExpectedCleared.Count)));
+    }
+
+    [Fact]
+    public void The_time_saved_is_compared_only_when_both_times_are_a_result()
+    {
+        SourceNote real = new(EvaluationSource.Real, "", ""), unavailable = new(EvaluationSource.Unavailable, "", "");
+
+        var both = new EfficiencyReport(real, 4.5, real, 22.5m);
+        Assert.Equal(18m, both.SavedMinutesPerCase);
+        Assert.Equal(EvaluationSource.Real, both.Saved.Source);
+        Assert.Equal(-2.5m, new EfficiencyReport(real, 25, real, 22.5m).SavedMinutesPerCase);
+
+        var agentMissing = new EfficiencyReport(unavailable, 4.5, real, 22.5m);
+        Assert.Null(agentMissing.SavedMinutesPerCase);
+        Assert.Equal(EvaluationSource.Unavailable, agentMissing.Saved.Source);
+        Assert.Null(new EfficiencyReport(real, 4.5, unavailable, null).SavedMinutesPerCase);
+    }
+
+    [Fact]
+    public void Every_golden_title_has_a_Romanian_translation_for_metrics() =>
+        Assert.All(GoldenCases.All, c => Assert.True(Lang.Translations.ContainsKey(c.Title), c.Title));
 
     [Fact]
     public async Task A_shield_that_sees_nothing_misses_every_kind_of_concealment()

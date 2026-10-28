@@ -80,8 +80,16 @@ public sealed class EvaluationService(
     {
         var start = Stopwatch.GetTimestamp();
         var versions = new SortedSet<string>(StringComparer.Ordinal);
-        var goldenRows = golden.Select(c => { ct.ThrowIfCancellationRequested(); return Golden(c, versions); }).ToList();
-        var syntheticRows = synthetic.Select(s => { ct.ThrowIfCancellationRequested(); return Synthetic(s, versions); }).ToList();
+        var goldenRows = golden.Select(c => { ct.ThrowIfCancellationRequested(); return Golden(c, versions) with
+        {
+            ExpectedIndicia = c.ExpectedIndicia.Count > 0 ? [.. c.ExpectedIndicia.Select(h => Key(h.RuleId, h.Jurisdiction, h.CoveredBy))] : c.ExpectedHits,
+            ExpectedCleared = c.ExpectedClearedRules.Count > 0 ? [.. c.ExpectedClearedRules.Select(h => Key(h.RuleId, h.Jurisdiction, Coverage.None))] : c.ExpectedCleared,
+        }; }).ToList();
+        var syntheticRows = synthetic.Select(s => { ct.ThrowIfCancellationRequested(); return Synthetic(s, versions) with
+        {
+            ExpectedIndicia = [.. s.ExpectedHits.Select(h => Key(h.RuleId, h.Jurisdiction, Coverage.None))],
+            ExpectedCleared = [.. s.ExpectedCleared.Select(h => Key(h.RuleId, h.Jurisdiction, Coverage.None))],
+        }; }).ToList();
         var version = string.Join(", ", versions);
         var (goldenTotals, syntheticTotals) = (CoverageTotals.Of(goldenRows), CoverageTotals.Of(syntheticRows));
         return new SpecCoverage(SpecSource(versions, version, goldenTotals, syntheticTotals), version, goldenRows, goldenTotals,
@@ -228,13 +236,28 @@ public sealed class EvaluationService(
 
     private DeadlineCheck Deadline(GoldenDeadline expected, RuleOutcome outcome, ClientSnapshot after, DateTime knownAt)
     {
-        if (expected.RuleId?.StartsWith("DL-EXPIRED", StringComparison.Ordinal) == true) return new(expected, null, null);
         // NEVERIFICAT: which account sets the deadline is not in the guide. Ours: the most recently opened one, which gives the
         // earliest deadline (a new account's 90 days never end after a preexisting one's). R2 to make it a shared function.
         var account = after.Accounts.MaxBy(a => a.OpenedOn);
         if (outcome.Regime is not { } regime || account is null) return new(expected, null, false);
 
         var actual = deadlines.Compute(new DeadlineInput(knownAt, regime, account.OpenedOn));
+        // As CaseService.OpeningDeadline: only an uncovered CRS indicium starts the 90 days; FATCA indicia alone give FATCA-SC,
+        // self-certification checks alone give none (GOLDEN-CASES Î1, NEVERIFICAT).
+        var uncovered = outcome.Uncovered.ToList();
+        if (!uncovered.Any(h => h.RuleId.StartsWith("CRS-IND-", StringComparison.Ordinal)))
+        {
+            if (uncovered.Any(h => h.RuleId.StartsWith("FATCA-IND-", StringComparison.Ordinal)))
+                actual = deadlines.Compute(new DeadlineInput(knownAt, Regime.Fatca, account.OpenedOn)) with { Preexisting = actual.Preexisting };
+            else if (uncovered.FirstOrDefault(h => h.RuleId.StartsWith("SC-", StringComparison.Ordinal)) is { } check)
+            {
+                var (en, ro) = CaseTexts.NoDeadlineForSelfCertificationCheck;
+                actual = actual with
+                {
+                    DueAt = null, RemindAt = null, RuleId = check.RuleId, GuidePage = check.GuidePage, Explanation = en, ExplanationRo = ro, DesignChoice = true,
+                };
+            }
+        }
         // No rule in the golden data = the guide gives no deadline (FATCA, Î1); the calculator answers FATCA-SC without a date.
         var matches = actual.Preexisting == expected.Preexisting && actual.DueAt == expected.DueAt && actual.RemindAt == expected.RemindAt
                       && (expected.RuleId is null || actual.RuleId == expected.RuleId);

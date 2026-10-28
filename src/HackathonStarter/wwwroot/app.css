@@ -320,16 +320,11 @@ a.app-list-row:active, .dense-row:active { background: var(--app-fill-strong); }
    are solid, context signals are dashed and never alert; the demo date drives every countdown. Motion explains a state
    change (the date moves, a stage is reached, a rule is applied); routine changes stay under 300ms. */
 :root { --crs-out: cubic-bezier(.16,1,.3,1); }
-@property --crs-n { syntax: "<integer>"; initial-value: 0; inherits: false; }
 
 .crs-swap { display: inline-flex; animation: crs-swap 380ms var(--crs-out) both; }
 @keyframes crs-swap { from { opacity: 0; transform: scale(.82); filter: blur(4px); } }
 .crs-roll { display: inline-block; animation: crs-roll 520ms var(--crs-out) both; }
 @keyframes crs-roll { from { opacity: 0; transform: translateY(55%); filter: blur(4px); } }
-.crs-count { font-variant-numeric: tabular-nums; animation: crs-count 1300ms var(--crs-out) 120ms both; counter-reset: crs-n var(--crs-n); --crs-n: var(--to); }
-.crs-count::after { content: counter(crs-n); }
-@keyframes crs-count { from { --crs-n: 0; } }
-.crs-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 /* Demo date in the top bar (Components/Crs/DemoDate.razor). */
 .demo-date { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 0; border-radius: 999px; background: var(--app-fill);
@@ -608,30 +603,6 @@ a.app-list-row:active, .dense-row:active { background: var(--app-fill-strong); }
 .crs-fact > .mud-icon-root { font-size: 19px; margin-top: 1px; color: var(--app-accent); }
 .crs-fact.is-old > div:not(.crs-hint) { color: var(--mud-palette-text-secondary); }
 .crs-fact.is-old > .mud-icon-root { color: var(--mud-palette-text-disabled); }
-
-/* Metrics (Pages/Metrics/MetricsPage.razor). */
-.crs-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-.crs-metrics.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-@media (max-width: 959.98px) { .crs-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.crs-metric { padding: 14px 16px; border-radius: var(--app-radius-md); background: var(--app-well); }
-.crs-metric .stat-value { display: flex; align-items: baseline; gap: 6px; }
-.crs-metric-of { font-size: 1rem; font-weight: 600; color: var(--mud-palette-text-secondary); }
-.crs-golden { display: grid; }
-.crs-golden-row { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto auto auto; align-items: center; gap: 12px; padding: 9px 0; font-size: 14px;
-}
-.crs-golden-row + .crs-golden-row { border-top: 1px solid var(--app-separator); }
-.crs-golden-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.crs-golden-decision, .crs-golden-checks { display: flex; align-items: center; gap: 6px; }
-.crs-golden-row.is-noinput { color: var(--mud-palette-text-secondary); }
-.crs-check { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; color: var(--mud-palette-text-secondary); }
-.crs-check .mud-icon-root { font-size: 15px; }
-.crs-check.is-ok .mud-icon-root { color: var(--mud-palette-success); }
-.crs-check.is-bad { color: var(--mud-palette-error); }
-.crs-check.is-skip .mud-icon-root { color: var(--mud-palette-text-disabled); }
-@media (max-width: 959.98px) {
-  .crs-golden-row { grid-template-columns: 34px minmax(0, 1fr) auto; }
-  .crs-golden-checks { grid-column: 2 / -1; } .crs-golden-decision { grid-column: 2 / -1; grid-row: 2; }
-}
 
 /* Bars for counts (Metrics, Dashboard). */
 .crs-bar { height: 8px; border-radius: 4px; background: var(--app-fill); overflow: hidden; }

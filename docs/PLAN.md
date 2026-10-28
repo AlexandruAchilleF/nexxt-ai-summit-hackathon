@@ -1303,8 +1303,9 @@ Reguli ale Tech Lead-ului:
       (secțiunea 9.2).
 - [x] Exemplul Austria la cazul 3 (fișa OCDE AT).
 - [x] Data de start pentru conturile preexistente: CRS 31.12.2015, FATCA 30.06.2014 (p. 20).
-- [ ] **Acum, nu înainte de pitch:** regula hackathonului despre codul scris înainte (tot planul stă pe template).
-      O spunem deschis în README (template-ul e în istoricul repo-ului).
+- [x] Regula hackathonului despre codul scris înainte: avem voie. [Rulebook-ul](https://nexxtsummit.com/rulebook) nu îl
+      interzice și cere doar ca lucrul pe temă să înceapă la startul oficial (28 oct., 09:00); organizatorii au confirmat pe
+      28 oct. O spunem deschis în README (secțiunea 13; template-ul e în istoricul repo-ului).
 
 **Cifrele din pitch (cu sursă, confirmate din rapoartele originale):** ANAF S1 2025: 3.204 verificări la 28 de
 instituții, 891 de înregistrări corectate, 7 controale specifice privind CRS, inițiate și coordonate (Raportul de
@@ -1342,7 +1343,7 @@ performanță ANAF 2024, p. 44–45).
 
 | # | Decizie | Cine | Până când |
 | --- | --- | --- | --- |
-| 0 | Regula hackathonului despre codul scris înainte: avem voie cu template-ul? Dacă nu, cade tot planul | oricine, la organizatori | **acum** |
+| 0 | Regula hackathonului despre codul scris înainte: avem voie cu template-ul? | rezolvat: da. Rulebook-ul nu interzice codul scris înainte, cere doar ca lucrul pe temă să înceapă la startul oficial (28 oct., 09:00); organizatorii au confirmat | — |
 | 1 | Ce rulează sub T3 (Claude Code / Codex) → ce fișiere de subagenți punem | rezolvat: T3 rulează Claude Code; `.claude/agents` și `.opencode/agents` sunt generate din `docs/agents` | — |
 | 2 | Cine ia fiecare rol R1–R5 | echipa | 16:00 |
 | 3 | Hosting: Render principal + AWS opțional (propunere) | echipa | 17:00 |

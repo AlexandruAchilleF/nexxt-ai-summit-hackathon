@@ -6,7 +6,7 @@ namespace HackathonStarter.E2E;
 [Collection("app")]
 public class AuditTests(AppFixture app)
 {
-    [Fact(Skip = "Needs audit entries at startup: the seed must go through ChangeService (R5, docs/roluri/R3-incredere.md).")]
+    [Fact]
     public async Task Tampering_an_entry_breaks_the_chain_exactly_there()
     {
         var page = await app.NewPageAsync();

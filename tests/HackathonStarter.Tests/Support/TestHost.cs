@@ -50,6 +50,8 @@ public sealed class TestHost : IAsyncDisposable
         IReadOnlyDictionary<string, IChatClient>? profiles = null,
         Action<PrivacyOptions>? privacy = null,
         Action<Dictionary<string, TargetOptions>>? targets = null,
+        IEnumerable<ICheck>? extraChecks = null,
+        Action<IServiceCollection>? configure = null,
         params AgentDefinition[] extraAgents)
     {
         var dir = Path.Combine(Path.GetTempPath(), "hs-tests-" + Guid.NewGuid().ToString("N")[..8]);
@@ -69,6 +71,7 @@ public sealed class TestHost : IAsyncDisposable
         services.AddDataProtection().UseEphemeralDataProtectionProvider();
         services.AddSingleton<PiiSealer>();
         services.AddChecks();
+        foreach (var check in extraChecks ?? []) services.AddSingleton(check);
         services.AddSingleton<IRunExporter, JsonTestCaseExporter>();
         services.AddSingleton<IRunExporter, XunitTestExporter>();
         services.AddSingleton<IRunExporter, MarkdownReportExporter>();
@@ -98,6 +101,7 @@ public sealed class TestHost : IAsyncDisposable
         services.AddSingleton<AgentDefinition, AssistantAgent>();
         services.AddSingleton<AgentDefinition, DebatePanel>();
         foreach (var agent in extraAgents) services.AddSingleton(agent);
+        configure?.Invoke(services); // extra services, e.g. in-memory fakes of the CRS contracts
 
         var root = services.BuildServiceProvider();
         await using (var db = await root.GetRequiredService<IDbContextFactory<AppDbContext>>().CreateDbContextAsync())

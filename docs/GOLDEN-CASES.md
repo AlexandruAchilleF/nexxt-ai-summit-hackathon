@@ -22,7 +22,7 @@ Toate datele sunt sintetice. CNP-urile, IBAN-urile, TIN-urile și numărul ABA a
 | `ExpectedHits` | Comparat **exact**, pe perechea (RuleId, Jurisdiction), cu `CoveredBy`. La `Evaluate` conține doar indicii (`*-IND-*`); la `EvaluateSelfCertification`, regulile `SC-*` aplicate. |
 | `ExpectedCleared` | Comparat ca **submulțime**: listăm regula-capcană (cea a cărei explicație contează), nu tot ce nu s-a aplicat. |
 | `GEN-DOMESTIC` | Stă în `Cleared` (are explicație, nu e indiciu). `GEN-CHANGE-CIRC` nu se așteaptă nicăieri explicit. |
-| Termenul | Coloane separate: regula (`DL-*`), `Preexisting`, `DueAt`, `RemindAt`. Nu e în `ExpectedHits`. |
+| Termenul | Coloane separate: regula (`DL-*`), `Preexisting`, `DueAt`, `RemindAt`. Nu e în `ExpectedHits`. Regula de la expirare (`DL-EXPIRED-*`, `Case.OutcomeRuleId`) stă separat, în `ExpectedOutcomeRuleId` (17a, 17b). |
 | „Rezident RO standard” | Adresă de reședință în RO (curentă), un mobil RO (curent), cetățenie `[RO]`, `BirthCountry = RO`, autocertificare `Valid` cu `[RO, TIN = CNP]`, `DeclaresUsPerson = false`, semnată la deschiderea primului cont, la ghișeu. Fișele trec doar ce diferă. |
 | Canalul | Fișele scriu în română („la ghișeu”, „online”, „call center”). În cod: `branch` / `online` / `call center` (`ChangeEvent.SourceChannel`, `SelfCertification.Channel`); „ghișeu” e doar textul afișat în română. Cazul 12 („prin poștă”) are încă `poștă`: valoarea în cod e deschisă. |
 | Conturi | `Depository` = cont curent / economii / depozit; `Custodial` = cont de instrumente financiare. Preexistent se calculează din `OpenedOn` (CRS ≤ 31.12.2015, FATCA ≤ 30.06.2014, p. 20). |
@@ -50,8 +50,8 @@ Toate datele sunt sintetice. CNP-urile, IBAN-urile, TIN-urile și numărul ABA a
 | 14 | Telefon SUA lângă telefonul RO | Lucian Toma `CL-0014` | motor (R1) | `FatcaAlert` | `FATCA-IND-PHONE` (US) | `CRS-IND-PHONE` (US) | fără termen din ghid (Î1) | 31, 38; 29 c; 25 | VALIDAT (28.10, 19:00) |
 | 15 | Cluj → Iași | Ioana Mureșan `CL-0015` | motor (R1) | `NoCase` | — | `GEN-DOMESTIC` | — | design | APROBAT R5 |
 | 16 | Mutare în Spania, cont nou, fără răspuns, ziua 85 | Irina Constantin `CL-0016` | flux (R2) | `Clarification`; caz `Reminded` → `Escalated` | `CRS-IND-ADDR` (ES) | — | `DL-NEW-90`, 2027-01-26 | 35–36 | VALIDAT (28.10, 19:00) |
-| 17a | Același caz după expirare | Irina Constantin `CL-0016` | flux (R2) | caz `Expired`; rezident RO și ES | `CRS-IND-ADDR` (ES) | — | `DL-EXPIRED-NEW` | 35–36 | VALIDAT (28.10, 19:00) |
-| 17b | Mutare în Spania în martie, cont preexistent | Gheorghe Marin `CL-0017` | flux (R2) | `Clarification`; termen 31 dec.; la expirare rezident cel puțin în ES | `CRS-IND-ADDR` (ES) | — | `DL-PRE-YEAR`, 2026-12-31; `DL-EXPIRED-PRE` | 29 | VALIDAT (28.10, 19:00) |
+| 17a | Același caz după expirare | Irina Constantin `CL-0016` | flux (R2) | caz `Expired`; rezident RO și ES | `CRS-IND-ADDR` (ES) | — | `DL-NEW-90`, 2027-01-26 (al cazului 16); la expirare `DL-EXPIRED-NEW` | 35–36 | VALIDAT (28.10, 19:00) |
+| 17b | Mutare în Spania în martie, cont preexistent | Gheorghe Marin `CL-0017` | flux (R2) | `Clarification`; termen 31 dec.; la expirare rezident cel puțin în ES | `CRS-IND-ADDR` (ES) | — | `DL-PRE-YEAR`, 2026-12-31; la expirare `DL-EXPIRED-PRE` | 29 | VALIDAT (28.10, 19:00) |
 | 18 | Răspuns în termen: student | Teodora Iliescu `CL-0018` | motor (R1) + flux (R2) | `Clarification` → `Compliant` → `Closed`; nu e raportabil DE | `CRS-IND-ADDR` (DE, `AcceptedExplanation`) | — | `DL-NEW-90`, 2027-01-26 | 35, 37 | VALIDAT (28.10, 19:00) |
 
 Decizii: [`PLAN.md` §7.2](PLAN.md#72-schimbări-cazuri-dovezi). `NoCase` = nicio regulă de indiciu aplicată;

@@ -23,6 +23,7 @@ public static class RuleIds
     public const string FatcaPowerOfAttorney = "FATCA-IND-POA";
     public const string FatcaInCareOf = "FATCA-IND-CO";
     public const string FatcaChange = "FATCA-SC";
+    public const string FatcaTin = "FATCA-TIN";
     public const string FatcaScopeAllAccounts = "FATCA-SCOPE-ALL";
 
     public const string SelfCertValid = "SC-VALID";
@@ -37,6 +38,14 @@ public static class RuleIds
     public const string DeadlineExpiredPreexisting = "DL-EXPIRED-PRE";
 
     public const string Explanation = "RESP-EXPLANATION";
+
+    /// <summary>
+    /// A finding on a submitted self-certification (SC-*, FATCA-TIN, FATCA-SC from EvaluateSelfCertification), not a change of
+    /// circumstances: it starts no CRS 90 days (guide p. 35-37; golden case 2) and does not move the moment a case's change
+    /// became known (the date for <see cref="ICrsRuleEngine.EvaluateCurrent(Clients.ClientSnapshot, DateTime)"/>).
+    /// </summary>
+    public static bool IsSelfCertificationFinding(string ruleId) =>
+        ruleId.StartsWith("SC-", StringComparison.Ordinal) || ruleId is FatcaTin or FatcaChange;
 }
 
 /// <summary>
@@ -57,7 +66,7 @@ public static class RuleCatalog
     [
         Rule(RuleIds.Domestic, Regime.Both, "Schimbare în România",
             "Datele din lista închisă de indicii rămân în România: nicio regulă nu se aplică, deci nu se deschide caz.",
-            "29-31", "Change within Romania",
+            NotVerified, "Change within Romania",
             "CPF Anexa 1, Sec. III.B pct. 12 (listă închisă); Sec. VII.A pct. 5 lit. c)", RuleBasis.Interpretation,
             "Everything on the closed list of indicia stays in Romania: no rule applies, so no case is opened."),
 
@@ -175,6 +184,17 @@ public static class RuleCatalog
             "reportable. Preexisting account: US reportable, except under II.B.4 (a \"not a US person\" self-certification " +
             "and, depending on the indicium, documents). US citizenship on file has no exception. The agreement sets no deadline."),
 
+        Rule(RuleIds.FatcaTin, Regime.Fatca, "FATCA: TIN-ul SUA",
+            "Autocertificarea declară rezidență fiscală în SUA sau statut de persoană SUA, dar nu dă TIN-ul SUA. Contul se " +
+            "tratează drept raportabil SUA, iar banca obține o autocertificare cu TIN-ul SUA (formularul W-9 sau un formular " +
+            "similar agreat). Motivele A, B și C de la CRS nu îl înlocuiesc. Un TIN SUA în format greșit cere clarificare " +
+            "(politică: verificare de format, nu de titular). Acordul nu dă un termen.",
+            "38", "FATCA: the US TIN", "IGA art. 2 alin. (2) lit. a) pct. (1); Anexa I, Sec. III.B.1; Sec. VI.A", RuleBasis.Verified,
+            "The self-certification declares US tax residence or US person status but gives no US TIN. The account is treated " +
+            "as US reportable, and the bank obtains a self-certification with the US TIN (Form W-9 or a similar agreed form). " +
+            "The CRS reasons A, B and C do not replace it. A US TIN in the wrong format needs clarification (policy: a format " +
+            "check, not an ownership check). The agreement sets no deadline."),
+
         Rule(RuleIds.FatcaScopeAllAccounts, Regime.Fatca, "FATCA: verificăm toate conturile",
             "Banca nu aplică pragurile de 50.000 USD (conturi preexistente și conturi de depozit noi): toate conturile " +
             "persoanelor fizice sunt verificate.",
@@ -199,12 +219,12 @@ public static class RuleCatalog
         Rule(RuleIds.TinMissing, Regime.Crs, "TIN lipsă",
             "TIN lipsă acceptat doar cu motiv (A/B/C, formularul de la p. 53). Fără TIN, deși jurisdicția emite TIN tuturor " +
             "rezidenților (fișa OCDE), orice motiv: banca are motive să știe că autocertificarea e nesigură (p. 37). " +
-            "TIN-ul SUA al unui rezident SUA nu poate lipsi (p. 38).",
-            "37, 38, 48, 53", "Missing TIN", "CPF Anexa 1, Sec. VII.A pct. 3 lit. a) pct. (iv); Sec. I.D pct. 1-4",
+            "TIN-ul SUA e o regulă FATCA: FATCA-TIN.",
+            "37, 48, 53", "Missing TIN", "CPF Anexa 1, Sec. VII.A pct. 3 lit. a) pct. (iv); Sec. I.D pct. 1-4",
             RuleBasis.Verified,
             "A missing TIN is accepted only with a reason (A/B/C, the form on p. 53). No TIN although the jurisdiction issues " +
             "TINs to all residents (OECD sheet), whatever the reason: the bank has reason to know the self-certification is " +
-            "unreliable (p. 37). A US resident's US TIN cannot be missing (p. 38)."),
+            "unreliable (p. 37). The US TIN is a FATCA rule: FATCA-TIN."),
 
         Rule(RuleIds.SelfCertConsistent, Regime.Crs, "Autocertificare consecventă cu dosarul",
             "Jurisdicțiile din indicii sunt declarate în autocertificarea validă: contul e raportabil pentru fiecare " +
@@ -223,12 +243,15 @@ public static class RuleCatalog
             "status for at most 90 days, until a new self-certification or an explanation."),
 
         Rule(RuleIds.DeadlinePreexistingYear, Regime.Crs, "Cont preexistent: sfârșitul anului sau 90 de zile",
-            "Ultima zi a anului calendaristic relevant sau 90 de zile de la notificare / descoperire, cea mai târzie. Ghidul " +
-            "spune „sau”; textul „oricare dintre acestea este mai recentă” e scris pentru testul adresei de rezidență, iar " +
-            "aplicarea lui generală e decizia echipei.",
-            "29", "Preexisting account: year end or 90 days", "CPF Anexa 2 pct. 1; ghid p. 29", RuleBasis.Interpretation,
-            "The last day of the relevant calendar year or 90 days after notice / discovery, whichever is later. The guide says " +
-            "\"or\"; the \"whichever is later\" text is written for the residence address test, and applying it generally is the team's decision."),
+            "Ultima zi a anului calendaristic relevant sau 90 de zile de la notificare / descoperire, cea mai târzie. Pe ruta " +
+            "indiciilor legea spune doar „ori” (Anexa 1, Sec. III.B pct. 16), Comentariul OCDE „the later of” (Sec. III pct. 16); " +
+            "ghidul spune „sau”. „Cea mai târzie” e interpretarea noastră (GOLDEN-CASES N1).",
+            "29", "Preexisting account: year end or 90 days",
+            "CPF Anexa 1, Sec. III.B pct. 16 (ruta indiciilor: „ori”); Comentariul OCDE, Sec. III pct. 16 („the later of”)",
+            RuleBasis.Interpretation,
+            "The last day of the relevant calendar year or 90 days after notice / discovery, whichever is later. On the indicia " +
+            "route the law says only \"or\" (Anexa 1, III.B(16)), the OECD Commentary \"the later of\" (Section III, para. 16); " +
+            "the guide says \"or\". \"Whichever is later\" is our interpretation (GOLDEN-CASES N1)."),
 
         Rule(RuleIds.DeadlineExpiredNew, Regime.Crs, "Expirare, cont nou",
             "Fără autocertificare nouă: titularul e rezident și în jurisdicția inițială, și în cea nouă.",

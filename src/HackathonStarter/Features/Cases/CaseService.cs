@@ -40,8 +40,8 @@ public record DeadlineTick(int Reminded, int Escalated, int Expired);
 /// </summary>
 public interface ICaseService
 {
-    /// <summary>Open cases first, ordered by deadline; cases without a deadline (FATCA) last, ordered explicitly
-    /// (SQLite and PostgreSQL sort NULLs differently).</summary>
+    /// <summary>Open cases first, ordered by deadline; cases without a deadline (FATCA, self-certification checks) last,
+    /// ordered explicitly (SQLite and PostgreSQL sort NULLs differently).</summary>
     Task<List<Case>> QueueAsync(CaseQueueFilter? filter = null);
     /// <summary>The case with indicia, evidence, signals, requests, responses and proof.</summary>
     Task<Case?> GetAsync(string code);
@@ -49,8 +49,9 @@ public interface ICaseService
     /// <summary>
     /// Opens a case for a change with uncovered indicia; preexisting/new and the deadline are computed by code from the
     /// client's accounts (Preexisting.For, IDeadlineCalculator; several accounts: the earliest deadline, GOLDEN-CASES I4,
-    /// NEVERIFICAT). If the client already has an open case, the new indicia are added and the deadline stays (design
-    /// choice: the guide is silent, PLAN 9.2, NEVERIFICAT).
+    /// NEVERIFICAT). Only the indicia of a change of circumstances (*-IND-*) give a deadline: CRS ones the CRS deadline,
+    /// FATCA ones none (p. 38), self-certification checks (SC-*) none. If the client already has an open case, the new
+    /// indicia are added and the deadline stays (design choice: the guide is silent, PLAN 9.2, NEVERIFICAT).
     /// </summary>
     Task<Case> OpenAsync(ChangeEvent change, RuleOutcome outcome);
 
@@ -128,7 +129,7 @@ public class CaseService(
             var clientCode = filter.ClientCode.Trim();
             query = query.Where(c => c.ClientCode == clientCode);
         }
-        // NULL ordering differs between SQLite and PostgreSQL: cases without a deadline (FATCA) go last explicitly.
+        // NULL ordering differs between SQLite and PostgreSQL: cases without a deadline (FATCA, SC checks) go last explicitly.
         return await query
             .OrderBy(c => c.Status == CaseStatus.Closed || c.Status == CaseStatus.Expired)
             .ThenBy(c => c.DueAt == null)
@@ -176,6 +177,19 @@ public class CaseService(
         ArgumentNullException.ThrowIfNull(change);
         ArgumentNullException.ThrowIfNull(outcome);
         var user = await RequireEditor();
+        return await OpenAsync(change, outcome, Actor(user));
+    }
+
+    /// <summary>OpenAsync with no signed-in user, only for ChangeService.RecordAsSystemAsync (the startup seed): <paramref name="actor"/> goes to the audit log.</summary>
+    internal Task<Case> OpenAsSystemAsync(ChangeEvent change, RuleOutcome outcome, string actor)
+    {
+        ArgumentNullException.ThrowIfNull(change);
+        ArgumentNullException.ThrowIfNull(outcome);
+        return OpenAsync(change, outcome, actor);
+    }
+
+    private async Task<Case> OpenAsync(ChangeEvent change, RuleOutcome outcome, string actor)
+    {
         var uncovered = outcome.Uncovered.GroupBy(h => (h.RuleId, h.Jurisdiction)).Select(g => g.First()).ToList();
         if (uncovered.Count == 0)
             throw new InvalidOperationException($"Decision {outcome.Decision} has no uncovered indicium: no case to open.");
@@ -192,7 +206,7 @@ public class CaseService(
                 .Where(c => c.ClientId == client.Id && c.Status != CaseStatus.Closed && c.Status != CaseStatus.Expired)
                 .OrderBy(c => c.Id)
                 .FirstOrDefaultAsync();
-            if (existing is not null) return await ExtendAsync(db, existing, change, uncovered, regime, client.Accounts, now, user);
+            if (existing is not null) return await ExtendAsync(db, existing, change, uncovered, regime, client.Accounts, now, actor);
 
             var item = new Case
             {
@@ -206,12 +220,11 @@ public class CaseService(
                 AssignedTo = DefaultAssignee,
                 Indicia = [.. uncovered.Select(h => ToIndicium(h, change.Id, now))],
             };
-            // Both uses the CRS deadline; FATCA alone has none in the guide (p. 38).
-            ApplyDeadline(item, Deadline(client.Accounts, change.ReceivedAt, HasCrs(regime) ? Regime.Crs : Regime.Fatca, now));
+            ApplyDeadline(item, OpeningDeadline(uncovered, regime, client.Accounts, change.ReceivedAt, now));
             db.Cases.Add(item);
             await db.SaveChangesAsync();
 
-            await audit.AppendAsync(Actor(user), AuditKinds.CaseOpened, new
+            await audit.AppendAsync(actor, AuditKinds.CaseOpened, new
             {
                 code = item.Code, client = item.ClientCode, changeId = change.Id, regime = item.Regime.ToString(),
                 rules = item.Indicia.Select(i => $"{i.RuleId}:{i.Jurisdiction}").ToArray(),
@@ -222,29 +235,57 @@ public class CaseService(
     }
 
     private async Task<Case> ExtendAsync(AppDbContext db, Case item, ChangeEvent change, List<RuleHit> uncovered, Regime regime,
-                                         List<Account> accounts, DateTime now, DemoUser user)
+                                         List<Account> accounts, DateTime now, string actor)
     {
         var added = uncovered.Where(h => !item.Indicia.Any(i => i.RuleId == h.RuleId && i.Jurisdiction == h.Jurisdiction)).ToList();
         if (added.Count == 0) return item;
 
+        var hadCrs = HasCrs(item.Regime);
         item.Indicia.AddRange(added.Select(h => ToIndicium(h, change.Id, now)));
         item.Regime = item.Regime == regime ? regime : Regime.Both;
         // The deadline stays (design choice, NEVERIFICAT: the guide is silent on several changes in one case, PLAN 9.2).
-        // A FATCA-only case has none (p. 38): when it gains a CRS indicium, the CRS deadline starts from this change.
+        // A case without one (FATCA only, p. 38, or self-certification checks only) gets the CRS deadline from the change
+        // that brings its first CRS indicium (p. 29, 35-36); a self-certification check never starts one.
         var deadlineStarted = false;
-        if (item.DueAt is null && HasCrs(item.Regime))
+        if (item.DueAt is null && added.Any(h => IsCrsIndicium(h.RuleId)))
         {
             ApplyDeadline(item, Deadline(accounts, change.ReceivedAt, Regime.Crs, now));
             deadlineStarted = true;
         }
+        // A FATCA case that gains a CRS rule but no deadline: preexisting on the CRS cutoff, as when a case opens (OpeningDeadline).
+        else if (!hadCrs && HasCrs(item.Regime))
+            item.IsPreexisting = Deadline(accounts, change.ReceivedAt, Regime.Crs, now).Preexisting;
         await db.SaveChangesAsync();
 
-        await audit.AppendAsync(Actor(user), AuditKinds.CaseIndiciumAdded, new
+        await audit.AppendAsync(actor, AuditKinds.CaseIndiciumAdded, new
         {
             code = item.Code, changeId = change.Id, regime = item.Regime.ToString(),
             added = added.Select(h => $"{h.RuleId}:{h.Jurisdiction}").ToArray(), deadlineStarted, dueAt = item.DueAt,
         }, item.Id);
         return item;
+    }
+
+    /// <summary>
+    /// The deadline of a new case, set only by its uncovered indicia of a change of circumstances (*-IND-*, the lists of
+    /// p. 29 and p. 31): a CRS one gives the CRS deadline (a Both case too); FATCA ones alone give none (FATCA-SC, p. 38).
+    /// Self-certification checks alone (SC-*, e.g. a TIN in the wrong format) give none either: the 90 days follow a change
+    /// of circumstances (p. 29, 35-36), and the guide gives no deadline for checking a declaration (GOLDEN-CASES I1, as for
+    /// FATCA; NEVERIFICAT). IsPreexisting as for any case: on the CRS cutoff when the case has a CRS rule, else on FATCA's.
+    /// </summary>
+    private DeadlineResult OpeningDeadline(IReadOnlyList<RuleHit> uncovered, Regime regime, IReadOnlyCollection<Account> accounts,
+                                           DateTime knownAt, DateTime now)
+    {
+        var usual = Deadline(accounts, knownAt, HasCrs(regime) ? Regime.Crs : Regime.Fatca, now);
+        if (uncovered.Any(h => IsCrsIndicium(h.RuleId))) return usual; // DL-NEW-90 or DL-PRE-YEAR
+        if (uncovered.Any(h => IsIndicium(h.RuleId)))                  // FATCA indicia only: FATCA-SC, no deadline
+            return Deadline(accounts, knownAt, Regime.Fatca, now) with { Preexisting = usual.Preexisting };
+
+        var check = uncovered.FirstOrDefault(h => h.RuleId.StartsWith("SC-", StringComparison.Ordinal)) ?? uncovered[0];
+        var (en, ro) = CaseTexts.NoDeadlineForSelfCertificationCheck;
+        return usual with
+        {
+            DueAt = null, RemindAt = null, RuleId = check.RuleId, GuidePage = check.GuidePage, Explanation = en, ExplanationRo = ro, DesignChoice = true,
+        };
     }
 
     /// <summary>One deadline per account; several accounts give the earliest (GOLDEN-CASES I4, NEVERIFICAT). No account = a new one opened today.</summary>
@@ -588,7 +629,9 @@ public class CaseService(
             item.ReportableFor = [.. outcome.ReportableFor];
             item.Outcome = en;
             item.OutcomeRo = ro;
-            item.OutcomeRuleId = explanation ? "RESP-EXPLANATION" : item.Regime == Regime.Fatca ? "FATCA-SC" : "SC-CONSISTENT";
+            // The rule the closing rests on: RESP-EXPLANATION (p. 37); a valid new self-certification, SC-VALID (p. 34) for
+            // CRS and Both (golden case 4), FATCA-SC (p. 38) for FATCA alone.
+            item.OutcomeRuleId = explanation ? "RESP-EXPLANATION" : item.Regime == Regime.Fatca ? "FATCA-SC" : "SC-VALID";
             // The only write of CaseService to client data (Client.AcceptedExplanations, golden case 18).
             db.AcceptedExplanations.AddRange(accepted);
             await db.SaveChangesAsync();
@@ -723,7 +766,8 @@ public class CaseService(
         return await WriteAsync(async () =>
         {
             await using var db = await dbFactory.CreateDbContextAsync();
-            // DueAt null (FATCA, p. 38) never reminds or expires; ResponseReceived is not expired (the answer came in time).
+            // DueAt null (FATCA, p. 38; self-certification checks) never reminds or expires; ResponseReceived is not expired
+            // (the answer came in time).
             var waiting = await db.Cases.Include(c => c.Indicia).Include(c => c.Requests)
                 .Where(c => c.DueAt != null && (c.Status == CaseStatus.Open || c.Status == CaseStatus.AwaitingClient
                                                 || c.Status == CaseStatus.Reminded || c.Status == CaseStatus.Escalated))
@@ -894,6 +938,11 @@ public class CaseService(
         RequiredDocuments.For(item.Regime, item.IsPreexisting, item.Indicia.Select(i => i.RuleId));
 
     private static bool HasCrs(Regime regime) => regime is Regime.Crs or Regime.Both;
+
+    /// <summary>An indicium of a change of circumstances (CRS p. 29, FATCA p. 31): the only rules that give a case a deadline.</summary>
+    private static bool IsIndicium(string ruleId) => IsCrsIndicium(ruleId) || ruleId.StartsWith("FATCA-IND-", StringComparison.Ordinal);
+
+    private static bool IsCrsIndicium(string ruleId) => ruleId.StartsWith("CRS-IND-", StringComparison.Ordinal);
 
     private static Regime Combine(IEnumerable<Regime> regimes)
     {
