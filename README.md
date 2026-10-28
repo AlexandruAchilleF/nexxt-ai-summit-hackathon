@@ -124,7 +124,9 @@ CRS preexistent = existent la 31.12.2015, FATCA preexistent = existent la 30.06.
 - **Termenul la contul preexistent.** Ghidul (p. 29) spune „până în ultima zi a anului calendaristic în cauză [...], sau
   în 90 de zile calendaristice”, în paragraful despre testul adresei de rezidență (nota 57). Aplicăm cea mai târzie
   dintre cele două date. Pentru contul documentat prin adresa de rezidență așa scrie legea (Codul de procedură fiscală,
-  Anexa nr. 2 pct. 1: „oricare dintre acestea este mai recentă”) și Comentariul OCDE la CRS (Secțiunea III, pct. 13).
+  Anexa nr. 2 pct. 1: „oricare dintre acestea este mai recentă”), care transpune Directiva 2011/16/UE, Anexa II pct. 1 (introdusă prin Directiva 2014/107/UE): „by the later of the last day of the relevant calendar year or other appropriate reporting period, or 90 calendar days following the notice or discovery of such change in circumstances”
+  ([EUR-Lex](https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32014L0107); citatul e verificat pe [copia legislation.gov.uk](https://www.legislation.gov.uk/eudr/2011/16/annex/II), 28.10.2026), și Comentariul OCDE la CRS (Secțiunea III, pct. 13). Directiva are aceeași limită: se aplică
+  atunci când banca „has relied on the residence address test”.
   La indiciile din căutarea electronică legea spune doar „ori” (Anexa nr. 1, secțiunea III, subsecțiunea B, pct. 16),
   ghidul (p. 30) nu dă termen, iar Comentariul OCDE (pct. 16) spune „until the later of”. Sistemul nu știe prin ce
   procedură a fost documentat contul, deci aplică aceeași regulă și tratează toate cazurile ca indicii din căutarea
@@ -154,8 +156,8 @@ flowchart LR
   `ClientSnapshot` imutabil și întoarce un rezultat, deci se testează în milisecunde.
 - **Servicii** (`ChangeService`, `CaseService`, `ClientService`, `EvaluationService`): validare, roluri, tranzacții, jurnal.
   Tranzițiile cazului sunt doar aici, fiecare cu verificare de rol și cu intrare în jurnal.
-- **Agentul** e unul singur, cu unelte; nu atinge baza de date direct. Orchestrarea (cine deschide cazul, când expiră) e în
-  cod. Uneltele care schimbă ceva (`sendClientRequest`, `closeCase`) cer aprobarea omului; după aprobare rulează fără model.
+- **Agentul** e un agent cu unelte, orchestrat de cod, cu omul la decizie: nu atinge baza de date direct, iar cine
+  deschide cazul, regulile și termenele sunt în cod. Uneltele care schimbă ceva (`sendClientRequest`, `closeCase`) cer aprobarea omului; după aprobare rulează fără model.
 - **Data simulată** (`SimClock`) e un serviciu separat, cu decalaj setabil („+85 de zile”). Codul CRS nu citește ora din
   altă parte; restul aplicației rămâne pe ceasul real.
 - Entitățile, interfețele și structura folderelor: [`docs/PLAN.md` §6–13](docs/PLAN.md#6-arhitectura).
