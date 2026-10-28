@@ -89,7 +89,10 @@ else
         try
         {
             _run = await Runner.DecideAsync(agent, _run!.Id, args.Step.Id, args.Approved);
-            Snackbar.Add(args.Approved ? T("Approved and executed") : T("Rejected"), Severity.Success);
+            if (_run.Steps.FirstOrDefault(s => s.Id == args.Step.Id)?.Error is { } error)
+                Snackbar.Add(T("Approved, but the action failed: {0}", error), Severity.Error);
+            else
+                Snackbar.Add(args.Approved ? T("Approved and executed") : T("Rejected"), Severity.Success);
         }
         catch (Exception ex) { Snackbar.Add(T(ex.Message), Severity.Error); }
     }

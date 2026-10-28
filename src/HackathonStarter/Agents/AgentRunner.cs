@@ -300,13 +300,14 @@ public class AgentRunner(
         }
         catch (Exception ex) when (!ct.IsCancellationRequested)
         {
-            var error = ex is TimeoutException
-                ? $"Tool timed out after {Options.ToolTimeoutSeconds}s"
-                : ex.InnerException?.Message ?? ex.Message;
+            var error = ToolError(ex);
             await w.AddAsync(new AgentStep { Kind = StepKind.ToolResult, Id = callId, Tool = name, Error = error });
             return JsonSerializer.Serialize(new { error });
         }
     }
+
+    private string ToolError(Exception ex) =>
+        ex is TimeoutException ? $"Tool timed out after {Options.ToolTimeoutSeconds}s" : ex.InnerException?.Message ?? ex.Message;
 
     private async Task<string> ExecuteAsync(AgentTool tool, Dictionary<string, JsonElement> args, ToolContext ctx, CancellationToken ct)
     {
@@ -351,7 +352,12 @@ public class AgentRunner(
             }
             catch (Exception ex)
             {
-                run.Steps.Add(new AgentStep { Kind = StepKind.ToolResult, Id = id, Tool = step.Tool, Error = ex.InnerException?.Message ?? ex.Message });
+                var error = ToolError(ex);
+                run.Steps.Add(new AgentStep { Kind = StepKind.ToolResult, Id = id, Tool = step.Tool, Error = error });
+                run.Steps.Add(new AgentStep { Kind = StepKind.Text, Text = $"Approved by {user.Name}, but the action failed: {error.TrimEnd('.')}." });
+                // No model call follows to recover from it: the run failed, like any run that cannot finish.
+                step.Error = error;
+                run.Error = error;
             }
         }
         else
@@ -360,8 +366,9 @@ public class AgentRunner(
             run.Steps.Add(new AgentStep { Kind = StepKind.Text, Text = $"Rejected by {user.Name}. No changes were made." });
         }
 
-        run.Status = run.Steps.Any(s => s is { Kind: StepKind.Approval, State: ApprovalState.Pending })
-            ? RunStatus.AwaitingApproval : RunStatus.Completed;
+        run.Status = run.Error is not null ? RunStatus.Error
+            : run.Steps.Any(s => s is { Kind: StepKind.Approval, State: ApprovalState.Pending }) ? RunStatus.AwaitingApproval
+            : RunStatus.Completed;
         await store.SaveAsync(run);
         return run;
     }

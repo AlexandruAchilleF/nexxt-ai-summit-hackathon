@@ -55,6 +55,8 @@ public static partial class Lang
             ["Approved and executed"] = "Aprobată și executată",
             ["Approved by {0}"] = "Aprobată de {0}",
             ["approved by {0}"] = "aprobat de {0}",
+            ["Approved by {0}, but the action failed"] = "Aprobată de {0}, dar acțiunea a eșuat",
+            ["Approved, but the action failed: {0}"] = "Aprobată, dar acțiunea a eșuat: {0}",
             ["Approved: it can be downloaded now."] = "Aprobat: poate fi descărcat acum.",
             ["Architecture"] = "Arhitectură",
             ["Archived"] = "Arhivat",

@@ -107,6 +107,26 @@ public class AgentRunnerTests
     }
 
     [Fact]
+    public async Task An_approved_action_that_fails_is_not_shown_as_done()
+    {
+        var model = new FakeChatClient().CallTool("updateItem", new { id = 999, title = "Ghost", status = "Archived" }).Reply("proposed");
+        await using var host = await TestHost.CreateAsync(model);
+        var run = await host.RunAsync("assistant", "Archive the 'Ghost' item");
+        var approval = run.Steps.Single(s => s.Kind == StepKind.Approval);
+
+        var decided = await host.Get<AgentRunner>().DecideAsync(host.Agent("assistant"), run.Id, approval.Id, approved: true);
+
+        Assert.Equal(RunStatus.Error, decided.Status);
+        Assert.Equal("Item 999 not found", decided.Error);
+        Assert.Equal("Item 999 not found", decided.Steps.Single(s => s.Kind == StepKind.ToolResult).Error);
+        var card = decided.Steps.Single(s => s.Kind == StepKind.Approval);
+        Assert.Equal((ApprovalState.Approved, "Item 999 not found"), (card.State!.Value, card.Error));
+        Assert.Equal("Approved by Ana Admin, but the action failed: Item 999 not found.", decided.Steps.Last(s => s.Kind == StepKind.Text).Text);
+        Assert.DoesNotContain(decided.Steps, s => s.Text.Contains("Done:"));
+        Assert.Equal(RunStatus.Error, (await host.Get<RunStore>().GetAsync(run.Id))!.Status);
+    }
+
+    [Fact]
     public async Task A_live_proposal_gets_one_last_turn_without_tools_then_the_run_ends()
     {
         var model = new FakeChatClient()
