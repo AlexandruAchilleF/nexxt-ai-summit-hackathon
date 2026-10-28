@@ -64,6 +64,7 @@
                 <tr><td>@T("Recorded runs (demo fallback)")</td><td>@T(PrivacySettings.CurrentValue.RedactRecordings ? "Masked like the run history." : "Not masked (Privacy:RedactRecordings = false): use synthetic data only.")</td></tr>
                 <tr><td>@T("Exports (tests, reports)")</td><td>@T("Built from the masked history and downloadable only after a person approves them.")</td></tr>
                 <tr><td>@T("Uploaded documents")</td><td>@T("Kept in memory for the current conversation only. Passages an agent reads from them become part of the run history, masked like the rest.")</td></tr>
+                <tr><td>@T("Case evidence")</td><td>@T("Quotes from the client's documents are stored with the case as written, not masked, and marked verified or not: they are part of the bank's case file. Agent runs, prompts and tool results are stored masked.")</td></tr>
                 <tr><td>@T("Audit log (hash chain)")</td><td>@T("Every change received, rule applied, case transition and human decision, with personal data masked like the run history. Each entry holds the SHA-256 hash of the previous one, so an edited entry is found on verification.")</td></tr>
             </tbody>
         </MudSimpleTable>
