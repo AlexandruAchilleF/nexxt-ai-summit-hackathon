@@ -66,22 +66,25 @@ public abstract class Check : ICheck
     protected CheckResult NotApplicable(string reason) => new(Id, Version, Title, CheckOutcome.NotApplicable, reason, []);
 
     /// <summary>
-    /// The text around a match (about 40 characters each side), with personal data masked. The window first grows to
-    /// take in whole any personal data item it cuts: cut first, the rest of a phone ("+49 89 4521 7730" to "49 89 4521
-    /// 7730") would no longer look like personal data and stay in clear.
+    /// The text around a match (about 40 characters each side), with personal data masked. The whole text is masked
+    /// once, after line breaks become spaces, and the window is cut from the masked text: a cut through a phone ("+49 89
+    /// 4521 7730" to "49 89 4521 7730"), or a phone broken by a line break, can never show its digits.
     /// </summary>
     protected static string Excerpt(string text, int index, int length)
     {
-        var start = Math.Max(0, index - 40);
-        var end = Math.Min(text.Length, index + length + 40);
-        foreach (var item in PiiVault.Detect(text))
-            for (var at = text.IndexOf(item.Value, StringComparison.Ordinal); at >= 0; at = text.IndexOf(item.Value, at + 1, StringComparison.Ordinal))
-            {
-                var itemEnd = at + item.Value.Length;
-                if (at < start && itemEnd > start) start = at;
-                if (at < end && itemEnd > end) end = itemEnd;
-            }
-        return (start > 0 ? "…" : "") + PiiVault.ForStorage().Mask(text[start..end]).ReplaceLineEndings(" ") + (end < text.Length ? "…" : "");
+        index = Math.Clamp(index, 0, text.Length);
+        length = Math.Clamp(length, 0, text.Length - index);
+        // Line breaks become spaces first, so a phone broken by one is masked whole.
+        var prefix = text[..index].ReplaceLineEndings(" ");
+        var match = text.Substring(index, length).ReplaceLineEndings(" ");
+        var masked = PiiVault.ForStorage().Mask(text.ReplaceLineEndings(" "));
+        // Where the match lands in the masked text: placeholders change lengths, so the prefix and the match are masked
+        // on their own just to measure them (the window may shift by a few characters; nothing in it is ever in clear).
+        var at = Math.Min(masked.Length, PiiVault.ForStorage().Mask(prefix).Length);
+        var span = Math.Min(masked.Length - at, PiiVault.ForStorage().Mask(match).Length);
+        var start = Math.Max(0, at - 40);
+        var end = Math.Min(masked.Length, at + span + 40);
+        return (start > 0 ? "…" : "") + masked[start..end] + (end < masked.Length ? "…" : "");
     }
 }
 

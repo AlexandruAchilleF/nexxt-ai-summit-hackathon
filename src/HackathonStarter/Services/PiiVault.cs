@@ -278,7 +278,7 @@ public partial class PiiVault
     // comma, more than 2 digits, or a number of 10+ digits before it, is a CSV field, not decimals: "+498945217730,1985",
     // "+498945217730,35", "+1 (212) 555-0147,35".
     // No atomic group: when the last part runs into a word ("+1 212 555 0147 9am") the match ends at the part before.
-    [GeneratedRegex(@"(?<![\w+]|\w-)(?:\+|\\u002[Bb]|(?<!(?<!\d)0[.,]|\b[A-Za-z]{2}\d{2}(?: [A-Za-z0-9]{4}){0,7} )00)(?!\d{1,3}(?:\.\d{3})+(?![\d.])|\d+\.\d{1,2}(?![\d.]))(?<number>[1-9]\d*(?:[ .-]?\(\d{1,4}\)[ .-]?\d+)?(?:[ .-]\d+)*)(?!\w|(?<!\d(?:[ .()-]{0,2}\d){9}),\d{1,2}(?!\d))")]
+    [GeneratedRegex(@"(?<![\w+]|\w-)(?:\+|\\u002[Bb]|(?<!(?<!\d)0[.,]|\b[A-Za-z]{2}\d{2}(?: [A-Za-z0-9]{4}){0,7} )00)(?!\d{1,3}(?:\.\d{3})+(?![\d.])|\d+\.\d{1,2}(?![\d.]))(?<number>[1-9]\d*(?:(?:[.-]|[ \u00A0\u202F]{1,2})?\(\d{1,4}\)(?:[.-]|[ \u00A0\u202F]{1,2})?\d+)?(?:(?:[.-]|[ \u00A0\u202F]{1,2})\d+)*)(?!\w|(?<!\d(?:[ \u00A0\u202F.()-]{0,2}\d){9}),\d{1,2}(?!\d))")]
     private static partial Regex InternationalPhoneRegex();
 
     [GeneratedRegex(@"\[(?:EMAIL|IBAN|CARD|CNP|PHONE)_\d+\]")]
