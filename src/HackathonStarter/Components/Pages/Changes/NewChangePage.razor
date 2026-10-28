@@ -1,7 +1,566 @@
 @page "/changes/new"
+@using HackathonStarter.Features.Changes
+@using HackathonStarter.Features.Clients
+@using HackathonStarter.Features.Evaluation
+@using HackathonStarter.Features.Rules
+@using HackathonStarter.Features.Shield
+@using HackathonStarter.Features.Tin
+@inject IChangeService Changes
+@inject IClientService Clients
+@inject ITinFormat TinFormat
+@inject CurrentUser CurrentUser
+@inject NavigationManager Nav
+@implements IDisposable
 
 <PageTitle>@T("New change") · @SiteConfig.Name</PageTitle>
 
-<PageHeader Title="@T("New change")" Description="@T("Record a change to a client's data and see the decision immediately.")" />
+<PageHeader Title="@T("New change")" Description="@T("Record a change to a client's data, as core banking would send it. Code applies the rules of the ANAF guide at once: no case, a case with a deadline, or an alert.")" />
 
-<EmptyState Icon="@Icons.Material.Rounded.EditNote" Title="@T("Coming in the next phase")" Description="@T("The backend for this page is being built.")" />
+@if (_error is not null)
+{
+    <ErrorState Message="@_error" OnRetry="LoadAsync" />
+}
+else if (_clients is null)
+{
+    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="120px" Style="border-radius:20px" />
+    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="420px" Style="border-radius:20px" Class="mt-4" />
+}
+else
+{
+    @if (_showGolden)
+    {
+    <MudPaper Outlined="true" Class="pa-4 mb-4 app-enter crs-demo-card">
+        <div class="crs-head" style="margin-bottom:12px;flex-wrap:wrap">
+            <div>
+                <div class="app-card-title">@T("Start from a golden case")</div>
+                <div class="crs-hint">@T("The cases written before the code, with their expected result. Pick one to fill in the form, then record it.")</div>
+            </div>
+            <Segmented Label="@T("Start from a golden case")" @bind-Value="_group"
+                       Options="@([.. Scenarios.GroupBy(s => s.Group).Select(g => new Segmented.Option(g.Key, T(g.Key), g.Count()))])" />
+        </div>
+        <div class="crs-chips" @key="_group">
+            @{ var n = 0; }
+            @foreach (var s in Scenarios.Where(s => s.Group == _group))
+            {
+                <button type="button" class="@($"crs-chip crs-chip-in{(_scenario?.Id == s.Id ? " is-on" : "")}")" style="@($"--i:{n++}")" @onclick="() => UseAsync(s)" disabled="@(!_canWrite)">
+                    <MudIcon Icon="@CrsUi.Icon(s.Kind)" />
+                    <span><span class="crs-code">@s.Id</span> @T(s.Title)</span>
+                </button>
+            }
+        </div>
+        <MudButton Variant="Variant.Text" Size="Size.Small" Class="mt-3" StartIcon="@Icons.Material.Rounded.Close" OnClick="HideGolden">@T("Hide the golden cases")</MudButton>
+    </MudPaper>
+    }
+
+    <div class="crs-grid two">
+        <MudPaper Outlined="true" Class="pa-4 app-enter" Style="animation-delay:80ms">
+            <div class="app-card-title mb-4">@T("The change")</div>
+            <div class="crs-form cols-2">
+                <MudAutocomplete T="string" Value="_clientCode" ValueChanged="SelectClientAsync" SearchFunc="SearchAsync" ToStringFunc="ClientLabel"
+                                 Label="@T("Client")" Variant="Variant.Outlined" Dense="true" Class="span-2" MaxItems="12" ResetValueOnEmptyText="true"
+                                 AdornmentIcon="@Icons.Material.Rounded.PersonSearch" Disabled="@(!_canWrite)" />
+                <MudSelect T="ChangeKind" Value="_kind" ValueChanged="k => { _kind = k; _result = null; }" Label="@T("What changed")" Variant="Variant.Outlined" Dense="true" Disabled="@(!_canWrite)">
+                    @foreach (var k in Enum.GetValues<ChangeKind>())
+                    {
+                        <MudSelectItem Value="k">@CrsUi.Label(k)</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudSelect T="string" @bind-Value="_channel" Label="@T("Received via")" Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense" Disabled="@(!_canWrite)">
+                    @foreach (var c in CrsUi.Channels.Union([_channel]))
+                    {
+                        <MudSelectItem Value="c">@CrsUi.Channel(c)</MudSelectItem>
+                    }
+                </MudSelect>
+
+                @switch (_kind)
+                {
+                    case ChangeKind.AddressChanged or ChangeKind.AddressAdded:
+                        <MudSelect T="AddressKind" @bind-Value="_address.Kind" Label="@T("Address type")" Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense">
+                            @foreach (var a in Enum.GetValues<AddressKind>())
+                            {
+                                <MudSelectItem Value="a">@CrsUi.Label(a)</MudSelectItem>
+                            }
+                        </MudSelect>
+                        @CountryField(_address.Country, v => _address.Country = v)
+                        <MudTextField T="string" @bind-Value="_address.Line" Label="@T("Street and number")" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                        <MudTextField T="string" @bind-Value="_address.City" Label="@T("City")" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                        @if (_kind == ChangeKind.AddressChanged)
+                        {
+                            <MudCheckBox T="bool" @bind-Value="_withPhone" Label="@T("A new phone replaces the current ones")" Dense="true" Class="span-2" />
+                            @if (_withPhone)
+                            {
+                                <MudTextField T="string" @bind-Value="_phone.Number" Label="@T("Phone")" Placeholder="+49 89 ..." Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                                @CountryField(_phone.Country, v => _phone.Country = v)
+                            }
+                        }
+                        break;
+                    case ChangeKind.PhoneAdded or ChangeKind.PhoneChanged or ChangeKind.PhoneRemoved:
+                        <MudTextField T="string" @bind-Value="_phone.Number" Label="@T("Phone")" Placeholder="+40 7..." Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                        @CountryField(_phone.Country, v => _phone.Country = v)
+                        break;
+                    case ChangeKind.StandingOrderCreated:
+                        <MudSelect T="string" @bind-Value="_fromIban" Label="@T("From account")" Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense" Class="span-2">
+                            @foreach (var a in _client?.Accounts ?? [])
+                            {
+                                <MudSelectItem Value="a.Iban">@a.Product · @CrsUi.Label(a.Type) · @a.Iban</MudSelectItem>
+                            }
+                        </MudSelect>
+                        <MudTextField T="string" @bind-Value="_beneficiary" Label="@T("Beneficiary account")" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                        @CountryField(_beneficiaryCountry, v => _beneficiaryCountry = v)
+                        @if (_client?.Accounts.FirstOrDefault(a => a.Iban == _fromIban) is { Type: AccountType.Depository })
+                        {
+                            <div class="crs-hint span-2"><MudIcon Icon="@Icons.Material.Rounded.Info" Style="font-size:15px;vertical-align:-3px" /> @T("A depository account: a standing order from it is not a CRS indicium (guide p. 29, lit. d).")</div>
+                        }
+                        break;
+                    case ChangeKind.PowerOfAttorneyGranted:
+                        <MudTextField T="string" @bind-Value="_holder" Label="@T("Holder's name")" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                        @CountryField(_holderCountry, v => _holderCountry = v)
+                        break;
+                    case ChangeKind.PersonalDataChanged:
+                        @CountryField(_birthCountry, v => _birthCountry = v, T("Birth country"))
+                        <MudTextField T="string" @bind-Value="_citizenships" Label="@T("Citizenships")" Placeholder="RO, US" HelperText="@T("Comma separated. Nationality is never a CRS signal; only US matters, for FATCA.")" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                        break;
+                    case ChangeKind.SelfCertSubmitted:
+                        <div class="span-2">
+                            @foreach (var row in _residences)
+                            {
+                                var r = row;
+                                <div class="d-flex flex-wrap align-center gap-2 mb-2">
+                                    <CountryPicker @bind-Value="r.Country" Class="crs-field-md" />
+                                    <MudTextField T="string" @bind-Value="r.Tin" Label="TIN" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" Class="crs-field-grow" />
+                                    @if (r.Country.Trim().Length == 2 && !string.IsNullOrWhiteSpace(r.Tin))
+                                    {
+                                        <span class="crs-swap" @key="@($"{r.Country}{r.Tin}")"><TinBadge Check="TinFormat.Check(r.Country.Trim().ToUpperInvariant(), r.Tin)" /></span>
+                                    }
+                                    else if (r.Country.Trim().Length == 2)
+                                    {
+                                        <MudSelect T="NoTinReason" @bind-Value="r.Reason" Label="@T("No TIN: reason")" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" Class="crs-field-md">
+                                            @foreach (var reason in Enum.GetValues<NoTinReason>())
+                                            {
+                                                <MudSelectItem Value="reason">@(reason == NoTinReason.None ? T("No reason given") : CrsUi.Label(reason))</MudSelectItem>
+                                            }
+                                        </MudSelect>
+                                    }
+                                    @if (_residences.Count > 1)
+                                    {
+                                        <MudIconButton Icon="@Icons.Material.Rounded.RemoveCircleOutline" Size="Size.Small" aria-label="@T("Remove")" OnClick="() => _residences.Remove(r)" />
+                                    }
+                                </div>
+                                @if (r.Reason != NoTinReason.None && string.IsNullOrWhiteSpace(r.Tin))
+                                {
+                                    <MudTextField T="string" @bind-Value="r.Explanation" Label="@T("Why there is no TIN")" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+                                }
+                            }
+                            <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Rounded.Add" OnClick="() => _residences.Add(new())">@T("Add a residence")</MudButton>
+                            <MudCheckBox T="bool" @bind-Value="_declaresUs" Label="@T("Declares to be a US person")" Dense="true" />
+                        </div>
+                        break;
+                    case ChangeKind.DocumentUploaded:
+                        <MudSelect T="int?" @bind-Value="_documentId" Label="@T("Document")" Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense" Class="span-2"
+                                   HelperText="@T("The hidden-text shield scans it before any model reads it.")">
+                            @foreach (var d in _documents)
+                            {
+                                <MudSelectItem T="int?" Value="d.Id">@d.FileName · @CrsUi.Label(d.Kind) · @CrsUi.Label(d.ShieldVerdict)</MudSelectItem>
+                            }
+                        </MudSelect>
+                        break;
+                }
+            </div>
+
+            <div class="d-flex flex-wrap align-center gap-2 mt-5">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" StartIcon="@Icons.Material.Rounded.Rule" Disabled="@(!_canWrite || _busy || !Ready)" OnClick="RecordAsync"
+                           Class="@(_scenario is not null && _result is null ? "crs-ready" : "")">
+                    @if (_busy)
+                    {
+                        <span class="app-spin mr-2"></span> @T("Applying the rules…")
+                    }
+                    else
+                    {
+                        @T("Record and apply the rules")
+                    }
+                </MudButton>
+                @if (_canWrite && !_busy && MissingReason is { } missing)
+                {
+                    <span class="crs-hint" style="margin:0">@missing</span>
+                }
+                else if (_client is not null)
+                {
+                    <MudButton Variant="Variant.Text" Href="@($"/clients/{_client.Code}")" EndIcon="@Icons.Material.Rounded.ChevronRight">@T("See the client's data")</MudButton>
+                }
+            </div>
+            @if (!_canWrite)
+            {
+                <MudAlert Severity="Severity.Info" Dense="true" Class="mt-4" Icon="@Icons.Material.Rounded.Lock">@T("Viewers can't record changes. Switch to Ana or Mihai from the top bar.")</MudAlert>
+            }
+            @if (_submitError is not null)
+            {
+                <MudAlert Severity="Severity.Error" Class="mt-4">@_submitError</MudAlert>
+            }
+        </MudPaper>
+
+        <div style="position:sticky;top:72px">
+            @if (_result is { } res)
+            {
+                var o = res.Outcome;
+                var tone = CrsUi.Tone(o.Decision);
+                <div @ref="_verdict" style="scroll-margin-top:72px"></div>
+                <MudPaper Outlined="true" Class="@($"pa-4 crs-verdict{(tone is null ? "" : $" is-{tone}")}")" @key="res.Change.Id">
+                    <div class="crs-verdict-stamp">
+                        <span class="crs-verdict-glyph"><MudIcon Icon="@CrsUi.Icon(o.Decision)" /></span>
+                        <div>
+                            <div class="crs-hint" style="margin:0">@T("Decision of the code")</div>
+                            <div class="crs-verdict-title">@CrsUi.Label(o.Decision)</div>
+                        </div>
+                    </div>
+                    <p class="mt-4 mb-0" style="max-width:65ch">@Lang.Pick(o.ExplanationRo, o.Explanation)</p>
+
+                    @if (_scenario is { } g && _scenarioRun == res.Change.Id)
+                    {
+                        var match = o.Decision == g.Expected;
+                        <div class="mt-3 crs-swap" style="display:flex">
+                            <Pill Tone="@(match ? "success" : "warning")" Icon="@(match ? Icons.Material.Rounded.Verified : Icons.Material.Rounded.CompareArrows)">
+                                @(match ? T("Matches golden case {0}", g.Id) : T("Differs from golden case {0}, which expects {1}", g.Id, CrsUi.Label(g.Expected)))
+                            </Pill>
+                        </div>
+                    }
+
+                    <div class="d-flex flex-wrap gap-2 mt-4">
+                        @if (res.CaseCode is { } code)
+                        {
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" EndIcon="@Icons.Material.Rounded.ArrowForward" Href="@($"/cases/{code}")">@T("Open case {0}", code)</MudButton>
+                        }
+                        <MudButton Variant="Variant.Outlined" Href="@($"/clients/{_clientCode}")">@T("See the client")</MudButton>
+                    </div>
+
+                    <MudDivider Class="my-4" />
+                    <div class="crs-title mb-1">@T("Rules checked")</div>
+                    <div class="crs-hint mb-2">@T("Engine {0}. Same data in, same decision out.", o.EngineVersion)</div>
+                    @{ var i = 0; }
+                    @foreach (var hit in o.Indicia)
+                    {
+                        var covered = hit.CoveredBy != Coverage.None;
+                        <div class="@($"crs-rule {(covered ? "is-covered" : "is-hit")}")" style="@($"--i:{i++}")">
+                            <span class="crs-rule-icon"><MudIcon Icon="@(covered ? Icons.Material.Rounded.TaskAlt : Icons.Material.Rounded.Gavel)" /></span>
+                            <div>
+                                <b style="font-weight:600">@CrsUi.RuleTitle(hit.RuleId)</b> <span class="crs-hint">· @CrsUi.Country(hit.Jurisdiction)</span>
+                                <div class="crs-hint">@Lang.Pick(hit.ExplanationRo, hit.Explanation)</div>
+                                <div class="crs-quote-meta"><span class="crs-code">@hit.RuleId</span> · @CrsUi.Page(hit.GuidePage) · @CrsUi.Label(hit.CoveredBy)</div>
+                            </div>
+                            <Pill Tone="@(covered ? "success" : "warning")">@(covered ? T("covered") : T("applies"))</Pill>
+                        </div>
+                    }
+                    @foreach (var hit in o.Cleared)
+                    {
+                        <div class="crs-rule" style="@($"--i:{i++}")">
+                            <span class="crs-rule-icon"><MudIcon Icon="@Icons.Material.Rounded.Remove" /></span>
+                            <div>
+                                <b style="font-weight:600">@CrsUi.RuleTitle(hit.RuleId)</b>
+                                <div class="crs-hint">@Lang.Pick(hit.ExplanationRo, hit.Explanation)</div>
+                                <div class="crs-quote-meta"><span class="crs-code">@hit.RuleId</span> · @CrsUi.Page(hit.GuidePage)</div>
+                            </div>
+                            <Pill>@T("does not apply")</Pill>
+                        </div>
+                    }
+                    @if (o.Indicia.Count == 0 && o.Cleared.Count == 0)
+                    {
+                        <div class="crs-hint">@T("No indicium rule concerns this change.")</div>
+                    }
+                    @if (o.ReportableFor.Count > 0)
+                    {
+                        <div class="d-flex flex-wrap align-center gap-2 mt-3">
+                            <span class="crs-hint" style="margin:0">@T("Reportable for")</span>
+                            @foreach (var j in o.ReportableFor)
+                            {
+                                <Pill Tone="accent" Icon="@Icons.Material.Rounded.Public">@CrsUi.Country(j)</Pill>
+                            }
+                        </div>
+                    }
+                </MudPaper>
+            }
+            else
+            {
+                <MudPaper Outlined="true" Class="pa-4 app-enter" Style="animation-delay:160ms">
+                    <div class="app-card-title mb-3">@T("What happens when you record it")</div>
+                    <ol class="crs-steps">
+                        <li><b>@T("The change is saved and applied")</b><span>@T("Before and after, with personal data masked in storage.")</span></li>
+                        <li><b>@T("Code applies the rules")</b><span>@T("Every indicium of the guide is checked, each with its rule ID and page.")</span></li>
+                        <li><b>@T("A case opens only when it matters")</b><span>@T("An uncovered indicium opens a case and starts the legal deadline.")</span></li>
+                        <li><b>@T("Everything goes into the audit log")</b><span>@T("Hash-chained, so a later edit shows.")</span></li>
+                    </ol>
+                </MudPaper>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private sealed record Scenario(string Id, string Title, string Group, ChangeKind Kind, Decision Expected, GoldenCase Golden);
+
+    private sealed class ResidenceRow
+    {
+        public string Country { get; set; } = "";
+        public string Tin { get; set; } = "";
+        public NoTinReason Reason { get; set; }
+        public string? Explanation { get; set; }
+    }
+
+    private sealed class AddressForm
+    {
+        public AddressKind Kind { get; set; } = AddressKind.Residence;
+        public string Line { get; set; } = "";
+        public string City { get; set; } = "";
+        public string Country { get; set; } = "";
+    }
+
+    private sealed class PhoneForm
+    {
+        public string Number { get; set; } = "";
+        public string Country { get; set; } = "";
+    }
+
+    // The golden cases whose change can be recorded as is, grouped by what the demo shows. Uploads that carry a FATCA fact
+    // (cases 6 and 7) are recorded as the personal data the agent would read from the passport. Case 12 is left out: its
+    // golden After also ends the residence, which an AddressChanged of kind InCareOf does not do in ChangeService.
+    private static readonly (string Id, string Group)[] Picks =
+    [
+        ("4", "Opens a case"), ("18", "Opens a case"), ("16", "Opens a case"), ("17b", "Opens a case"), ("11", "Opens a case"), ("5b", "Opens a case"),
+        ("5c", "FATCA"), ("6", "FATCA"), ("7", "FATCA"), ("14", "FATCA"),
+        ("15", "Traps: no case"), ("1", "Traps: no case"), ("5a", "Traps: no case"), ("13", "Traps: no case"), ("8", "Traps: no case"),
+        ("2", "Self-certification"), ("3", "Self-certification"), ("9", "Self-certification"),
+        ("10", "Hidden text"),
+    ];
+
+    private static readonly List<Scenario> Scenarios = [.. Picks
+        .Select(p => (p.Group, Golden: GoldenCases.All.FirstOrDefault(g => g.Id == p.Id && g.Change is not null)))
+        .Where(x => x.Golden is not null)
+        .Select(x => new Scenario(x.Golden!.Id, x.Golden.Title, x.Group, KindOf(x.Golden), x.Golden.ExpectedDecision, x.Golden))];
+
+    private string _group = Picks[0].Group;
+    private bool _showGolden;
+    [CascadingParameter] public DemoContext? Demo { get; set; }
+    /// <summary>?golden=1, from the Demo menu: also when the page is already open.</summary>
+    [SupplyParameterFromQuery(Name = "golden")] public string? Golden { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (Golden is not null && !_showGolden)
+        {
+            _showGolden = true;
+            OfferDemo();
+        }
+    }
+    private ElementReference _verdict;
+    [Inject] private IJSRuntime JS { get; set; } = default!;
+    private List<Client>? _clients;
+    private Client? _client;
+    private string? _clientCode;
+    private List<DocumentInfo> _documents = [];
+    private ChangeKind _kind = ChangeKind.AddressChanged;
+    private string _channel = "online";
+    private AddressForm _address = new();
+    private PhoneForm _phone = new();
+    private bool _withPhone, _declaresUs;
+    private string? _fromIban;
+    private string _beneficiary = "", _beneficiaryCountry = "", _holder = "", _holderCountry = "", _birthCountry = "", _citizenships = "";
+    private List<ResidenceRow> _residences = [new()];
+    private int? _documentId;
+    private Scenario? _scenario;
+    private int? _scenarioRun;
+    private ChangeResult? _result;
+    private string? _error, _submitError;
+    private bool _canWrite, _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _canWrite = (await CurrentUser.GetAsync()).Role is Roles.Admin or Roles.Member; // ChangeService checks it again
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            _error = null;
+            _clients = await Clients.ListAsync();
+            // ?client=CL-0001 picks the client; ?scenario=4 fills in a golden case (the dashboard's first step).
+            var query = new Uri(Nav.Uri).Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries).Select(p => p.Split('='))
+                .Where(p => p.Length == 2).ToDictionary(p => p[0], p => Uri.UnescapeDataString(p[1]));
+            _showGolden = query.ContainsKey("golden") || query.ContainsKey("scenario");
+            if (query.TryGetValue("scenario", out var id) && Scenarios.FirstOrDefault(s => s.Id == id) is { } scenario && _canWrite)
+            {
+                _group = scenario.Group;
+                await UseAsync(scenario);
+            }
+            else if (query.TryGetValue("client", out var client) && _clientCode is null) await SelectClientAsync(client);
+            OfferDemo();
+        }
+        catch (Exception ex) { _error = ex.Message; }
+    }
+
+    /// <summary>The golden cases are a demo tool: they sit behind the Demo menu, not in the bank's form.</summary>
+    private void OfferDemo() => Demo?.Offer(this, T("New change"),
+    [
+        new(_showGolden ? T("Hide the golden cases") : T("Show the golden cases"), Icons.Material.Rounded.AutoAwesomeMotion,
+            () => { _showGolden = !_showGolden; OfferDemo(); return InvokeAsync(StateHasChanged); }),
+    ]);
+
+    private void HideGolden()
+    {
+        _showGolden = false;
+        OfferDemo();
+    }
+
+    public void Dispose() => Demo?.Withdraw(this);
+
+    private Task<IEnumerable<string>> SearchAsync(string? value, CancellationToken _)
+    {
+        var q = (value ?? "").Trim();
+        var list = _clients ?? [];
+        return Task.FromResult(list
+            .Where(c => q.Length == 0 || c.Code.Contains(q, StringComparison.OrdinalIgnoreCase) || TextMatch.ContainsAny(c.FullName, q))
+            .Select(c => c.Code));
+    }
+
+    private string ClientLabel(string? code) => code is null ? "" : _clients?.FirstOrDefault(c => c.Code == code) is { } c ? $"{c.FullName} · {c.Code}" : code;
+
+    private async Task SelectClientAsync(string? code)
+    {
+        _clientCode = code;
+        _result = null;
+        _client = code is null ? null : await Clients.GetAsync(code);
+        _documents = code is null ? [] : await Clients.ListDocumentsAsync(code);
+        _fromIban = _client?.Accounts.OrderBy(a => a.Id).FirstOrDefault()?.Iban;
+    }
+
+    private static ChangeKind KindOf(GoldenCase g) => Personal(g) is not null ? ChangeKind.PersonalDataChanged : g.Change!.Kind;
+
+    /// <summary>A passport upload whose golden After snapshot changes the birth country or the citizenships.</summary>
+    private static (string? Birth, IReadOnlyList<string>? Citizenships)? Personal(GoldenCase g)
+    {
+        if (g.Change?.Kind != ChangeKind.DocumentUploaded || g.Before is not { } b || g.After is not { } a) return null;
+        var birth = a.BirthCountry != b.BirthCountry ? a.BirthCountry : null;
+        var cit = !a.Citizenships.SequenceEqual(b.Citizenships) ? a.Citizenships : null;
+        return birth is null && cit is null ? null : (birth, cit);
+    }
+
+    private async Task UseAsync(Scenario s)
+    {
+        var r = s.Golden.Change!;
+        _scenario = s;
+        _submitError = null;
+        await SelectClientAsync(r.ClientCode);
+        _kind = s.Kind;
+        _channel = r.Channel;
+        if (r.Address is { } a) _address = new() { Kind = a.Kind, Line = a.Line, City = a.City, Country = a.Country };
+        _withPhone = r.Phone is not null && r.Kind == ChangeKind.AddressChanged;
+        if (r.Phone is { } p) _phone = new() { Number = p.Number, Country = p.Country };
+        if (r.AccountIban is { } iban) _fromIban = iban;
+        if (r.StandingOrder is { } o) (_beneficiary, _beneficiaryCountry) = (o.BeneficiaryAccount, o.BeneficiaryCountry);
+        if (r.PowerOfAttorney is { } poa) (_holder, _holderCountry) = (poa.HolderName, poa.HolderCountry);
+        if (r.SelfCertification is { } sc)
+        {
+            _declaresUs = sc.DeclaresUsPerson;
+            _residences = [.. sc.Residences.Select(x => new ResidenceRow { Country = x.Country, Tin = x.Tin ?? "", Reason = x.NoTinReason, Explanation = x.NoTinExplanation })];
+        }
+        if (Personal(s.Golden) is { } personal)
+        {
+            _birthCountry = personal.Birth ?? "";
+            _citizenships = personal.Citizenships is null ? "" : string.Join(", ", personal.Citizenships);
+        }
+        if (r.Kind == ChangeKind.DocumentUploaded && s.Kind == ChangeKind.DocumentUploaded)
+        {
+            var names = s.Golden.Documents.Select(d => d.FileName).ToHashSet();
+            _documentId = _documents.FirstOrDefault(d => names.Contains(d.FileName))?.Id ?? _documents.FirstOrDefault()?.Id;
+        }
+    }
+
+    /// <summary>What the form still needs, said next to the disabled button.</summary>
+    private string? MissingReason => Ready ? null : _clientCode is null ? T("Pick a client first.") : _kind switch
+    {
+        ChangeKind.AddressChanged or ChangeKind.AddressAdded => T("Add the country and the address."),
+        ChangeKind.PhoneAdded or ChangeKind.PhoneChanged or ChangeKind.PhoneRemoved => T("Add the phone number and its country."),
+        ChangeKind.StandingOrderCreated => T("Pick the account and add the beneficiary's account and country."),
+        ChangeKind.PowerOfAttorneyGranted => T("Add the holder's name and country."),
+        ChangeKind.PersonalDataChanged => T("Add the birth country or the citizenships."),
+        ChangeKind.SelfCertSubmitted => T("Add at least one country of residence."),
+        ChangeKind.DocumentUploaded => T("Pick a document."),
+        _ => null,
+    };
+
+    private bool Ready => _clientCode is not null && _kind switch
+    {
+        ChangeKind.AddressChanged or ChangeKind.AddressAdded => _address.Country.Trim().Length == 2 && (_address.Line + _address.City).Trim().Length > 0,
+        ChangeKind.PhoneAdded or ChangeKind.PhoneChanged or ChangeKind.PhoneRemoved => _phone.Number.Trim().Length > 0 && _phone.Country.Trim().Length == 2,
+        ChangeKind.StandingOrderCreated => _fromIban is not null && _beneficiary.Trim().Length > 0 && _beneficiaryCountry.Trim().Length == 2,
+        ChangeKind.PowerOfAttorneyGranted => _holder.Trim().Length > 0 && _holderCountry.Trim().Length == 2,
+        ChangeKind.PersonalDataChanged => _birthCountry.Trim().Length == 2 || _citizenships.Trim().Length > 0,
+        ChangeKind.SelfCertSubmitted => _residences.Any(x => x.Country.Trim().Length == 2),
+        ChangeKind.DocumentUploaded => _documentId is not null,
+        _ => false,
+    };
+
+    private ChangeRequest Build()
+    {
+        string Up(string v) => v.Trim().ToUpperInvariant();
+        var summary = _scenario?.Golden.Change is { } g && g.ClientCode == _clientCode ? g.Summary : null;
+        return _kind switch
+        {
+            ChangeKind.AddressChanged or ChangeKind.AddressAdded => new(_clientCode!, _kind, _channel, Summary: summary,
+                Address: new AddressSnapshot(_address.Kind, _address.Line.Trim(), _address.City.Trim(), Up(_address.Country)),
+                Phone: _kind == ChangeKind.AddressChanged && _withPhone && _phone.Number.Trim().Length > 0 ? new PhoneSnapshot(_phone.Number.Trim(), Up(_phone.Country)) : null),
+            ChangeKind.PhoneAdded or ChangeKind.PhoneChanged or ChangeKind.PhoneRemoved => new(_clientCode!, _kind, _channel, Summary: summary,
+                Phone: new PhoneSnapshot(_phone.Number.Trim(), Up(_phone.Country))),
+            ChangeKind.StandingOrderCreated => new(_clientCode!, _kind, _channel, Summary: summary, AccountIban: _fromIban,
+                StandingOrder: new StandingOrderSnapshot(_beneficiary.Trim(), Up(_beneficiaryCountry))),
+            ChangeKind.PowerOfAttorneyGranted => new(_clientCode!, _kind, _channel, Summary: summary,
+                PowerOfAttorney: new PowerOfAttorneySnapshot(_holder.Trim(), Up(_holderCountry))),
+            ChangeKind.PersonalDataChanged => new(_clientCode!, _kind, _channel, Summary: summary,
+                BirthCountry: _birthCountry.Trim().Length == 2 ? Up(_birthCountry) : null,
+                Citizenships: _citizenships.Trim().Length == 0 ? null : [.. _citizenships.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(Up)]),
+            ChangeKind.SelfCertSubmitted => new(_clientCode!, _kind, _channel, Summary: summary,
+                SelfCertification: new SelfCertificationSnapshot(Now,
+                    [.. _residences.Where(x => x.Country.Trim().Length == 2).Select(x => new TaxResidenceSnapshot(Up(x.Country),
+                        string.IsNullOrWhiteSpace(x.Tin) ? null : x.Tin.Trim(), string.IsNullOrWhiteSpace(x.Tin) ? x.Reason : NoTinReason.None,
+                        string.IsNullOrWhiteSpace(x.Tin) ? x.Explanation : null))],
+                    _declaresUs)),
+            ChangeKind.DocumentUploaded => new(_clientCode!, _kind, _channel, Summary: summary, DocumentId: _documentId),
+            _ => throw new InvalidOperationException(),
+        };
+    }
+
+    [Inject] private Features.Deadlines.ISimClock Clock { get; set; } = default!;
+    private DateTime Now => Clock.UtcNow;
+
+    private async Task RecordAsync()
+    {
+        _busy = true;
+        _submitError = null;
+        try
+        {
+            _result = await Changes.RecordAsync(Build());
+            _scenarioRun = _scenario?.Golden.ClientCode == _clientCode ? _result.Change.Id : null;
+            // The client's data moved: refresh accounts and documents, keeping the result on screen.
+            _client = await Clients.GetAsync(_clientCode!);
+            _documents = await Clients.ListDocumentsAsync(_clientCode!);
+            await CrsSignals.RaiseAsync();
+        }
+        catch (Exception ex) { _submitError = ex.Message; }
+        finally { _busy = false; }
+        _reveal = _result is not null;
+    }
+
+    private bool _reveal;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_reveal) return;
+        _reveal = false;
+        // On a phone the verdict renders under the form: bring it into view.
+        try { await JS.InvokeVoidAsync("revealElement", _verdict); } catch (JSException) { } catch (JSDisconnectedException) { }
+    }
+
+    private RenderFragment CountryField(string value, Action<string> set, string? label = null) => __builder =>
+    {
+        <CountryPicker Value="@value" ValueChanged="v => set(v ?? string.Empty)" Label="@label" />
+    };
+}

@@ -1,0 +1,7 @@
+@using HackathonStarter.Features.Rules
+@* The rule engine's decision (code, never a model). *@
+<Pill Tone="@CrsUi.Tone(Decision)" Icon="@CrsUi.Icon(Decision)" Title="@CrsUi.Describe(Decision)">@CrsUi.Label(Decision)</Pill>
+
+@code {
+    [Parameter, EditorRequired] public Decision Decision { get; set; }
+}

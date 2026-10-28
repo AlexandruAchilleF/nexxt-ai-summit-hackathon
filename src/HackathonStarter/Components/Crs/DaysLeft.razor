@@ -1,0 +1,26 @@
+@* Days to a deadline on the demo date. Tone: a week or less = warning, past = danger; no deadline (FATCA, p. 38) = neutral. *@
+@if (Due is null)
+{
+    <Pill Icon="@Icons.Material.Rounded.AllInclusive" Title="@T("The guide gives no FATCA deadline (p. 38)")">@T("No deadline")</Pill>
+}
+else if (Done)
+{
+    <Pill Icon="@Icons.Material.Rounded.Event">@CrsUi.Date(Due.Value)</Pill>
+}
+else
+{
+    var days = CrsUi.DaysBetween(Now, Due.Value);
+    <span class="crs-swap" @key="days">
+        <Pill Tone="@(days < 0 ? "danger" : days <= 7 ? "warning" : null)" Icon="@(days < 0 ? Icons.Material.Rounded.EventBusy : Icons.Material.Rounded.Timer)"
+              Title="@CrsUi.Date(Due.Value)">
+            <span class="tabular">@(days < 0 ? T("{0} d overdue", -days) : days == 0 ? T("Due today") : days == 1 ? T("1 day left") : T("{0} days left", days))</span>
+        </Pill>
+    </span>
+}
+
+@code {
+    [Parameter] public DateTime? Due { get; set; }
+    [Parameter, EditorRequired] public DateTime Now { get; set; }
+    /// <summary>A closed or expired case shows the date only.</summary>
+    [Parameter] public bool Done { get; set; }
+}

@@ -1,7 +1,155 @@
 @page "/cases"
+@using HackathonStarter.Features.Cases
+@using HackathonStarter.Features.Clients
+@using HackathonStarter.Features.Deadlines
+@implements IDisposable
+@inject ICaseService Cases
+@inject IClientService Clients
+@inject ISimClock Clock
 
 <PageTitle>@T("Cases") · @SiteConfig.Name</PageTitle>
 
-<PageHeader Title="@T("Cases")" Description="@T("The queue of CRS/FATCA cases, ordered by deadline.")" />
+<PageHeader Title="@T("Cases")" Description="@T("The queue of CRS/FATCA cases, ordered by deadline on the demo date. Cases without a deadline in the guide (FATCA) come last.")">
+    <Actions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.EditNote" Href="/changes/new">@T("New change")</MudButton>
+    </Actions>
+</PageHeader>
 
-<EmptyState Icon="@Icons.Material.Rounded.AssignmentLate" Title="@T("Coming in the next phase")" Description="@T("The backend for this page is being built.")" />
+@if (_error is not null)
+{
+    <ErrorState Message="@_error" OnRetry="LoadAsync" />
+}
+else if (_cases is null)
+{
+    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="44px" Width="360px" Style="border-radius:12px" Class="mb-4" />
+    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="300px" Style="border-radius:20px" />
+}
+else
+{
+    <div class="d-flex flex-wrap align-center gap-3 mb-4 app-enter">
+        <Segmented Label="@T("Cases")" @bind-Value="_view" Options="@([
+            new("open", T("Open"), _cases.Count(c => c.IsOpen)),
+            new("approval", T("Waiting for approval"), _drafts.Count),
+            new("urgent", T("Due in 7 days"), _cases.Count(Urgent)),
+            new("done", T("Closed or expired"), _cases.Count(c => !c.IsOpen))])" />
+        <MudTextField T="string" @bind-Value="_search" Placeholder="@T("Search by code, client or rule  ( / )")" UserAttributes="@(new() { ["data-hotkey"] = "/" })" Variant="Variant.Outlined" Margin="Margin.Dense"
+                      Immediate="true" DebounceInterval="150" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Rounded.Search" Clearable="true" Class="crs-field-search" />
+    </div>
+
+    var shown = Shown().ToList();
+    @if (_cases.Count == 0)
+    {
+        <EmptyState Icon="@Icons.Material.Rounded.AssignmentTurnedIn" Title="@T("No cases yet")"
+                    Description="@T("A case opens only when a change touches an uncovered indicium from the guide. Record a change, or start from a golden case such as Maria's move to Munich.")">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/changes/new" StartIcon="@Icons.Material.Rounded.EditNote">@T("Record a change")</MudButton>
+        </EmptyState>
+    }
+    else if (shown.Count == 0)
+    {
+        <EmptyState Icon="@Icons.Material.Rounded.FilterAltOff" Title="@T("Nothing matches")" Description="@T("Try another filter or clear the search.")" />
+    }
+    else
+    {
+        <div class="app-list crs-queue" @key="@($"{_view}|{_search}")">
+            <div class="crs-queue-row crs-queue-head" aria-hidden="true">
+                <span>@T("Case and client")</span><span>@T("Indicia")</span><span>@T("Deadline")</span><span>@T("Status")</span><span></span>
+            </div>
+            @{ var i = 0; }
+            @foreach (var c in shown)
+            {
+                <a class="app-list-row crs-queue-row" href="@($"/cases/{c.Code}")" style="@($"--i:{i++}")">
+                    <span class="crs-queue-main">
+                        <span class="d-flex align-center gap-2">
+                            <span class="crs-code">@c.Code</span>
+                            <Pill>@CrsUi.Label(c.Regime)</Pill>
+                        </span>
+                        <span class="app-list-meta d-block">@Name(c.ClientCode) · @c.ClientCode</span>
+                    </span>
+                    <span class="crs-queue-rules">
+                        @foreach (var ind in c.Indicia.Take(3))
+                        {
+                            <span class="crs-rule-tag" title="@($"{CrsUi.RuleTitle(ind.RuleId)} · {ind.RuleId}")">@CrsUi.ShortRule(ind.RuleId) · @ind.Jurisdiction</span>
+                        }
+                        @if (c.Indicia.Count > 3)
+                        {
+                            <span class="crs-rule-tag">+@(c.Indicia.Count - 3)</span>
+                        }
+                    </span>
+                    <span class="crs-queue-due"><DaysLeft Due="c.DueAt" Now="_now" Done="@(!c.IsOpen)" /></span>
+                    <span class="crs-queue-status">
+                        @if (_drafts.Contains(c.Code))
+                        {
+                            <Pill Tone="warning" Icon="@Icons.Material.Rounded.HowToReg">@T("Needs approval")</Pill>
+                        }
+                        else
+                        {
+                            <CaseStatusPill Status="c.Status" />
+                        }
+                    </span>
+                    <MudIcon Icon="@Icons.Material.Rounded.ChevronRight" Class="app-chevron" />
+                </a>
+            }
+        </div>
+    }
+}
+
+@code {
+    private List<Case>? _cases;
+    private HashSet<string> _drafts = [];
+    /// <summary>?view=approval / urgent / done, from the dashboard cards.</summary>
+    [SupplyParameterFromQuery(Name = "view")] public string? View { get; set; }
+    private Dictionary<string, string> _names = [];
+    private string _view = "open";
+    private string? _search;
+    private DateTime _now;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (View is "approval" or "urgent" or "done" or "open") _view = View;
+        CrsSignals.Changed += OnSignal;
+        await LoadAsync();
+    }
+
+    private Task OnSignal() => InvokeAsync(async () => { await LoadAsync(); StateHasChanged(); });
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            _error = null;
+            _now = Clock.UtcNow;
+            var cases = await Cases.QueueAsync(new CaseQueueFilter(OpenOnly: false));
+            // Drafts live on the full case; the queue carries the indicia only.
+            var drafts = new HashSet<string>();
+            foreach (var c in cases.Where(c => c.IsOpen))
+                if (await Cases.GetAsync(c.Code) is { } full && full.Requests.Any(r => r.Status == RequestStatus.Draft)) drafts.Add(c.Code);
+            _drafts = drafts;
+            _cases = cases;
+            _names = (await Clients.ListAsync()).ToDictionary(c => c.Code, c => c.FullName);
+        }
+        catch (Exception ex) { _error = ex.Message; }
+    }
+
+    private bool Urgent(Case c) => c.IsOpen && c.DueAt is { } due && CrsUi.DaysBetween(_now, due) <= 7;
+
+    private string Name(string code) => _names.GetValueOrDefault(code, code);
+
+    private IEnumerable<Case> Shown()
+    {
+        IEnumerable<Case> list = _view switch
+        {
+            "open" => _cases!.Where(c => c.IsOpen),
+            "urgent" => _cases!.Where(Urgent),
+            "approval" => _cases!.Where(c => _drafts.Contains(c.Code)),
+            "done" => _cases!.Where(c => !c.IsOpen).OrderByDescending(c => c.ClosedAt ?? c.ExpiredAt),
+            _ => _cases!,
+        };
+        var q = _search?.Trim();
+        if (string.IsNullOrEmpty(q)) return list;
+        return list.Where(c => c.Code.Contains(q, StringComparison.OrdinalIgnoreCase) || c.ClientCode.Contains(q, StringComparison.OrdinalIgnoreCase)
+                               || TextMatch.ContainsAny(Name(c.ClientCode), q) || c.Indicia.Any(i => i.RuleId.Contains(q, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    public void Dispose() => CrsSignals.Changed -= OnSignal;
+}

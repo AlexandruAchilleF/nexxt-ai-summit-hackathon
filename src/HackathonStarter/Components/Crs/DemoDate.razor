@@ -1,0 +1,129 @@
+@using HackathonStarter.Features.Cases
+@using HackathonStarter.Features.Deadlines
+@implements IDisposable
+@inject ISimClock Clock
+@inject SimClockControl Control
+@inject ICaseService Cases
+@inject CurrentUser CurrentUser
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+
+@* The Demo menu in the top bar: the demo date (docs/PLAN.md 9.1) and every demo shortcut in one place, so the pages show only
+   the bank's workflow. The page in view adds its own shortcuts through DemoContext (this case's reminder day, the sample
+   answer, tamper mode). After a date move the deadline tick runs at once, so reminders and expiries show before it closes. *@
+<MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" Class="ml-1" aria-label="@T("Demo")" ListClass="demo-menu">
+    <ActivatorContent>
+        <span class="@($"demo-date{(_offsetDays > 0 ? " is-ahead" : "")}{(_busy ? " is-busy" : "")}")" title="@T("Demo: date and shortcuts")" tabindex="0" role="button" aria-haspopup="menu">
+            <MudIcon Icon="@Icons.Material.Rounded.CalendarMonth" Size="Size.Small" />
+            <span class="demo-date-value" @key="_offsetDays">@CrsUi.Date(Clock.UtcNow)</span>
+            <span class="demo-date-short" @key="@($"s{_offsetDays}")">@CrsUi.DateShort(Clock.UtcNow)</span>
+            @if (_offsetDays > 0)
+            {
+                <span class="demo-date-offset tabular" @key="@($"o{_offsetDays}")">+@_offsetDays @T("d")</span>
+            }
+        </span>
+    </ActivatorContent>
+    <ChildContent>
+        <div class="demo-date-head">
+            <div class="app-card-title" style="font-size:15px">@T("Demo")</div>
+            <div class="app-card-sub">
+                @if (_offsetDays > 0)
+                {
+                    @T("{0} days ahead of the real date. Deadlines, reminders and expiries follow it.", _offsetDays)
+                }
+                else
+                {
+                    @T("The real date. Move it forward to see reminders and expiries.")
+                }
+            </div>
+        </div>
+        @if (Demo?.Actions is { Count: > 0 } actions)
+        {
+            <div class="demo-menu-group">@Demo.Title</div>
+            @foreach (var a in actions)
+            {
+                var action = a;
+                <MudMenuItem Icon="@action.Icon" IconColor="@(action.Destructive ? Color.Error : Color.Primary)" OnClick="() => RunAsync(action)" Disabled="_busy">
+                    @action.Label
+                    @if (action.Hint is not null)
+                    {
+                        <span class="app-card-sub ml-2">@action.Hint</span>
+                    }
+                </MudMenuItem>
+            }
+        }
+        <div class="demo-menu-group">@T("Demo date")</div>
+        @if (_isOperator)
+        {
+            @foreach (var days in Steps)
+            {
+                <MudMenuItem Icon="@Icons.Material.Rounded.FastForward" OnClick="() => AdvanceAsync(days)" Disabled="_busy">
+                    @(days == 1 ? T("+1 day") : T("+{0} days", days))
+                </MudMenuItem>
+            }
+            <MudMenuItem Icon="@Icons.Material.Rounded.Restore" OnClick="ResetAsync" Disabled="@(_busy || _offsetDays == 0)">@T("Back to the real date")</MudMenuItem>
+        }
+        else
+        {
+            <div class="demo-date-head app-card-sub" style="padding-top:2px">@T("Only the operator moves the demo date.")</div>
+        }
+        <div class="demo-menu-group">@T("Scenarios")</div>
+        <MudMenuItem Icon="@Icons.Material.Rounded.AutoAwesomeMotion" OnClick="@(() => Nav.NavigateTo("/changes/new?golden=1"))">@T("Golden cases")</MudMenuItem>
+        <MudMenuItem Icon="@Icons.Material.Rounded.Insights" OnClick="@(() => Nav.NavigateTo("/metrics"))">@T("Measure the rules")</MudMenuItem>
+    </ChildContent>
+</MudMenu>
+
+@code {
+    private static readonly int[] Steps = [1, 7, 30];
+    private int _offsetDays;
+    private bool _isOperator, _busy;
+
+    [Parameter] public DemoContext? Demo { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _offsetDays = (int)Math.Round(Clock.Offset.TotalDays);
+        _isOperator = (await CurrentUser.GetAsync()).Role == Roles.Operator; // SimClockControl checks it again
+        Clock.Changed += OnClockChanged;
+        if (Demo is not null) Demo.Changed += OnDemoChanged;
+    }
+
+    private void OnClockChanged() => _ = InvokeAsync(() =>
+    {
+        _offsetDays = (int)Math.Round(Clock.Offset.TotalDays);
+        StateHasChanged();
+    });
+
+    private void OnDemoChanged() => _ = InvokeAsync(StateHasChanged);
+
+    private Task AdvanceAsync(int days) => MoveAsync(() => Control.AdvanceDaysAsync(days));
+
+    private Task ResetAsync() => MoveAsync(Control.ResetAsync);
+
+    private async Task MoveAsync(Func<Task<TimeSpan>> move)
+    {
+        _busy = true;
+        try
+        {
+            var tick = await CrsSignals.MoveClockAsync(move, Cases, Clock);
+            if (tick.Reminded + tick.Expired > 0)
+                Snackbar.Add(T("Deadline check: {0} reminded and escalated, {1} expired", tick.Reminded, tick.Expired), Severity.Warning);
+        }
+        catch (Exception ex) { Snackbar.Add(CrsUi.Problem(ex), Severity.Error); }
+        finally { _busy = false; }
+    }
+
+    private async Task RunAsync(DemoContext.DemoAction action)
+    {
+        _busy = true;
+        try { await action.Run(); }
+        catch (Exception ex) { Snackbar.Add(CrsUi.Problem(ex), Severity.Error); }
+        finally { _busy = false; }
+    }
+
+    public void Dispose()
+    {
+        Clock.Changed -= OnClockChanged;
+        if (Demo is not null) Demo.Changed -= OnDemoChanged;
+    }
+}

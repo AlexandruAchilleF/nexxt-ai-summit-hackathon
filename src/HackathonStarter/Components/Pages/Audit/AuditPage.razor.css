@@ -20,3 +20,29 @@
     padding-left: 10px;
     padding-right: 10px;
 }
+
+/* The chain on screen: a link before each sequence number. Verify sweeps down it, each link lighting in turn; the broken
+   entry shakes and everything after it fades back, because it can no longer be trusted. */
+.audit-table ::deep .audit-link { display: inline-flex; vertical-align: -3px; margin-right: 4px; color: var(--mud-palette-text-disabled); }
+.audit-table ::deep .audit-link .mud-icon-root { font-size: 15px; transform: rotate(-45deg); }
+.audit-table.is-swept ::deep tbody tr .audit-link,
+.audit-table.is-broken ::deep tbody tr:not(.is-break):not(.is-after) .audit-link {
+    animation: audit-link 500ms cubic-bezier(.16,1,.3,1) both;
+    animation-delay: calc(var(--i, 0) * 22ms);
+}
+.audit-table.is-swept ::deep tbody tr,
+.audit-table.is-broken ::deep tbody tr:not(.is-break):not(.is-after) {
+    animation: audit-row 700ms cubic-bezier(.16,1,.3,1) both;
+    animation-delay: calc(var(--i, 0) * 22ms);
+}
+.audit-table ::deep tbody tr.is-break { animation: audit-break 520ms cubic-bezier(.36,.07,.19,.97) both; animation-delay: calc(var(--i, 0) * 22ms + 120ms); }
+.audit-table ::deep tbody tr.is-break .audit-link { color: var(--mud-palette-error); }
+.audit-table ::deep tbody tr.is-after { opacity: .5; transition: opacity 600ms; }
+
+@keyframes audit-link {
+    0% { color: var(--mud-palette-text-disabled); transform: scale(.6); }
+    60% { color: var(--mud-palette-success); transform: scale(1.25); }
+    100% { color: var(--mud-palette-success); transform: none; }
+}
+@keyframes audit-row { 0% { background: transparent; } 30% { background: var(--app-success-tint); } 100% { background: transparent; } }
+@keyframes audit-break { 0%, 100% { transform: none; } 20%, 60% { transform: translateX(-4px); } 40%, 80% { transform: translateX(4px); } }

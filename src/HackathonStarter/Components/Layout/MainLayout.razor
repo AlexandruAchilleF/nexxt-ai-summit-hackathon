@@ -31,6 +31,7 @@
                         <MudIconButton Class="pwa-install" Size="Size.Small" Icon="@Icons.Material.Rounded.InstallDesktop" Color="Color.Inherit" aria-label="@T("Install app")" />
                     </MudTooltip>
                 }
+                <DemoDate Demo="_demo" />
                 <LangSwitch />
                 <MudTooltip Text="@T("Toggle dark mode")">
                     <MudIconButton Size="Size.Small" Icon="@(_dark ? Icons.Material.Rounded.LightMode : Icons.Material.Rounded.DarkMode)" Color="Color.Inherit" OnClick="() => _dark = !_dark" aria-label="@T("Toggle dark mode")" />
@@ -38,7 +39,7 @@
                 <UserMenu />
             </header>
             <div class="app-content">
-                @Body
+                <CascadingValue Value="_demo" IsFixed="true">@Body</CascadingValue>
                 <AppFooter />
             </div>
         </div>
@@ -54,6 +55,7 @@
 
 @code {
     private bool _drawer = true;
+    private readonly DemoContext _demo = new();
     private bool _dark = SiteConfig.DarkModeByDefault;
 
     private NavItem? Current

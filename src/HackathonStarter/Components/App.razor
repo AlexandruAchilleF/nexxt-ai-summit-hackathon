@@ -35,7 +35,15 @@
     {
         <script src="@Assets["pwa.js"]"></script>
     }
-    <script>window.scrollToBottom = el => { if (el) el.scrollTop = el.scrollHeight; };</script>
+    <script>window.scrollToBottom = el => { if (el) el.scrollTop = el.scrollHeight; };
+        // "/" focuses the page's search box (the queue), like most work tools.
+        document.addEventListener("keydown", e => {
+            if (e.key !== "/" || e.ctrlKey || e.metaKey || e.altKey || /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName) || document.activeElement?.isContentEditable) return;
+            const box = document.querySelector('[data-hotkey="/"] input, input[data-hotkey="/"]');
+            if (box) { e.preventDefault(); box.focus(); }
+        });
+        window.focusChecked = () => requestAnimationFrame(() => document.activeElement?.closest('[role=radiogroup]')?.querySelector('[aria-checked=true]')?.focus());
+        window.revealElement = el => { if (el && el.getBoundingClientRect && el.getBoundingClientRect().top > innerHeight * .6) el.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" }); };</script>
 </body>
 
 </html>

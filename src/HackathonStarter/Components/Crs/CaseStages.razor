@@ -1,0 +1,34 @@
+@using HackathonStarter.Features.Cases
+@* Where a case is in its life (docs/PLAN.md 9.3), in four stages; the line fills up to the current one. *@
+<div class="@($"crs-stages{(Status == CaseStatus.Closed ? " is-closed" : Status == CaseStatus.Expired ? " is-expired" : "")}")"
+     style="@($"--stage:{CrsUi.Stage(Status)}")" role="list" aria-label="@T("Case stages")">
+    @for (var i = 0; i < 4; i++)
+    {
+        var stage = CrsUi.Stage(Status);
+        var css = i < stage ? "is-done" : i == stage ? "is-current" : "";
+        <div class="@($"crs-stage {css}")" role="listitem" aria-current="@(i == stage ? "step" : null)">
+            <span class="crs-stage-node"><MudIcon Icon="@(i < stage ? Icons.Material.Rounded.Check : StageIcon(i))" /></span>
+            <span>@StageLabel(i)</span>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public CaseStatus Status { get; set; }
+
+    private string StageLabel(int i) => i switch
+    {
+        0 => T("Opened"),
+        1 => Status is CaseStatus.Reminded or CaseStatus.Escalated ? CrsUi.Label(Status) : T("Awaiting client"),
+        2 => T("Answer received"),
+        _ => Status == CaseStatus.Expired ? T("Expired") : T("Closed"),
+    };
+
+    private string StageIcon(int i) => i switch
+    {
+        0 => Icons.Material.Rounded.FiberNew,
+        1 => Status is CaseStatus.Reminded or CaseStatus.Escalated ? Icons.Material.Rounded.PriorityHigh : Icons.Material.Rounded.HourglassTop,
+        2 => Icons.Material.Rounded.MarkEmailRead,
+        _ => Status == CaseStatus.Expired ? Icons.Material.Rounded.EventBusy : Icons.Material.Rounded.TaskAlt,
+    };
+}

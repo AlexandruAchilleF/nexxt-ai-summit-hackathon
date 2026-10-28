@@ -1,0 +1,590 @@
+@using HackathonStarter.Features.Cases
+@using HackathonStarter.Features.Changes
+@using HackathonStarter.Features.Clients
+@using HackathonStarter.Features.Evaluation
+@using HackathonStarter.Features.Rules
+@using HackathonStarter.Features.Tin
+@inject ICaseService Cases
+@inject IChangeService Changes
+@inject IClientService Clients
+@inject ITinFormat TinFormat
+@inject ISnackbar Snackbar
+
+@* The one thing to do next on a case, named by what it does (docs/PLAN.md 6.3): write the request, approve it, register the
+   answer, approve the closing. Every button calls CaseService or ChangeService, which check the state and the role again. *@
+<MudPaper Outlined="true" Class="@($"pa-4 crs-next {Tone}")" @key="@($"{Case.Status}-{Case.Requests.Count}-{Case.Responses.Count}")">
+    @if (_error is not null)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4" ShowCloseIcon="true" CloseIconClicked="() => _error = null">@_error</MudAlert>
+    }
+
+    @switch (Case.Status)
+    {
+        case CaseStatus.Closed or CaseStatus.Expired:
+            @Outcome
+            break;
+        case CaseStatus.ResponseReceived:
+            @Closing
+            break;
+        case CaseStatus.Open when Draft is not null:
+            @Approval(Draft)
+            break;
+        case CaseStatus.Open:
+            @Drafting
+            break;
+        default:
+            @if (Draft is { } reminder)
+            {
+                @Approval(reminder)
+                <MudDivider Class="my-5" />
+            }
+            @Answer
+            break;
+    }
+</MudPaper>
+
+@code {
+    [Parameter, EditorRequired] public Case Case { get; set; } = default!;
+    [Parameter, EditorRequired] public DateTime Now { get; set; }
+    [Parameter] public IReadOnlyList<string> RequiredDocs { get; set; } = [];
+    /// <summary>Code's re-evaluation of the client today (shown before closing on a self-certification).</summary>
+    [Parameter] public RuleOutcome? Current { get; set; }
+    [Parameter] public bool IsOperator { get; set; }
+    [Parameter] public bool IsEditor { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+    /// <summary>Who is acting: restated on the approval checkpoints and compared with the drafter (four eyes).</summary>
+    [Parameter] public DemoUser? User { get; set; }
+    [Parameter] public string? ClientName { get; set; }
+
+    private string? _error;
+    private bool _busy;
+
+    private string Signer => User?.Name ?? CrsUi.Actor(null);
+
+    private ClientRequest? Draft => Case.Requests.Where(r => r.Status == RequestStatus.Draft).OrderByDescending(r => r.Id).FirstOrDefault();
+
+    private string Tone => Case.Status switch
+    {
+        CaseStatus.Closed => "is-success",
+        CaseStatus.Expired => "is-danger",
+        CaseStatus.Reminded or CaseStatus.Escalated => "is-warning",
+        _ when Draft is not null => "is-warning",
+        _ => "",
+    };
+
+    private async Task RunAsync(Func<Task> work, string? done = null)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            await work();
+            if (done is not null) Snackbar.Add(done, Severity.Success);
+            await OnChanged.InvokeAsync();
+        }
+        catch (Exception ex) { _error = CrsUi.Problem(ex); }
+        finally { _busy = false; }
+    }
+
+    private RenderFragment Head(string title, string text, string icon) => @<div class="crs-next-head">
+        <span class="crs-next-icon"><MudIcon Icon="@icon" /></span>
+        <div>
+            <div class="app-card-title">@title</div>
+            <div class="crs-hint" style="max-width:72ch">@text</div>
+            @if (Case.IsOpen && Case.Indicia.Count > 0)
+            {
+                <div class="crs-why">
+                    <span>@T("Why this case:")</span>
+                    @foreach (var i in Case.Indicia.Take(4))
+                    {
+                        <span class="crs-why-item" title="@($"{CrsUi.RuleTitle(i.RuleId)} · {i.RuleId}, {CrsUi.Page(i.GuidePage)}")">@CrsUi.ShortRule(i.RuleId) · @CrsUi.Country(i.Jurisdiction)</span>
+                    }
+                    @if (Case.DueAt is { } due)
+                    {
+                        <span>@T("due {0}", CrsUi.Date(due))</span>
+                    }
+                </div>
+            }
+        </div>
+    </div>;
+
+    /// <summary>Waits for the operator to confirm a step that cannot be undone, restating what it does.</summary>
+    private RenderFragment Checkpoint(string title, IEnumerable<(string Label, string Value)> facts, string confirm, string icon, Color color,
+                                      Func<Task> run, Action back, string? warning = null) => @<div class="crs-checkpoint">
+        <div class="crs-title mb-2">@title</div>
+        <dl class="crs-kv">
+            @foreach (var (label, value) in facts)
+            {
+                <dt>@label</dt><dd>@value</dd>
+            }
+        </dl>
+        @if (warning is not null)
+        {
+            <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-3" Icon="@Icons.Material.Rounded.Groups">@warning</MudAlert>
+        }
+        <div class="d-flex flex-wrap align-center gap-2 mt-4">
+            <MudButton Variant="Variant.Filled" Color="color" StartIcon="@icon" Disabled="_busy" OnClick="run">@confirm</MudButton>
+            <MudButton Variant="Variant.Text" Disabled="_busy" OnClick="back">@T("Back")</MudButton>
+            <span class="crs-hint" style="margin:0">@T("Recorded in the audit log as {0}, {1}.", Signer, CrsUi.DateTimeText(Now))</span>
+        </div>
+    </div>;
+
+    private RenderFragment ReadOnlyNote(string who) => @<MudAlert Severity="Severity.Info" Dense="true" Class="mt-4" Icon="@Icons.Material.Rounded.Lock">@who</MudAlert>;
+
+    // ---- 1. Draft the request ----
+
+    private string _lang = Lang.Current;
+    private string? _body;
+    private bool _edited;
+
+    private string Body => _body ??= Template(_lang);
+
+    private string Template(string lang)
+    {
+        var due = Case.DueAt is { } d ? CrsUi.Local(d).ToString("d MMMM yyyy", System.Globalization.CultureInfo.GetCultureInfo(lang == "en" ? "en-GB" : "ro-RO")) : null;
+        var docs = string.Join("\n", RequiredDocs.Select(x => "- " + (lang == "en" ? x : Lang.Translations.GetValueOrDefault(x, x))));
+        return lang == "en"
+            ? "Hello,\n\nTo report your accounts correctly to the tax authority, we need to confirm where you are resident for tax purposes, after the recent change to your details. "
+              + (due is null ? "Please send us:\n" : $"Please send us by {due}:\n") + docs
+              + "\n\nIf anything is unclear, we are happy to help.\n\nKind regards,\nThe tax compliance team"
+            : "Bună ziua,\n\nPentru a vă raporta corect conturile la ANAF, trebuie să confirmăm unde sunteți rezident fiscal, după modificarea recentă a datelor dumneavoastră. "
+              + (due is null ? "Vă rugăm să ne trimiteți:\n" : $"Vă rugăm să ne trimiteți până la {due}:\n") + docs
+              + "\n\nDacă aveți întrebări, vă stăm la dispoziție.\n\nCu stimă,\nEchipa de conformitate fiscală";
+    }
+
+    private void SetLang(string lang)
+    {
+        _lang = lang;
+        if (!_edited) _body = Template(lang);
+    }
+
+    private RenderFragment Drafting => __builder =>
+    {
+        var kind = Case.Responses.Count > 0 ? RequestKind.FollowUp : RequestKind.Initial;
+        <div>
+            @Head(T("Write the request to the client"), T("The documents to ask for are computed by code from the indicia, the regime and the account age. The text is a starting point; nothing leaves the bank before the operator approves it."), Icons.Material.Rounded.EditNote)
+            <div class="crs-grid two">
+                <div>
+                    <div class="d-flex align-center gap-2 mb-2">
+                        <Segmented Label="@T("Language of the letter")" Value="@_lang" ValueChanged="SetLang" Options="@([new("ro", "RO"), new("en", "EN")])" />
+                        <span class="crs-hint" style="margin:0">@T("Language of the letter")</span>
+                    </div>
+                    <MudTextField T="string" Value="Body" ValueChanged="v => { _body = v; _edited = true; }" Variant="Variant.Outlined" Lines="10" Sizing="InputSizing.Auto"
+                                  Label="@T("Letter")" Disabled="@(!IsEditor)" Immediate="true" />
+                </div>
+                <div>
+                    <div class="crs-title mb-2">@T("Documents requested")</div>
+                    <ul class="crs-docs">
+                        @foreach (var doc in RequiredDocs)
+                        {
+                            <li><MudIcon Icon="@Icons.Material.Rounded.Description" /> @T(doc)</li>
+                        }
+                    </ul>
+                    @if (Case.DueAt is { } due)
+                    {
+                        <div class="crs-hint mt-3">@T("Due by {0} ({1}).", CrsUi.Date(due), Case.DeadlineRuleId)</div>
+                    }
+                </div>
+            </div>
+            <div class="d-flex flex-wrap align-center gap-2 mt-4">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.Drafts" Disabled="@(_busy || !IsEditor || string.IsNullOrWhiteSpace(Body))"
+                           OnClick="@(() => RunAsync(() => Cases.DraftRequestAsync(Case.Code, _lang, Body, kind), T("Draft saved: it waits for the operator's approval")))">
+                    @(kind == RequestKind.FollowUp ? T("Save the follow-up draft") : T("Save the draft"))
+                </MudButton>
+                <span class="crs-hint" style="margin:0">@T("The draft goes into the audit log with your name.")</span>
+            </div>
+            @if (!IsEditor)
+            {
+                @ReadOnlyNote(T("Viewers read the case; the operator and the tax department write the request."))
+            }
+        </div>
+    };
+
+    // ---- 2. Approve a draft ----
+
+    private string _channel = "email";
+    private bool _rejecting;
+    private int? _confirmRequest;
+    private string _reason = "";
+
+    private RenderFragment Approval(ClientRequest draft) => __builder =>
+    {
+        <div>
+            @Head(draft.Kind == RequestKind.Reminder ? T("Approve the reminder to the client") : T("Approve the request to the client"),
+                  draft.DraftedBy == CaseService.SystemActor
+                      ? T("Drafted by the deadline watcher on the reminder day. Approving sends it; the case keeps waiting for the client.")
+                      : T("Drafted by {0}. Approving sends it and starts the wait for the client's answer.", CrsUi.Actor(draft.DraftedBy)),
+                  Icons.Material.Rounded.HowToReg)
+            <div class="crs-grid two">
+                <div class="crs-letter">@draft.Body</div>
+                <div>
+                    <div class="crs-title mb-2">@T("Documents requested")</div>
+                    <ul class="crs-docs mb-4">
+                        @foreach (var doc in draft.RequestedDocuments)
+                        {
+                            <li><MudIcon Icon="@Icons.Material.Rounded.Description" /> @T(doc)</li>
+                        }
+                    </ul>
+                    <MudSelect T="string" @bind-Value="_channel" Label="@T("Send via")" Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense" Disabled="@(!IsOperator)">
+                        @foreach (var c in CrsUi.Channels)
+                        {
+                            <MudSelectItem Value="c">@CrsUi.Channel(c)</MudSelectItem>
+                        }
+                    </MudSelect>
+                </div>
+            </div>
+            @if (_rejecting)
+            {
+                <div class="d-flex flex-wrap align-start gap-2 mt-4">
+                    <MudTextField T="string" @bind-Value="_reason" Label="@T("Why is it rejected?")" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" Class="crs-field-lg" AutoFocus="true" />
+                    <MudButton Variant="Variant.Outlined" Color="Color.Error" Disabled="@(_busy || string.IsNullOrWhiteSpace(_reason))"
+                               OnClick="@(() => RunAsync(async () => { await Cases.RejectRequestAsync(Case.Code, draft.Id, _reason); _body = draft.Body; _edited = true; _rejecting = false; _reason = ""; }, T("Draft rejected: write a new one")))">
+                        @T("Reject and rewrite")
+                    </MudButton>
+                    <MudButton Variant="Variant.Text" OnClick="() => _rejecting = false">@T("Cancel")</MudButton>
+                </div>
+            }
+            else if (_confirmRequest == draft.Id)
+            {
+                @Checkpoint(draft.Kind == RequestKind.Reminder ? T("Send this reminder?") : T("Send this request?"),
+                    [
+                        (T("To"), ClientName ?? Case.ClientCode),
+                        (T("Via"), CrsUi.Channel(_channel)),
+                        (T("Documents"), T("{0} requested", draft.RequestedDocuments.Count)),
+                        (T("Deadline"), Case.DueAt is { } due ? CrsUi.Date(due) : T("No deadline")),
+                        (T("Drafted by"), CrsUi.Actor(draft.DraftedBy)),
+                    ],
+                    T("Confirm and send"), Icons.Material.Rounded.Send, Color.Primary,
+                    () => RunAsync(async () => { await Cases.ApproveRequestAsync(Case.Code, draft.Id, _channel); _confirmRequest = null; }, T("Approved and sent via {0}", CrsUi.Channel(_channel))),
+                    () => _confirmRequest = null,
+                    User is not null && draft.DraftedBy == "user:" + User.Id ? T("You wrote this draft. A second person should approve what goes to the client (four eyes).") : null)
+            }
+            else
+            {
+                <div class="d-flex flex-wrap align-center gap-2 mt-4">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.Send" Disabled="@(_busy || !IsOperator)"
+                               OnClick="@(() => _confirmRequest = draft.Id)">@T("Approve and send")</MudButton>
+                    <MudButton Variant="Variant.Outlined" Disabled="@(_busy || !IsOperator)" OnClick="() => _rejecting = true">@T("Reject")</MudButton>
+                    <span class="crs-hint" style="margin:0">@T("You check the details once more before it goes.")</span>
+                </div>
+            }
+            @if (!IsOperator)
+            {
+                @ReadOnlyNote(T("Only the operator approves what goes to the client."))
+            }
+        </div>
+    };
+
+    // ---- 3. Register the answer ----
+
+    private ResponseKind _kind = ResponseKind.NewSelfCertification;
+    private ExplanationCategory _category = ExplanationCategory.Student;
+    private string _answerChannel = "online";
+    private string _summary = "";
+    private DateTime? _signedOn;
+    private bool _declaresUs, _documentary;
+    private readonly List<ResidenceRow> _residences = [new()];
+    private bool _escalating;
+    private string _escalation = "";
+
+    private sealed class ResidenceRow
+    {
+        public string Country { get; set; } = "";
+        public string Tin { get; set; } = "";
+        public NoTinReason Reason { get; set; }
+    }
+
+    /// <summary>True when the Demo menu can fill in this case's golden answer (offered by CaseDetailPage).</summary>
+    public bool CanFillSample => Sample is not null && IsEditor && Case.Status is CaseStatus.AwaitingClient or CaseStatus.Reminded or CaseStatus.Escalated;
+
+    private GoldenResponse? Sample => GoldenCases.All.Where(g => g.ClientCode == Case.ClientCode && g.Response is not null).Select(g => g.Response).FirstOrDefault();
+
+    public void FillSample()
+    {
+        if (Sample is not { } s) return;
+        _kind = s.Kind;
+        _category = s.Category == ExplanationCategory.None ? ExplanationCategory.Student : s.Category;
+        _answerChannel = string.IsNullOrWhiteSpace(s.Channel) ? "online" : s.Channel;
+        _residences.Clear();
+        if (s.SelfCertification is { } sc)
+        {
+            _declaresUs = sc.DeclaresUsPerson;
+            _residences.AddRange(sc.Residences.Select(r => new ResidenceRow { Country = r.Country, Tin = r.Tin ?? "", Reason = r.NoTinReason }));
+        }
+        if (_residences.Count == 0) _residences.Add(new());
+        _documentary = Case.IsPreexisting;
+        _summary = s.Kind == ResponseKind.ReasonableExplanation ? T("The client explains the stay abroad: {0}.", CrsUi.Label(_category).ToLowerInvariant()) : T("New self-certification received.");
+        StateHasChanged();
+    }
+
+    private bool AnswerReady => _kind switch
+    {
+        ResponseKind.NewSelfCertification => _residences.Any(r => r.Country.Trim().Length == 2),
+        ResponseKind.ReasonableExplanation => _category != ExplanationCategory.None,
+        _ => !string.IsNullOrWhiteSpace(_summary),
+    };
+
+    private async Task RegisterAsync()
+    {
+        int? selfCertId = null;
+        if (_kind == ResponseKind.NewSelfCertification)
+        {
+            // Signed on the chosen day, but never after the bank received it (guide p. 34).
+            var signed = _signedOn is { } day ? DateTime.SpecifyKind(day.Date, DateTimeKind.Utc) : Now;
+            if (signed > Now) signed = Now;
+            var snapshot = new SelfCertificationSnapshot(signed,
+                [.. _residences.Where(r => r.Country.Trim().Length == 2).Select(r => new TaxResidenceSnapshot(r.Country.Trim().ToUpperInvariant(),
+                    string.IsNullOrWhiteSpace(r.Tin) ? null : r.Tin.Trim(), string.IsNullOrWhiteSpace(r.Tin) ? r.Reason : NoTinReason.None))],
+                _declaresUs);
+            // ChangeService owns client data: it saves the self-certification and lets code evaluate it against the case.
+            await Changes.RecordAsync(new ChangeRequest(Case.ClientCode, ChangeKind.SelfCertSubmitted, _answerChannel, SelfCertification: snapshot, CaseCode: Case.Code));
+            var client = await Clients.GetAsync(Case.ClientCode);
+            selfCertId = client?.SelfCertifications.Where(s => s.Status == SelfCertStatus.Valid).OrderByDescending(s => s.Id).Select(s => (int?)s.Id).FirstOrDefault();
+        }
+        await Cases.RegisterResponseAsync(Case.Code, new NewResponse(_kind,
+            _kind == ResponseKind.ReasonableExplanation ? _category : ExplanationCategory.None, _answerChannel,
+            string.IsNullOrWhiteSpace(_summary) ? CrsUi.Label(_kind) : _summary, HasDocumentaryEvidence: _documentary, SelfCertificationId: selfCertId));
+    }
+
+    private RenderFragment Answer => __builder =>
+    {
+        <div>
+            @Head(T("Register the client's answer"),
+                  Case.Status == CaseStatus.Escalated && Case.EscalationReason is { } why
+                      ? T("Escalated to the tax department: {0}", why)
+                      : T("Waiting since the request was sent. Record what the client sent; code then checks whether it is enough to close."),
+                  Icons.Material.Rounded.MarkEmailUnread)
+            <div class="crs-form cols-2">
+                <MudSelect T="ResponseKind" @bind-Value="_kind" Label="@T("Answer")" Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense" Disabled="@(!IsEditor)">
+                    @foreach (var k in Enum.GetValues<ResponseKind>())
+                    {
+                        <MudSelectItem Value="k">@CrsUi.Label(k)</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudSelect T="string" @bind-Value="_answerChannel" Label="@T("Received via")" Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense" Disabled="@(!IsEditor)">
+                    @foreach (var c in CrsUi.Channels)
+                    {
+                        <MudSelectItem Value="c">@CrsUi.Channel(c)</MudSelectItem>
+                    }
+                </MudSelect>
+
+                @if (_kind == ResponseKind.NewSelfCertification)
+                {
+                    <div class="span-2">
+                        <div class="crs-title mb-1">@T("Tax residences declared")</div>
+                        <div class="crs-hint mb-3">@T("The TIN format is checked as you type: \"format valid\", never \"TIN valid\".")</div>
+                        @foreach (var row in _residences)
+                        {
+                            var r = row;
+                            <div class="d-flex flex-wrap align-center gap-2 mb-2 crs-swap" style="display:flex">
+                                <CountryPicker @bind-Value="r.Country" Class="crs-field-md" Disabled="@(!IsEditor)" />
+                                <MudTextField T="string" @bind-Value="r.Tin" Label="TIN" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" Class="crs-field-grow" Disabled="@(!IsEditor)" />
+                                @if (r.Country.Trim().Length == 2 && !string.IsNullOrWhiteSpace(r.Tin))
+                                {
+                                    <span class="crs-swap" @key="@($"{r.Country}{r.Tin}")"><TinBadge Check="TinFormat.Check(r.Country.Trim().ToUpperInvariant(), r.Tin)" /></span>
+                                }
+                                else if (r.Country.Trim().Length == 2)
+                                {
+                                    <MudSelect T="NoTinReason" @bind-Value="r.Reason" Label="@T("No TIN: reason")" Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" Class="crs-field-md" Disabled="@(!IsEditor)">
+                                        @foreach (var reason in Enum.GetValues<NoTinReason>())
+                                        {
+                                            <MudSelectItem Value="reason">@(reason == NoTinReason.None ? T("No reason given") : CrsUi.Label(reason))</MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                }
+                                @if (_residences.Count > 1)
+                                {
+                                    <MudIconButton Icon="@Icons.Material.Rounded.RemoveCircleOutline" Size="Size.Small" aria-label="@T("Remove")" OnClick="() => _residences.Remove(r)" />
+                                }
+                            </div>
+                        }
+                        <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Rounded.Add" OnClick="() => _residences.Add(new())" Disabled="@(!IsEditor)">@T("Add a residence")</MudButton>
+                    </div>
+                    <MudDatePicker @bind-Date="_signedOn" Label="@T("Signed on")" Variant="Variant.Outlined" Margin="Margin.Dense" MaxDate="CrsUi.Local(Now).Date" Placeholder="@CrsUi.Date(Now)" Disabled="@(!IsEditor)" />
+                    <div class="d-flex flex-column">
+                        <MudCheckBox T="bool" @bind-Value="_declaresUs" Label="@T("Declares to be a US person")" Dense="true" Disabled="@(!IsEditor)" />
+                        @if (Case.IsPreexisting)
+                        {
+                            <MudCheckBox T="bool" @bind-Value="_documentary" Label="@T("New documentary evidence attached (preexisting account, p. 29)")" Dense="true" Disabled="@(!IsEditor)" />
+                        }
+                    </div>
+                }
+                else if (_kind == ResponseKind.ReasonableExplanation)
+                {
+                    <MudSelect T="ExplanationCategory" @bind-Value="_category" Label="@T("Explanation (guide p. 37)")" Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense" Class="span-2" Disabled="@(!IsEditor)">
+                        @foreach (var c in Enum.GetValues<ExplanationCategory>().Where(c => c != ExplanationCategory.None))
+                        {
+                            <MudSelectItem Value="c">@CrsUi.Label(c)</MudSelectItem>
+                        }
+                    </MudSelect>
+                }
+                <MudTextField T="string" @bind-Value="_summary" Label="@T("Note on the answer")" Variant="Variant.Outlined" Lines="2" Class="span-2" Immediate="true" Disabled="@(!IsEditor)" />
+            </div>
+            <div class="d-flex flex-wrap align-center gap-2 mt-4">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.MarkEmailRead" Disabled="@(_busy || !IsEditor || !AnswerReady)"
+                           OnClick="@(() => RunAsync(RegisterAsync, T("Answer registered: code checks it before closing")))">@T("Register the answer")</MudButton>
+                @if (IsEditor && !AnswerReady)
+                {
+                    <span class="crs-hint" style="margin:0">@(_kind == ResponseKind.NewSelfCertification ? T("Add at least one country of residence.") : T("Add a note on the answer."))</span>
+                }
+                @if (Case.Status is CaseStatus.AwaitingClient or CaseStatus.Reminded)
+                {
+                    @if (_escalating)
+                    {
+                        <MudTextField T="string" @bind-Value="_escalation" Label="@T("Why escalate?")" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" Class="crs-field-md" AutoFocus="true" />
+                        <MudButton Variant="Variant.Outlined" Color="Color.Warning" Disabled="@(_busy || string.IsNullOrWhiteSpace(_escalation))"
+                                   OnClick="@(() => RunAsync(async () => { await Cases.EscalateAsync(Case.Code, _escalation); _escalating = false; }, T("Escalated to the tax department")))">@T("Escalate")</MudButton>
+                        <MudButton Variant="Variant.Text" OnClick="() => _escalating = false">@T("Cancel")</MudButton>
+                    }
+                    else
+                    {
+                        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Rounded.PriorityHigh" Disabled="@(_busy || !IsEditor)" OnClick="() => _escalating = true">@T("Escalate to the tax department")</MudButton>
+                    }
+                }
+            </div>
+            @if (!IsEditor)
+            {
+                @ReadOnlyNote(T("Viewers read the case; the operator and the tax department register answers."))
+            }
+        </div>
+    };
+
+    // ---- 4. Approve the closing ----
+
+    private ConfirmationChannel _proofChannel = ConfirmationChannel.Online;
+    private ConfirmationEvidenceKind _evidenceKind = ConfirmationEvidenceKind.ElectronicAcceptance;
+
+    private RenderFragment Closing => __builder =>
+    {
+        var response = Case.Responses.OrderBy(r => r.ReceivedAt).ThenBy(r => r.Id).Last();
+        <div>
+            @Head(T("Approve the closing"), T("Code re-evaluates the client with the answer when you approve. If the answer is not enough, the case stays open and you ask for a follow-up."), Icons.Material.Rounded.Gavel)
+            <div class="crs-grid two">
+                <div>
+                    <dl class="crs-kv">
+                        <dt>@T("Answer")</dt><dd>@CrsUi.Label(response.Kind)@(response.Kind == ResponseKind.ReasonableExplanation ? $" · {CrsUi.Label(response.Category)}" : "")</dd>
+                        <dt>@T("Received")</dt><dd>@CrsUi.DateTimeText(response.ReceivedAt) · @CrsUi.Channel(response.Channel)</dd>
+                        @if (!string.IsNullOrWhiteSpace(response.Summary))
+                        {
+                            <dt>@T("Note")</dt><dd>@response.Summary</dd>
+                        }
+                    </dl>
+                    @if (response.Kind == ResponseKind.NewSelfCertification && Current is { } now)
+                    {
+                        <div class="mt-4 d-flex flex-wrap align-center gap-2">
+                            <span class="crs-hint" style="margin:0">@T("Code on today's data:")</span>
+                            <DecisionPill Decision="now.Decision" />
+                            @if (now.ReportableFor.Count > 0)
+                            {
+                                <span class="crs-hint" style="margin:0">@T("reportable for {0}", string.Join(", ", now.ReportableFor))</span>
+                            }
+                        </div>
+                        @foreach (var open in now.Uncovered)
+                        {
+                            <div class="crs-hint mt-1"><span class="crs-code">@open.RuleId</span> · @open.Jurisdiction · @Lang.Pick(open.ExplanationRo, open.Explanation)</div>
+                        }
+                    }
+                </div>
+                <div class="crs-form">
+                    <MudSelect T="ConfirmationChannel" @bind-Value="_proofChannel" Label="@T("Confirmation channel (p. 34)")" Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense" Disabled="@(!IsOperator)">
+                        @foreach (var c in Enum.GetValues<ConfirmationChannel>())
+                        {
+                            <MudSelectItem Value="c">@CrsUi.Label(c)</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudSelect T="ConfirmationEvidenceKind" @bind-Value="_evidenceKind" Label="@T("Form of confirmation")" Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense" Disabled="@(!IsOperator)">
+                        @foreach (var k in Enum.GetValues<ConfirmationEvidenceKind>())
+                        {
+                            <MudSelectItem Value="k">@CrsUi.Label(k)</MudSelectItem>
+                        }
+                    </MudSelect>
+                </div>
+            </div>
+            @if (_confirmClose)
+            {
+                @Checkpoint(T("Close this case?"),
+                    [
+                        (T("Client"), ClientName ?? Case.ClientCode),
+                        (T("Answer"), CrsUi.Label(response.Kind)),
+                        (T("Confirmation"), $"{CrsUi.Label(_proofChannel)} · {CrsUi.Label(_evidenceKind)}"),
+                        (T("Code on today's data:"), Current is { } cur && response.Kind == ResponseKind.NewSelfCertification ? CrsUi.Label(cur.Decision) : T("re-evaluated when you confirm")),
+                    ],
+                    T("Confirm and close"), Icons.Material.Rounded.TaskAlt, Color.Success,
+                    () => RunAsync(async () => { _confirmClose = false; await Cases.CloseAsync(Case.Code, _proofChannel, _evidenceKind); }, T("Case closed with proof of confirmation")),
+                    () => _confirmClose = false)
+            }
+            else
+            {
+                <div class="d-flex flex-wrap align-center gap-2 mt-4">
+                    <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Rounded.TaskAlt" Disabled="@(_busy || !IsOperator)"
+                               OnClick="() => _confirmClose = true">@T("Approve the closing")</MudButton>
+                    @if (_error is not null && IsEditor)
+                    {
+                        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Rounded.Reply"
+                                   OnClick="@(() => { _error = null; _followUp = true; })">@T("Ask for a follow-up")</MudButton>
+                    }
+                </div>
+            }
+            @if (_followUp)
+            {
+                <MudDivider Class="my-5" />
+                @Drafting
+            }
+            @if (!IsOperator)
+            {
+                @ReadOnlyNote(T("Only the operator approves the closing."))
+            }
+        </div>
+    };
+
+    private bool _followUp, _confirmClose;
+
+    // ---- 5. Closed or expired ----
+
+    private RenderFragment Outcome => __builder =>
+    {
+        var closed = Case.Status == CaseStatus.Closed;
+        <div>
+            <div class="crs-verdict-stamp mb-4">
+                <span class="crs-verdict-glyph" style="@(closed ? "background:var(--app-success-tint);color:var(--mud-palette-success)" : "background:var(--app-danger-tint);color:var(--mud-palette-error)")">
+                    <MudIcon Icon="@(closed ? Icons.Material.Rounded.TaskAlt : Icons.Material.Rounded.EventBusy)" />
+                </span>
+                <div>
+                    <div class="crs-verdict-title">@(closed ? T("Closed") : T("Expired"))</div>
+                    <div class="crs-hint">@CrsUi.DateTimeText((Case.ClosedAt ?? Case.ExpiredAt)!.Value) · <span class="crs-code">@Case.OutcomeRuleId</span></div>
+                </div>
+            </div>
+            <p style="max-width:75ch;margin:0 0 12px">@Lang.Pick(Case.OutcomeRo ?? Case.Outcome, Case.Outcome)</p>
+            <div class="d-flex flex-wrap align-center gap-2">
+                <span class="crs-hint" style="margin:0">@T("Reportable for")</span>
+                @if (Case.ReportableFor.Count == 0)
+                {
+                    <Pill>@T("No jurisdiction")</Pill>
+                }
+                @foreach (var j in Case.ReportableFor)
+                {
+                    <Pill Tone="accent" Icon="@Icons.Material.Rounded.Public">@CrsUi.Country(j)</Pill>
+                }
+            </div>
+            @if (Case.Proof is { } proof)
+            {
+                <MudDivider Class="my-5" />
+                <div class="crs-title mb-1">@T("Proof of confirmation")</div>
+                <div class="crs-hint mb-3">@T("Kept with the self-certification for audit (guide p. 34-35). Built by code from the answer.")</div>
+                <dl class="crs-kv">
+                    <dt>@T("Channel")</dt><dd>@CrsUi.Label(proof.Channel) · @CrsUi.Label(proof.EvidenceKind)</dd>
+                    <dt>@T("Confirmed")</dt><dd>@CrsUi.DateTimeText(proof.ConfirmedAt)</dd>
+                    <dt>@T("Declaration")</dt><dd>@T("dated {0}, received {1}", CrsUi.Date(proof.DeclarationDatedAt), CrsUi.Date(proof.DeclarationReceivedAt))</dd>
+                    <dt>@T("Signed by")</dt><dd>@proof.SignedBy</dd>
+                    <dt>@T("Approved by")</dt><dd>@proof.ApprovedBy</dd>
+                    @if (proof.TransactionOrDocumentId is { } reference)
+                    {
+                        <dt>@T("Reference")</dt><dd class="crs-code">@reference</dd>
+                    }
+                    <dt>SHA-256</dt><dd class="crs-code" title="@proof.EvidenceSha256">@proof.EvidenceSha256[..Math.Min(16, proof.EvidenceSha256.Length)]…</dd>
+                    <dt>@T("Steps")</dt><dd>@proof.CollectionSteps</dd>
+                </dl>
+            }
+        </div>
+    };
+}

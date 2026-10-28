@@ -1,0 +1,9 @@
+@using HackathonStarter.Features.Cases
+@* The case status as a word, an icon and a tone; the key restarts the swap animation when the status changes. *@
+<span class="crs-swap" @key="Status">
+    <Pill Tone="@CrsUi.Tone(Status)" Icon="@CrsUi.Icon(Status)">@CrsUi.Label(Status)</Pill>
+</span>
+
+@code {
+    [Parameter, EditorRequired] public CaseStatus Status { get; set; }
+}
