@@ -58,6 +58,9 @@ public partial class PiiVault
         text = CardRegex().Replace(text, m => IsLuhnValid(m.Value) ? Token("CARD", m.Value) : m.Value);
         text = PhoneRegex().Replace(text, m => Token("PHONE", m.Value));
         text = InternationalPhoneRegex().Replace(text, MaskInternationalPhone);
+        // Digits after a "+" that the phone pattern left (an amount to it, "+1900515400013.50") are checked as CNP and card.
+        text = CnpAfterPlusRegex().Replace(text, m => IsValidCnp(m.Value) ? Token("CNP", m.Value) : m.Value);
+        text = CardAfterPlusRegex().Replace(text, m => IsLuhnValid(m.Value) ? Token("CARD", m.Value) : m.Value);
         return text;
     }
 
@@ -139,7 +142,7 @@ public partial class PiiVault
             var part = number[range];
             var digits = Digits(part);
             if (kept >= 10 && (digits > 2 || previous > 2)) break;
-            if (kept >= 7 && part is ['0', '0', >= '1' and <= '9', ..] && Digits(number[range.Start..], max: 9) - 2 >= 7) break;
+            if (part is ['0', '0', >= '1' and <= '9', ..] && Digits(number[range.Start..], max: 9) - 2 >= 7) break;
             if (kept + digits > 15)
             {
                 if (part.IndexOfAny('-', '.') >= 0) (kept, cut) = (kept + digits, range.End.GetOffset(number.Length));
@@ -149,8 +152,10 @@ public partial class PiiVault
         }
         if (kept < 7)
         {
-            output.Append(run, start, end - start);
-            return end;
+            // Not a phone ("+12"): keep its first part and scan the rest, which may hold one ("+12 0049 89 4521 7730").
+            var first = number.IndexOf(' ') is var space and >= 0 ? space : number.Length;
+            output.Append(run, start, numberStart + first - start);
+            return numberStart + first;
         }
         var phone = (prefix[0] == '\\' ? "+" : prefix.ToString()) + number[..cut].ToString();
         output.Append(Token("PHONE", phone));
@@ -224,6 +229,12 @@ public partial class PiiVault
 
     [GeneratedRegex(@"(?<!(?<![\w+]|\w-)\+)\b[1-9]\d{12}\b")]
     private static partial Regex CnpRegex();
+
+    [GeneratedRegex(@"(?<=\+)[1-9]\d{12}\b")]
+    private static partial Regex CnpAfterPlusRegex();
+
+    [GeneratedRegex(@"(?<=\+)(?:\d[ -]?){12,18}\d\b")]
+    private static partial Regex CardAfterPlusRegex();
 
     // Romanian mobile/landline numbers: +40 / 0040 / 0 prefix, optional separators.
     [GeneratedRegex(@"(?<![\d\w])(?:\+40|0040|0)\s?[237]\d{2}[\s.-]?\d{3}[\s.-]?\d{3}(?!\d)")]

@@ -158,6 +158,8 @@ public class PiiVaultInternationalTests
     [InlineData("1001,0049 89 4521 7730", "1001,[PHONE_1]")] // a "00" number after a numeric column
     [InlineData("1,Maria,35,0049 89 4521 7730", "1,Maria,35,[PHONE_1]")]
     [InlineData("Maria,+1 (212) 555-0147,35", "Maria,[PHONE_1],35")]
+    [InlineData("Ref +12 0049 89 4521 7730", "Ref +12 [PHONE_1]")] // a "00" number after a short one
+    [InlineData("+1 0049 89 4521 7730", "+1 [PHONE_1]")]
     public void Only_the_phone_is_masked_not_what_follows(string text, string expected)
     {
         var vault = new PiiVault();
@@ -176,6 +178,8 @@ public class PiiVaultInternationalTests
     [InlineData("Card+4111111111111111", "Card+[CARD_1]", "CARD", "4111111111111111")]
     [InlineData("card+number+4111111111111111", "card+number+[CARD_1]", "CARD", "4111111111111111")]
     [InlineData("q=CNP+1900515400013", "q=CNP+[CNP_1]", "CNP", "1900515400013")] // URL-encoded query in a log
+    [InlineData("Suma +1900515400013.50", "Suma +[CNP_1].50", "CNP", "1900515400013")] // an amount to the phone pattern
+    [InlineData("Suma +378282246310005.50", "Suma +[CARD_1].50", "CARD", "378282246310005")]
     public void A_card_after_a_plus_is_still_a_card(string text, string expected, string type, string value)
     {
         Assert.Equal(expected, new PiiVault().Mask(text));
@@ -200,7 +204,7 @@ public class PiiVaultInternationalTests
     {
         // One regex match covers the whole run, and each number in it is masked before the rest is scanned again. A copy
         // of the rest per number made memory grow with the square of the run: 80,000 characters took 3.2 GB.
-        var text = string.Join(' ', Enumerable.Range(0, 3000).Select(i => $"0012.{3000 + i % 1000}"));
+        var text = string.Join(' ', Enumerable.Range(0, 3000).Select(i => $"0049.89.4521.{7000 + i % 1000}"));
         var before = GC.GetAllocatedBytesForCurrentThread();
 
         var masked = PiiVault.ForStorage().Mask(text);
