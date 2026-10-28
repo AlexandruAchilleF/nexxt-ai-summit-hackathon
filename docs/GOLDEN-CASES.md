@@ -243,7 +243,7 @@ Rezident RO standard, născut pe 1991-02-26 la Timișoara · CNP `1910226354122`
 | **Change** | `AddressChanged`, la ghișeu, **`2026-03-10T08:00Z`**: Avenida Diagonal 450, 08006 Barcelona, ES |
 | **Expected** | `Clarification` · hits: `CRS-IND-ADDR` (ES) · `DL-PRE-YEAR`, Preexisting = true · DueAt = max(**2026-12-31**, 2026-06-08) = 2026-12-31 · RemindAt 2026-12-26 |
 | Expirare | Tick după 31.12.2026 → `Expired` · `DL-EXPIRED-PRE`: rezident **cel puțin** în ES → ReportableFor ⊇ `[ES]` · p. 29, exemplul 2 |
-| NEVERIFICAT | „sau” (ghidul) vs. „cea mai târzie” (Comentariul OCDE); ora exactă de pe 31.12 (Î5) |
+| Decis | Cea mai târzie dintre 31.12 și +90 de zile (interpretarea noastră, aliniată la Comentariul OCDE; ghidul spune „sau”). Ora de pe 31.12: propunerea din Î5 |
 
 ### Cazul 18: Teodora Iliescu (`CL-0018`) · PROPUS
 

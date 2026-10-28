@@ -121,8 +121,9 @@ CRS preexistent = existent la 31.12.2015, FATCA preexistent = existent la 30.06.
   conturile noi, ghidul cere autocertificarea și testul de rezonabilitate față de informațiile băncii (p. 33). Folosim
   indiciile drept criterii prin care autocertificarea e contrazisă.
 - **Mutarea în țară** (`GEN-DOMESTIC`) nu are o pagină proprie: nicio regulă din p. 29–31 nu se aplică, deci `NoCase`.
-- **NEVERIFICAT:** la contul preexistent ghidul spune „sfârșitul anului **sau** 90 de zile”; „cea mai târzie” vine din
-  Comentariul OCDE. La FATCA, ghidul (p. 38) nu dă un termen pentru schimbarea de circumstanțe: cazul se deschide fără
+- **Termenul la contul preexistent.** Ghidul (p. 29) spune „până la sfârșitul anului **sau** 90 de zile”. Aplicăm cea mai
+  târzie dintre cele două date. Este interpretarea noastră, aliniată la Comentariul OCDE la standardul CRS.
+- **NEVERIFICAT:** la FATCA, ghidul (p. 38) nu dă un termen pentru schimbarea de circumstanțe: cazul se deschide fără
   termen din ghid, cu NEVERIFICAT afișat, și nu împrumutăm cele 90 de zile CRS.
 
 ## 6. Arhitectura
@@ -206,9 +207,12 @@ Cifrele se completează aici după prima rulare completă, cu data rulării. Nic
 ## 9. Confidențialitate
 
 - **Doar date sintetice.** Clienții, documentele și TIN-urile sunt generate; actele de identitate poartă „SPECIMEN”.
-- **Temeiul legal** ar fi obligația legală (art. 6 alin. 1 lit. c GDPR), prin Legea 207/2015 și Acordul FATCA
-  (trimiterea exactă: NEVERIFICAT).
-- **AI-ul nu decide** (art. 22 GDPR): codul aplică regulile, omul aprobă cererea și închiderea.
+- **Temeiul legal** este obligația legală (art. 6 alin. (1) lit. (c) GDPR): Legea 207/2015 privind Codul de procedură
+  fiscală (art. 62 alin. (7), art. 291 alin. (4) și Anexa nr. 1) și Acordul FATCA, așa cum le citează ghidul (p. 4).
+- **Art. 22 GDPR nu se aplică:** nicio decizie nu se ia exclusiv automat. Codul aplică regulile, omul aprobă cererea și
+  închiderea.
+- **Mascarea** CNP-urilor, IBAN-urilor, numerelor de card, e-mailurilor și telefoanelor înainte de model ține de
+  minimizarea datelor (art. 5 alin. (1) lit. (c) GDPR) și de securitatea prelucrării (art. 32 GDPR).
 - Numele și adresele nu sunt mascate înainte de model (datele sunt sintetice). Pagina `/privacy` arată, din configurația
   live, ce ajunge la care model, ce se salvează și cât timp.
 
