@@ -15,7 +15,6 @@ public static partial class Lang
         ro["Change applied successfully"] = "Schimbare aplicată cu succes";
         ro["Change kind"] = "Felul schimbării";
         ro["City (required)"] = "Oraș (obligatoriu)";
-        ro["Client"] = "Client";
         ro["Client (required)"] = "Client (obligatoriu)";
         ro["Country"] = "Țară";
         ro["Country code (e.g. DE, RO, IT)"] = "Cod țară (ex. DE, RO, IT)";

@@ -13,7 +13,7 @@
     <span class="crs-datebar-date" data-testid="demo-date" title="@T("The date CRS deadlines are computed on. The rest of the app keeps the real time.")">
         <MudIcon Icon="@Icons.Material.Rounded.Today" />
         <span class="crs-datebar-prefix">@T("Today:")</span>
-        <span class="tabular">@Format.Date(Now)</span>
+        <span class="tabular">@Format.Date(CurrentNow)</span>
         @if (_offsetDays > 0)
         {
             <span class="crs-datebar-offset tabular">@T("(+{0} days)", _offsetDays)</span>
@@ -52,7 +52,13 @@
     private bool _isAdmin, _busy;
     private int _offsetDays;
 
-    private DateTime Now => SimClock.UtcNow;
+    [Parameter]
+    public DateTime? Now { get; set; }
+
+    [Parameter]
+    public EventCallback<DateTime> OnDateChanged { get; set; }
+
+    private DateTime CurrentNow => Now ?? SimClock.UtcNow;
     private TimeSpan Offset => SimClock.Offset;
 
     private static string StepLabel(int days) => days == 1 ? T("+1 day") : T("+{0} days", days);
@@ -73,7 +79,7 @@
 
     private async Task Advance(int days)
     {
-        await Run(() => ClockControl.AdvanceDaysAsync(days), () => T("Demo date: {0}", Format.Date(Now)));
+        await Run(() => ClockControl.AdvanceDaysAsync(days), () => T("Demo date: {0}", Format.Date(CurrentNow)));
     }
 
     private async Task Reset()
