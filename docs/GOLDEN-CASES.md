@@ -24,6 +24,7 @@ Toate datele sunt sintetice. CNP-urile, IBAN-urile, TIN-urile și numărul ABA a
 | `GEN-DOMESTIC` | Stă în `Cleared` (are explicație, nu e indiciu). `GEN-CHANGE-CIRC` nu se așteaptă nicăieri explicit. |
 | Termenul | Coloane separate: regula (`DL-*`), `Preexisting`, `DueAt`, `RemindAt`. Nu e în `ExpectedHits`. |
 | „Rezident RO standard” | Adresă de reședință în RO (curentă), un mobil RO (curent), cetățenie `[RO]`, `BirthCountry = RO`, autocertificare `Valid` cu `[RO, TIN = CNP]`, `DeclaresUsPerson = false`, semnată la deschiderea primului cont, la ghișeu. Fișele trec doar ce diferă. |
+| Canalul | Fișele scriu în română („la ghișeu”, „online”, „call center”). În cod: `branch` / `online` / `call center` (`ChangeEvent.SourceChannel`, `SelfCertification.Channel`); „ghișeu” e doar textul afișat în română. |
 | Conturi | `Depository` = cont curent / economii / depozit; `Custodial` = cont de instrumente financiare. Preexistent se calculează din `OpenedOn` (CRS ≤ 31.12.2015, FATCA ≤ 30.06.2014, p. 20). |
 | Coduri | Clientul cazului *n* are codul `CL-00nn`, cu excepțiile: Maria = `CL-0001` (din machetă), cazul 1 refolosește clientul `CL-0015`, cazul 8 refolosește `CL-0013`, cazul 17a refolosește `CL-0016`. |
 

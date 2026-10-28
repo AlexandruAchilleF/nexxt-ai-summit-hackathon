@@ -886,7 +886,7 @@ DB și fără serviciile lui R2.
 | 4 | Maria: mutare la München, telefon DE, fără telefon RO, **cont nou** | caz deschis, termen 90 de zile, `Clarification` | `CRS-IND-ADDR`, `CRS-IND-PHONE` | motor (R1) + flux (R2) |
 | 5a | Ordin permanent către IBAN DE din **cont curent** | `NoCase`, explicat | `CRS-IND-SO` cleared (cont de depozit, p. 29) | motor (R1) |
 | 5b | Același ordin din **cont de custodie** | `Clarification` | `CRS-IND-SO` | motor (R1) |
-| 5c | Ordin permanent către IBAN US din **cont curent** | `FatcaAlert` | `FATCA-IND-SO` (fără excepția de depozit, p. 31) | motor (R1) |
+| 5c | Ordin permanent către un cont ținut în SUA (fără IBAN: număr de cont și ABA; contează țara contului beneficiarului, cazurile-etalon Î2) din **cont curent** | `FatcaAlert` | `FATCA-IND-SO` (fără excepția de depozit, p. 31) | motor (R1) |
 | 6 | Pașaport (PDF cu text) cu locul nașterii în SUA | `FatcaAlert` | `FATCA-IND-POB` | motor (R1) |
 | 7 | Cetățenie SUA în pașaport | `FatcaAlert` | `FATCA-IND-CIT`; `FATCA-IND-POB` cleared (născut în RO) | motor (R1) |
 | 8 | Rezident RO cu salariu de la o firmă germană | `NoCase`; semnal slab, explicat | niciun indiciu; 1 `ContextSignal` | motor (R1) + agent (R4) pentru semnal |
@@ -900,7 +900,7 @@ DB și fără serviciile lui R2.
 | 16 | Mutare în Spania (cont nou), fără răspuns, cu câteva zile înainte de termen | `Reminded` → `Escalated` | `DL-NEW-90` | flux (R2) |
 | 17a | Același caz după expirare, cont nou | `Expired`; rezident în RO și ES | `DL-EXPIRED-NEW` (p. 35–36) | flux (R2) |
 | 17b | Mutare în Spania în martie, **cont preexistent** | termen 31 dec.; la expirare rezident cel puțin în ES | `DL-PRE-YEAR`, `DL-EXPIRED-PRE` (p. 29) | flux (R2) |
-| 18 | Răspuns în termen cu explicație rezonabilă (student cu viză) | `Compliant` la reevaluare → `Closed`, cu canal, moment, dovadă; nu e raportabil pentru DE | `CRS-IND-ADDR` acoperit (`AcceptedExplanation`), `RESP-EXPLANATION` | motor (R1) + flux (R2) |
+| 18 | Răspuns în termen cu explicație rezonabilă (studentă în DE, fără viză: dovada e adeverința de student, cazurile-etalon Î7) | `Compliant` la reevaluare → `Closed`, cu canal, moment, dovadă; nu e raportabil pentru DE | `CRS-IND-ADDR` acoperit (`AcceptedExplanation`), `RESP-EXPLANATION` | motor (R1) + flux (R2) |
 
 Plus **50 de clienți sintetici** (`SyntheticData`, seed fix), cu distribuție controlată (ex. 60% fără nimic,
 15% indicii CRS, 5% FATCA, 20% capcane). Eticheta fiecăruia e **scenariul ales la generare** („capcană: ordin din

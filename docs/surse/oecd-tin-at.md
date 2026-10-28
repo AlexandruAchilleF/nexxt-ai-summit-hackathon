@@ -27,7 +27,11 @@ Sursa pentru cazul-etalon 3 (Bogdan Lazăr, autocertificare fără TIN pentru AT
 > TIN are not reported on official documents of identification: no TIN cards are issued. TIN numbers can be found on
 > tax assessments in the right upper corner on the first page.
 
-Formatul (Section II): `99-999/9999`, 9 cifre; cratima și bara nu sunt obligatorii.
+Formatul (Section II): `99-999/9999`, 9 cifre. Comentariul:
+
+> The hyphen and the slash are not mandatory in all cases (eg for the purpose of IT processing they should be omitted)
+
+Adică cratima și bara nu sunt obligatorii peste tot, iar la prelucrarea informatică se omit.
 
 ## Ce folosim din ea
 
