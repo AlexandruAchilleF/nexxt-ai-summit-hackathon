@@ -1,20 +1,16 @@
+using HackathonStarter.Features.Clients;
+using HackathonStarter.Features.Tin;
 using static HackathonStarter.Features.Rules.Phrases;
 
 namespace HackathonStarter.Features.Rules;
 
-/// <summary>
-/// TIN format check, implemented by R3 (Features/Tin). true = format valid, false = wrong format, null = not checked
-/// (no rules for that country). It never says the TIN belongs to the person: "format valid", never "TIN valid".
-/// </summary>
-public interface ITinFormatCheck
+/// <summary>Used when no <see cref="ITinFormat"/> is given: every TIN is "not checked", so SC-TIN-FORMAT never fires.</summary>
+internal sealed class TinFormatNotChecked : ITinFormat
 {
-    bool? HasValidFormat(string country, string tin);
-}
+    public TinCheck Check(string country, string tin) =>
+        new(country.ToUpperInvariant(), tin.Trim(), false, TinCheckSource.NotChecked, "No TIN format check registered.");
 
-/// <summary>Used until R3's validator is registered: every TIN is "not checked", so SC-TIN-FORMAT never fires.</summary>
-public sealed class TinFormatNotChecked : ITinFormatCheck
-{
-    public bool? HasValidFormat(string country, string tin) => null;
+    public bool? IssuesTinToAllResidents(string country) => null;
 }
 
 /// <summary>
@@ -23,7 +19,7 @@ public sealed class TinFormatNotChecked : ITinFormatCheck
 /// </summary>
 internal static class SelfCertRules
 {
-    public static void Check(RuleSubject client, SubjectSelfCertification sc, ITinFormatCheck tins, Findings f)
+    public static void Check(RuleSubject client, SubjectSelfCertification sc, ITinFormat tins, Findings f)
     {
         Validity(sc, f);
         foreach (var residence in sc.Residences) Tin(residence, tins, f);
@@ -56,8 +52,11 @@ internal static class SelfCertRules
                 $"The self-certification is not valid, missing: {string.Join(", ", missing.Select(m => m.En))} (IV.B(3)).");
     }
 
-    // A TIN for each reportable jurisdiction (and the US), or a reason; the format is R3's check.
-    private static void Tin(SubjectTaxResidence residence, ITinFormatCheck tins, Findings f)
+    // A TIN for each reportable jurisdiction (and the US), or a reason; the format is R3's check. NotChecked (no rules for
+    // the country yet) is "not checked", never "wrong format": FormatValid means nothing then.
+    private static bool? FormatValid(TinCheck check) => check.Source == TinCheckSource.NotChecked ? null : check.FormatValid;
+
+    private static void Tin(SubjectTaxResidence residence, ITinFormat tins, Findings f)
     {
         var country = Jurisdictions.Normalize(residence.Country);
         if (!Jurisdictions.IsCrsReportable(country) && !Jurisdictions.IsUnitedStates(country)) return;
@@ -66,7 +65,7 @@ internal static class SelfCertRules
 
         if (!string.IsNullOrWhiteSpace(residence.Tin))
         {
-            switch (tins.HasValidFormat(country, residence.Tin.Trim()))
+            switch (FormatValid(tins.Check(country, residence.Tin.Trim())))
             {
                 case false:
                     f.Hit(RuleIds.TinFormat, country, "SelfCertification/Tin",
@@ -89,20 +88,21 @@ internal static class SelfCertRules
         }
 
         // No TIN: reason C is enough; A / B only if the jurisdiction does not issue TINs to everyone (VII.A pct. 3 a) iv)).
-        var issuesToAll = Jurisdictions.IssuesTinToAll(country);
+        // R3's OECD sheets first; our table only where R3 has no answer yet.
+        var issuesToAll = tins.IssuesTinToAllResidents(country) ?? Jurisdictions.IssuesTinToAll(country);
         var hasExplanation = !string.IsNullOrWhiteSpace(residence.NoTinExplanation);
         switch (residence.NoTinReason)
         {
-            case SubjectNoTinReason.None:
+            case NoTinReason.None:
                 f.Hit(RuleIds.TinMissing, country, "SelfCertification/Tin",
                     $"Lipsește TIN-ul pentru {place} și nu e dat niciun motiv (A, B sau C).",
                     $"The TIN for {placeEn} is missing and no reason (A, B or C) is given.");
                 break;
-            case SubjectNoTinReason.NotRequired:
+            case NoTinReason.C_NotRequired:
                 Accepted(f, country, $"Fără TIN pentru {place}, motiv C: TIN-ul nu e cerut de legea internă (Sec. I.D).",
                     $"No TIN for {placeEn}, reason C: domestic law does not require it (I.D).");
                 break;
-            case SubjectNoTinReason.UnableToObtain when !hasExplanation:
+            case NoTinReason.B_UnableToObtain when !hasExplanation:
                 f.Hit(RuleIds.TinMissing, country, "SelfCertification/Tin",
                     $"Fără TIN pentru {place}, motiv B, dar fără explicația cerută de formular.",
                     $"No TIN for {placeEn}, reason B, but without the explanation the form asks for.");
@@ -113,7 +113,7 @@ internal static class SelfCertRules
                     $"No TIN for {placeEn}, although the OECD sheet says {placeEn} issues TINs to all individuals: the bank has reason to know the self-certification is unreliable (VII.A(3)(a)(iv)).");
                 break;
             case var _ when issuesToAll == false:
-                var letter = residence.NoTinReason == SubjectNoTinReason.CountryDoesNotIssue ? "A" : "B";
+                var letter = residence.NoTinReason == NoTinReason.A_CountryDoesNotIssue ? "A" : "B";
                 Accepted(f, country,
                     $"Fără TIN pentru {place}, motiv {letter}: fișa OCDE spune că {place} nu emite TIN tuturor persoanelor fizice. Motivul e înregistrat.",
                     $"No TIN for {placeEn}, reason {letter}: the OECD sheet says {placeEn} does not issue TINs to all individuals. The reason is recorded.",
@@ -147,7 +147,7 @@ internal static class SelfCertRules
                 $"The residence address on the self-certification is in {Place(formCountry, true)}, but {Place(formCountry, true)} is not declared as a jurisdiction of residence: the reasonableness test fails (guide p. 37, example 2).");
 
         var onFile = client.Addresses
-            .Where(a => a.IsCurrent && a.Kind is SubjectAddressKind.Residence or SubjectAddressKind.Mailing)
+            .Where(a => a.IsCurrent && a.Kind is AddressKind.Residence or AddressKind.Mailing)
             .Select(a => Jurisdictions.Normalize(a.Country))
             .Where(c => Jurisdictions.IsCrsReportable(c) && !declared.Contains(c) && c != formCountry)
             .Distinct();

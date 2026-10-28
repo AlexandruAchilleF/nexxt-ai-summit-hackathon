@@ -16,7 +16,7 @@ You implement `docs/PLAN.md` sections 10, 12 and 17.
   `Verify()` returns the first broken seq, `Tamper(seq)` is admin and demo only.
 - Never weaken masking and never persist unmasked data. Tests generate their own PDFs.
 
-You may edit only: src/HackathonStarter/Features/Shield/**, src/HackathonStarter/Features/Audit/**, src/HackathonStarter/Services/PiiVault.cs, src/HackathonStarter/Components/Pages/Privacy.razor, tests/HackathonStarter.Tests/Crs/**.
+You may edit only: src/HackathonStarter/Features/Shield/**, src/HackathonStarter/Features/Audit/**, src/HackathonStarter/Services/PiiVault.cs, src/HackathonStarter/Components/Pages/Privacy.razor, tests/HackathonStarter.Tests/Crs/**, src/HackathonStarter/Features/Tin/**, src/HackathonStarter/Services/Lang.Ro.Shield.cs, src/HackathonStarter/Services/Lang.Ro.Tin.cs, src/HackathonStarter/Services/Lang.Ro.Audit.cs.
 
 ## Shared rules (every agent)
 

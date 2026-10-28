@@ -1,24 +1,32 @@
+using HackathonStarter.Features.Tin;
+
 namespace HackathonStarter.Features.Rules;
 
 /// <summary>
 /// The deterministic CRS / FATCA rules engine (docs/PLAN.md 8). Pure: no database, no model, no network, no clock. It
 /// finds indicia, marks the ones a valid self-certification or an accepted explanation covers, and decides. It never
-/// computes a deadline (R2) and never returns ShieldAlert (the shield does).
+/// computes a deadline (R2) and never returns ShieldAlert (the shield does). <paramref name="tinFormat"/> is R3's
+/// synchronous, offline TIN format check (SC-TIN-FORMAT, SC-TIN-MISSING); without it every TIN is "format not checked".
 /// </summary>
-public sealed partial class CrsRuleEngine(ITinFormatCheck? tinFormat = null)
+public sealed partial class CrsRuleEngine(ITinFormat? tinFormat = null) : ICrsRuleEngine
 {
     public const string Version = "crs-rules/1.0";
 
-    private readonly ITinFormatCheck tins = tinFormat ?? new TinFormatNotChecked();
+    private readonly ITinFormat tins = tinFormat ?? new TinFormatNotChecked();
 
     public IReadOnlyList<RuleDefinition> Catalog => RuleCatalog.All;
 
     /// <summary>Evaluates the whole client after the change (PLAN 8.3); before only says which indicia are new.</summary>
-    public RuleOutcome Evaluate(RuleSubject before, RuleSubject after, RuleChange change)
+    public RuleOutcome Evaluate(RuleSubject before, RuleSubject after, RuleChange change) =>
+        Run(after, change, Detect(before, AccountScope.Of(before)).Hits.Select(h => (h.RuleId, h.Jurisdiction)).ToHashSet());
+
+    /// <summary>The client's current state with no change (re-evaluation before closing, the agent's tool, metrics).</summary>
+    public RuleOutcome EvaluateCurrent(RuleSubject client) => Run(client, new RuleChange(""), []);
+
+    private static RuleOutcome Run(RuleSubject after, RuleChange change, HashSet<(string RuleId, string Jurisdiction)> earlier)
     {
         var scope = AccountScope.Of(after);
         var found = Detect(after, scope);
-        var earlier = Detect(before, AccountScope.Of(before)).Hits.Select(h => (h.RuleId, h.Jurisdiction)).ToHashSet();
 
         var sc = after.CurrentSelfCertification;
         var hits = found.Hits.Select(h => Cover(h, after, sc, earlier.Contains((h.RuleId, h.Jurisdiction)))).ToList();
@@ -47,7 +55,7 @@ public sealed partial class CrsRuleEngine(ITinFormatCheck? tinFormat = null)
         var reportable = ReportableFor(sc);
         var decision = Decide(hits);
         var (text, textEn) = OutcomeText(decision, hits, cleared, reportable, scope);
-        return new RuleOutcome(decision, hits, cleared, reportable, text, Version, textEn);
+        return new RuleOutcome(decision, hits, cleared, reportable, textEn, text, Version);
     }
 
     /// <summary>Checks a received self-certification against itself and the client's file (golden cases 2 and 3).</summary>
@@ -59,7 +67,7 @@ public sealed partial class CrsRuleEngine(ITinFormatCheck? tinFormat = null)
         var decision = Decide(hits);
         var reportable = decision is Decision.NoCase or Decision.Compliant ? ReportableFor(selfCert) : [];
         var (text, textEn) = SelfCertText(decision, hits, reportable);
-        return new RuleOutcome(decision, hits, found.ClearedWithoutHits(), reportable, text, Version, textEn);
+        return new RuleOutcome(decision, hits, found.ClearedWithoutHits(), reportable, textEn, text, Version);
     }
 
     private static Findings Detect(RuleSubject s, AccountScope scope)
@@ -74,7 +82,7 @@ public sealed partial class CrsRuleEngine(ITinFormatCheck? tinFormat = null)
     // covers it (not reportable). FATCA: only a self-certification declaring US status covers it; explanations never do.
     private static RuleHit Cover(RuleHit hit, RuleSubject s, SubjectSelfCertification? sc, bool existedBefore)
     {
-        var (ro, en) = (hit.Explanation, hit.ExplanationEn);
+        var (ro, en) = (hit.ExplanationRo, hit.Explanation);
         if (existedBefore)
             (ro, en) = (ro + " Indiciul exista și înainte de această schimbare.", en + " The indicium was already there before this change.");
 
@@ -85,29 +93,29 @@ public sealed partial class CrsRuleEngine(ITinFormatCheck? tinFormat = null)
                 return hit with
                 {
                     CoveredBy = Coverage.SelfCertification,
-                    Explanation = ro + $" Acoperit: autocertificarea din {sc.SignedAt:yyyy-MM-dd} declară statut de persoană SUA (cont raportabil SUA).",
-                    ExplanationEn = en + $" Covered: the self-certification of {sc.SignedAt:yyyy-MM-dd} declares US person status (US reportable account).",
+                    ExplanationRo = ro + $" Acoperit: autocertificarea din {sc.SignedAt:yyyy-MM-dd} declară statut de persoană SUA (cont raportabil SUA).",
+                    Explanation = en + $" Covered: the self-certification of {sc.SignedAt:yyyy-MM-dd} declares US person status (US reportable account).",
                 };
-            return hit with { Explanation = ro, ExplanationEn = en };
+            return hit with { Explanation = en, ExplanationRo = ro };
         }
 
         if (sc is not null && declared.Contains(hit.Jurisdiction))
             return hit with
             {
                 CoveredBy = Coverage.SelfCertification,
-                Explanation = ro + $" Acoperit: autocertificarea din {sc.SignedAt:yyyy-MM-dd} declară {Phrases.Place(hit.Jurisdiction)}.",
-                ExplanationEn = en + $" Covered: the self-certification of {sc.SignedAt:yyyy-MM-dd} declares {Phrases.Place(hit.Jurisdiction, true)}.",
+                ExplanationRo = ro + $" Acoperit: autocertificarea din {sc.SignedAt:yyyy-MM-dd} declară {Phrases.Place(hit.Jurisdiction)}.",
+                Explanation = en + $" Covered: the self-certification of {sc.SignedAt:yyyy-MM-dd} declares {Phrases.Place(hit.Jurisdiction, true)}.",
             };
 
         if (s.AcceptedExplanations.Any(e => Jurisdictions.Normalize(e.Jurisdiction) == hit.Jurisdiction))
             return hit with
             {
                 CoveredBy = Coverage.AcceptedExplanation,
-                Explanation = ro + " Acoperit: explicație rezonabilă acceptată.",
-                ExplanationEn = en + " Covered: accepted reasonable explanation.",
+                ExplanationRo = ro + " Acoperit: explicație rezonabilă acceptată.",
+                Explanation = en + " Covered: accepted reasonable explanation.",
             };
 
-        return hit with { Explanation = ro, ExplanationEn = en };
+        return hit with { Explanation = en, ExplanationRo = ro };
     }
 
     private static Decision Decide(IReadOnlyList<RuleHit> hits)
@@ -132,7 +140,7 @@ public sealed partial class CrsRuleEngine(ITinFormatCheck? tinFormat = null)
         RuleBasis basis = RuleBasis.Verified)
     {
         var rule = RuleCatalog.Get(ruleId);
-        return new RuleHit(ruleId, rule.Regime, jurisdiction, ro, rule.GuidePage, field, Coverage.None, en, basis);
+        return new RuleHit(ruleId, rule.Regime, jurisdiction, en, ro, rule.GuidePage, field, Coverage.None, basis);
     }
 
     private static (string Ro, string En) DomesticText(RuleChange change) => change.Kind switch

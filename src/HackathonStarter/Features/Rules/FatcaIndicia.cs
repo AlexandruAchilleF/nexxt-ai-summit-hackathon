@@ -1,3 +1,4 @@
+using HackathonStarter.Features.Clients;
 using static HackathonStarter.Features.Rules.Phrases;
 
 namespace HackathonStarter.Features.Rules;
@@ -32,7 +33,7 @@ internal static class FatcaIndicia
 
         // lit. c): current US residence or mailing address.
         foreach (var address in s.Addresses.Where(a => a.IsCurrent && Jurisdictions.IsUnitedStates(a.Country)
-                     && a.Kind is SubjectAddressKind.Residence or SubjectAddressKind.Mailing))
+                     && a.Kind is AddressKind.Residence or AddressKind.Mailing))
             Hit(f, RuleIds.FatcaAddress, $"Addresses/{address.Kind}", basis,
                 "Adresă actuală în SUA: indiciu FATCA (lit. c).", "Current US address: FATCA indicium (c).");
 
@@ -51,7 +52,7 @@ internal static class FatcaIndicia
         foreach (var account in s.Accounts)
         foreach (var order in account.StandingOrders.Where(o => o.IsActive && Jurisdictions.IsUnitedStates(o.BeneficiaryCountry)))
         {
-            var depository = account.Type == SubjectAccountType.Depository;
+            var depository = account.Type == AccountType.Depository;
             var orderBasis = AccountStatus.IsFatcaPreexisting(account.OpenedOn) ? RuleBasis.Verified : RuleBasis.Interpretation;
             Hit(f, RuleIds.FatcaStandingOrder, "StandingOrders", orderBasis,
                 "Ordin permanent activ către un cont din SUA: indiciu FATCA (lit. e)" +
@@ -74,11 +75,11 @@ internal static class FatcaIndicia
     private static void InCareOf(RuleSubject s, AccountScope scope, Findings f)
     {
         var current = s.Addresses.Where(a => a.IsCurrent).ToList();
-        if (current.Count != 1 || current[0].Kind is not (SubjectAddressKind.InCareOf or SubjectAddressKind.HoldMail)) return;
+        if (current.Count != 1 || current[0].Kind is not (AddressKind.InCareOf or AddressKind.HoldMail)) return;
 
         var address = current[0];
         var field = $"Addresses/{address.Kind}";
-        var holdMail = address.Kind == SubjectAddressKind.HoldMail;
+        var holdMail = address.Kind == AddressKind.HoldMail;
 
         if (scope.FatcaLowerValue && (holdMail || !Jurisdictions.IsUnitedStates(address.Country)))
         {

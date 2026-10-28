@@ -14,7 +14,7 @@
 | Tool calling prin adaptorul MEAI pe Bedrock | Verificat live pe 28.10, cu agentul `assistant` din template: Sonnet 5.5 a apelat `getStats` (`source = Live`); Haiku 5.5 a apelat `validateIban`; `updateItem` a oprit rularea în `AwaitingApproval`, iar după aprobare unealta a rulat |
 | Extragere tipizată (`StructuredAi`) pe profilul `extract` | Verificat live: Haiku 5.5 a extras jurisdicțiile, TIN-urile și data dintr-o autocertificare SPECIMEN, fiecare cu citat (`source = ai`) |
 | Credențiale | Temporare (rolul `WSParticipantRole`), din variabilele de mediu. Expiră: dacă apare `ExpiredToken`, le reîmprospătezi din consola workshop-ului |
-| Ceas simulat (`SimClock`) | Cod CRS folosește doar `ISimClock` (serviciu separat), **niciodată** `DateTime.Now`, `UtcNow` sau `TimeProvider` direct (PLAN 9.1). Uneltele agentului apelează serviciile CRS care au această constrângere. |
+| Ceas simulat (`SimClock`) | Cod CRS folosește doar `SimClock` (serviciu separat), **niciodată** `DateTime.Now`, `UtcNow` sau `TimeProvider` direct (PLAN 9.1). Uneltele agentului apelează serviciile CRS care au această constrângere. |
 
 ## Programul tău
 

@@ -1,6 +1,6 @@
 # Cazurile-etalon (specificația)
 
-Datele exacte pentru cele 20 de cazuri din [`PLAN.md` §16.1](PLAN.md#161-cazurile-etalon-specificația): intrarea
+Datele exacte pentru cele 21 de cazuri din [`PLAN.md` §16.1](PLAN.md#161-cazurile-etalon-specificația): intrarea
 (snapshot înainte / după, schimbarea), rezultatul așteptat și pagina din
 [Ghidul ANAF DAC2/CRS/FATCA, 29.12.2025](ghid/). Se transcriu în `Features/Evaluation/GoldenCases.cs` după
 Faza 0, ca `GoldenCase(Id, Title, Before, After, Change, Expected, ExpectedHits, ExpectedCleared)`.
@@ -243,7 +243,7 @@ Rezident RO standard, născut pe 1991-02-26 la Timișoara · CNP `1910226354122`
 | **Change** | `AddressChanged`, la ghișeu, **`2026-03-10T08:00Z`**: Avenida Diagonal 450, 08006 Barcelona, ES |
 | **Expected** | `Clarification` · hits: `CRS-IND-ADDR` (ES) · `DL-PRE-YEAR`, Preexisting = true · DueAt = max(**2026-12-31**, 2026-06-08) = 2026-12-31 · RemindAt 2026-12-26 |
 | Expirare | Tick după 31.12.2026 → `Expired` · `DL-EXPIRED-PRE`: rezident **cel puțin** în ES → ReportableFor ⊇ `[ES]` · p. 29, exemplul 2 |
-| NEVERIFICAT | „sau” (ghidul) vs. „cea mai târzie” (Comentariul OCDE); ora exactă de pe 31.12 (Î5) |
+| Decis | Cea mai târzie dintre 31.12 și +90 de zile (Codul de procedură fiscală, Anexa nr. 2 pct. 1; Comentariul OCDE, Secțiunea III, pct. 13; ghidul spune „sau”). Ora de pe 31.12: propunerea din Î5 |
 
 ### Cazul 18: Teodora Iliescu (`CL-0018`) · PROPUS
 

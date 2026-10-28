@@ -1,0 +1,13 @@
+@page "/cases/{Code}"
+
+<PageTitle>@T("Case {0}", Code) · @SiteConfig.Name</PageTitle>
+
+<MudButton Href="/cases" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Class="mb-4" Size="Size.Small">@T("All cases")</MudButton>
+
+<PageHeader Title="@T("Case {0}", Code)" Description="@T("Indicia with the guide page, evidence, the client request and the deadline.")" />
+
+<EmptyState Icon="@Icons.Material.Rounded.FactCheck" Title="@T("Coming in the next phase")" Description="@T("The backend for this page is being built.")" />
+
+@code {
+    [Parameter] public string Code { get; set; } = "";
+}

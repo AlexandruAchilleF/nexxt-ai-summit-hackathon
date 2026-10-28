@@ -1,3 +1,4 @@
+using HackathonStarter.Features.Clients;
 using static HackathonStarter.Features.Rules.Phrases;
 
 namespace HackathonStarter.Features.Rules;
@@ -41,14 +42,14 @@ internal static class CrsIndicia
     private static void Addresses(RuleSubject s, AccountScope scope, Findings f)
     {
         var current = s.Addresses
-            .Where(a => a.IsCurrent && a.Kind is SubjectAddressKind.Residence or SubjectAddressKind.Mailing).ToList();
+            .Where(a => a.IsCurrent && a.Kind is AddressKind.Residence or AddressKind.Mailing).ToList();
 
         foreach (var address in current)
         {
             var country = Jurisdictions.Normalize(address.Country);
             if (Jurisdictions.IsRomania(country)) continue;
 
-            var mailing = address.Kind == SubjectAddressKind.Mailing;
+            var mailing = address.Kind == AddressKind.Mailing;
             var ruleId = mailing ? RuleIds.CrsMailing : RuleIds.CrsAddress;
             var field = mailing ? "Addresses/Mailing" : "Addresses/Residence";
             var (whatRo, whatEn) = mailing
@@ -125,7 +126,7 @@ internal static class CrsIndicia
         {
             var country = Jurisdictions.Normalize(order.BeneficiaryCountry);
             if (Jurisdictions.IsRomania(country)) continue;
-            var depository = account.Type == SubjectAccountType.Depository;
+            var depository = account.Type == AccountType.Depository;
 
             if (Jurisdictions.IsUnitedStates(country))
             {
@@ -188,7 +189,7 @@ internal static class CrsIndicia
     private static void InCareOf(RuleSubject s, AccountScope scope, Findings f)
     {
         var current = s.Addresses.Where(a => a.IsCurrent).ToList();
-        foreach (var address in current.Where(a => a.Kind is SubjectAddressKind.InCareOf or SubjectAddressKind.HoldMail))
+        foreach (var address in current.Where(a => a.Kind is AddressKind.InCareOf or AddressKind.HoldMail))
         {
             var country = Jurisdictions.Normalize(address.Country);
             if (Jurisdictions.IsRomania(country)) continue;
@@ -228,17 +229,17 @@ internal static class CrsIndicia
 
     private static string ProductRo(SubjectAccount a) => a.Product is { Length: > 0 } p ? p : a.Type switch
     {
-        SubjectAccountType.Depository => "cont de depozit",
-        SubjectAccountType.Custodial => "cont de custodie",
-        SubjectAccountType.Insurance => "contract de asigurare",
+        AccountType.Depository => "cont de depozit",
+        AccountType.Custodial => "cont de custodie",
+        AccountType.Insurance => "contract de asigurare",
         _ => "alt tip de cont",
     };
 
     private static string ProductEn(SubjectAccount a) => a.Type switch
     {
-        SubjectAccountType.Depository => "depository account",
-        SubjectAccountType.Custodial => "custodial account",
-        SubjectAccountType.Insurance => "insurance contract",
+        AccountType.Depository => "depository account",
+        AccountType.Custodial => "custodial account",
+        AccountType.Insurance => "insurance contract",
         _ => "other account",
     };
 }

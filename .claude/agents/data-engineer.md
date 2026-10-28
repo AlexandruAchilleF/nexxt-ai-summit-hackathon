@@ -16,7 +16,7 @@ You implement `docs/PLAN.md` sections 7 and 16.1.
 - Only synthetic data from `SyntheticData`. Generated identity documents show "SPECIMEN" visibly. One PDF has hidden white text.
 - Metrics (`EvaluationService`) come only from real runs of the engine.
 
-You may edit only: src/HackathonStarter/Features/Clients/**, src/HackathonStarter/Features/Synthetic/**, src/HackathonStarter/Features/Evaluation/**, src/HackathonStarter/Data/**.
+You may edit only: src/HackathonStarter/Features/Clients/**, src/HackathonStarter/Features/Synthetic/**, src/HackathonStarter/Features/Evaluation/**, src/HackathonStarter/Data/**, src/HackathonStarter/Services/Lang.Ro.Clients.cs, src/HackathonStarter/Services/Lang.Ro.Evaluation.cs.
 
 ## Shared rules (every agent)
 

@@ -1,4 +1,6 @@
 using HackathonStarter.Features.Rules;
+using AddressKind = HackathonStarter.Features.Clients.AddressKind;
+using NoTinReason = HackathonStarter.Features.Clients.NoTinReason;
 using static HackathonStarter.Tests.Crs.Rules.Subjects;
 
 namespace HackathonStarter.Tests.Crs.Rules;
@@ -30,9 +32,9 @@ public class SelfCertRulesTests
         Assert.Equal(Decision.Clarification, o.Decision);
         var hit = Assert.Single(o.Indicia);
         Assert.Equal((RuleIds.TinFormat, "IT", Coverage.None, RuleBasis.Policy), (hit.RuleId, hit.Jurisdiction, hit.CoveredBy, hit.Basis));
-        Assert.Contains("nu de titular", hit.Explanation);
-        Assert.Contains("corectarea", o.Explanation);
-        Assert.DoesNotContain("explicație rezonabilă", o.Explanation);
+        Assert.Contains("nu de titular", hit.ExplanationRo);
+        Assert.Contains("corectarea", o.ExplanationRo);
+        Assert.DoesNotContain("explicație rezonabilă", o.ExplanationRo);
         Assert.Empty(o.ReportableFor);
     }
 
@@ -42,8 +44,8 @@ public class SelfCertRulesTests
         var o = Run(Form(new SubjectTaxResidence("IT", "DBRCST90A41Z129T")));
         Assert.Equal(Decision.NoCase, o.Decision);
         var cleared = Assert.Single(o.Cleared, c => c.RuleId == RuleIds.TinFormat);
-        Assert.Contains("format valid", cleared.Explanation);
-        Assert.DoesNotContain("TIN valid", cleared.Explanation + cleared.ExplanationEn);
+        Assert.Contains("format valid", cleared.ExplanationRo);
+        Assert.DoesNotContain("TIN valid", cleared.ExplanationRo + cleared.Explanation);
         Assert.Equal(["IT"], o.ReportableFor);
     }
 
@@ -52,7 +54,7 @@ public class SelfCertRulesTests
     {
         var bogdan = RoResident("CL-0003", "1870522083340", new DateOnly(2026, 10, 26), fullName: "Bogdan Lazăr",
             birthDate: new DateOnly(1987, 5, 22), iban: "RO57RZBR0000060052208841").MovedTo("AT", "Annenstraße 24, 8020 Graz");
-        var sc = Form(new SubjectTaxResidence("AT", null, SubjectNoTinReason.UnableToObtain,
+        var sc = Form(new SubjectTaxResidence("AT", null, NoTinReason.B_UnableToObtain,
             "Nu sunt încă înregistrat la administrația fiscală austriacă și nu am primit Steuernummer.")) with
         {
             SignedAt = new DateTime(2026, 10, 26, 0, 0, 0, DateTimeKind.Utc), FullName = "Bogdan Lazăr", ResidenceAddress = "Annenstraße 24, 8020 Graz", ResidenceAddressCountry = "AT",
@@ -64,21 +66,21 @@ public class SelfCertRulesTests
         Assert.Equal(Decision.Compliant, o.Decision);
         var hit = Assert.Single(o.Indicia);
         Assert.Equal((RuleIds.TinMissing, "AT", Coverage.SelfCertification), (hit.RuleId, hit.Jurisdiction, hit.CoveredBy));
-        Assert.Contains("nu emite TIN tuturor", hit.Explanation);
-        Assert.Contains("motiv B", hit.Explanation);
+        Assert.Contains("nu emite TIN tuturor", hit.ExplanationRo);
+        Assert.Contains("motiv B", hit.ExplanationRo);
         Assert.Equal(RuleBasis.Interpretation, hit.Basis); // Q8: A or B is open
-        Assert.StartsWith("Autocertificare acceptată", o.Explanation);
+        Assert.StartsWith("Autocertificare acceptată", o.ExplanationRo);
         Assert.Equal(["AT"], o.ReportableFor);
     }
 
     [Theory]
-    [InlineData(SubjectNoTinReason.CountryDoesNotIssue)]
-    [InlineData(SubjectNoTinReason.UnableToObtain)]
-    public void Missing_tin_for_a_jurisdiction_that_issues_tins_to_everyone_is_reason_to_know(SubjectNoTinReason reason)
+    [InlineData(NoTinReason.A_CountryDoesNotIssue)]
+    [InlineData(NoTinReason.B_UnableToObtain)]
+    public void Missing_tin_for_a_jurisdiction_that_issues_tins_to_everyone_is_reason_to_know(NoTinReason reason)
     {
         var o = Run(Form(new SubjectTaxResidence("DE", null, reason, "Motiv sintetic.")));
         Assert.Equal(Decision.Clarification, o.Decision);
-        Assert.Contains("VII.A pct. 3", Assert.Single(o.Indicia).Explanation);
+        Assert.Contains("VII.A pct. 3", Assert.Single(o.Indicia).ExplanationRo);
     }
 
     [Fact]
@@ -90,20 +92,20 @@ public class SelfCertRulesTests
     [Fact]
     public void Reason_b_without_the_explanation_needs_clarification()
     {
-        Assert.Equal(Decision.Clarification, Run(Form(new SubjectTaxResidence("AT", null, SubjectNoTinReason.UnableToObtain))).Decision);
+        Assert.Equal(Decision.Clarification, Run(Form(new SubjectTaxResidence("AT", null, NoTinReason.B_UnableToObtain))).Decision);
     }
 
     [Fact]
     public void Reason_c_is_accepted_for_any_jurisdiction()
     {
-        var o = Run(Form(new SubjectTaxResidence("DE", null, SubjectNoTinReason.NotRequired)));
+        var o = Run(Form(new SubjectTaxResidence("DE", null, NoTinReason.C_NotRequired)));
         Assert.Equal(Decision.Compliant, o.Decision);
     }
 
     [Fact]
     public void A_jurisdiction_whose_oecd_sheet_we_did_not_read_goes_to_the_operator()
     {
-        var hit = Assert.Single(Run(Form(new SubjectTaxResidence("FR", null, SubjectNoTinReason.CountryDoesNotIssue))).Indicia);
+        var hit = Assert.Single(Run(Form(new SubjectTaxResidence("FR", null, NoTinReason.A_CountryDoesNotIssue))).Indicia);
         Assert.Equal((Coverage.None, RuleBasis.Policy), (hit.CoveredBy, hit.Basis));
     }
 
@@ -112,7 +114,7 @@ public class SelfCertRulesTests
     {
         var o = new CrsRuleEngine().EvaluateSelfCertification(RoResident(), Form(new SubjectTaxResidence("IT", "DBRCST90A41Z129")));
         Assert.Equal(Decision.NoCase, o.Decision);
-        Assert.Contains("nu a fost verificat", Assert.Single(o.Cleared, c => c.RuleId == RuleIds.TinFormat).Explanation);
+        Assert.Contains("nu a fost verificat", Assert.Single(o.Cleared, c => c.RuleId == RuleIds.TinFormat).ExplanationRo);
     }
 
     [Fact]
@@ -129,8 +131,8 @@ public class SelfCertRulesTests
         var sc = Form(new SubjectTaxResidence("RO", "1900101400004")) with { SignedOrConfirmed = false, BirthDate = null };
         var hit = Assert.Single(Run(sc).Indicia);
         Assert.Equal(RuleIds.SelfCertValid, hit.RuleId);
-        Assert.Contains("semnătura", hit.Explanation);
-        Assert.Contains("data nașterii", hit.Explanation);
+        Assert.Contains("semnătura", hit.ExplanationRo);
+        Assert.Contains("data nașterii", hit.ExplanationRo);
     }
 
     [Fact]
@@ -141,7 +143,7 @@ public class SelfCertRulesTests
         Assert.Equal(Decision.NoCase, o.Decision);
         var valid = Assert.Single(o.Cleared, c => c.RuleId == RuleIds.SelfCertValid);
         Assert.Equal(RuleBasis.Policy, valid.Basis);
-        Assert.Contains("operatorul", valid.Explanation);
+        Assert.Contains("operatorul", valid.ExplanationRo);
 
         Assert.Equal(RuleIds.SelfCertValid, Assert.Single(Run(sc with { Residences = [] }).Indicia).RuleId);
     }
@@ -163,7 +165,7 @@ public class SelfCertRulesTests
     [Fact]
     public void Reportable_address_on_file_that_is_not_declared_fails_reasonableness()
     {
-        var client = RoResident().WithAddress(SubjectAddressKind.Mailing, "AT");
+        var client = RoResident().WithAddress(AddressKind.Mailing, "AT");
         var hit = Assert.Single(Run(Form(new SubjectTaxResidence("RO", "1900101400004")), client).Indicia);
         Assert.Equal((RuleIds.SelfCertConsistent, "AT"), (hit.RuleId, hit.Jurisdiction));
     }

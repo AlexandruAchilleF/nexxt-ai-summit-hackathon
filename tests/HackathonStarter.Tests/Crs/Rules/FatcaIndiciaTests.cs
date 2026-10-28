@@ -1,4 +1,6 @@
 using HackathonStarter.Features.Rules;
+using AccountType = HackathonStarter.Features.Clients.AccountType;
+using AddressKind = HackathonStarter.Features.Clients.AddressKind;
 using static HackathonStarter.Tests.Crs.Rules.Subjects;
 
 namespace HackathonStarter.Tests.Crs.Rules;
@@ -49,9 +51,9 @@ public class FatcaIndiciaTests
     }
 
     [Theory]
-    [InlineData(SubjectAddressKind.Residence)]
-    [InlineData(SubjectAddressKind.Mailing)]
-    public void Current_us_address_is_an_indicium(SubjectAddressKind kind)
+    [InlineData(AddressKind.Residence)]
+    [InlineData(AddressKind.Mailing)]
+    public void Current_us_address_is_an_indicium(AddressKind kind)
     {
         HitOf(Run(RoResident().WithAddress(kind, "US")), RuleIds.FatcaAddress);
     }
@@ -60,7 +62,7 @@ public class FatcaIndiciaTests
     public void Us_phone_is_an_indicium_even_next_to_a_romanian_phone()
     {
         var o = Run(RoResident().WithPhone("+13125550147", "US"));
-        Assert.Contains("excepția CRS nu se aplică", HitOf(o, RuleIds.FatcaPhone).Explanation);
+        Assert.Contains("excepția CRS nu se aplică", HitOf(o, RuleIds.FatcaPhone).ExplanationRo);
     }
 
     [Fact]
@@ -72,17 +74,17 @@ public class FatcaIndiciaTests
     [Fact]
     public void Us_standing_order_from_a_deposit_account_is_an_indicium()
     {
-        var after = RoResident().WithAccounts(Account(SubjectAccountType.Depository, FatcaPreexisting).WithOrder("073909523/4417209358", "US"));
+        var after = RoResident().WithAccounts(Account(AccountType.Depository, FatcaPreexisting).WithOrder("073909523/4417209358", "US"));
         var hit = HitOf(Run(after), RuleIds.FatcaStandingOrder);
         Assert.Equal(RuleBasis.Verified, hit.Basis);
-        Assert.Contains("nu există la FATCA", hit.Explanation);
+        Assert.Contains("nu există la FATCA", hit.ExplanationRo);
     }
 
     [Fact]
     public void Inactive_us_standing_order_is_not_an_indicium()
     {
         var after = RoResident().WithAccounts(
-            Account(SubjectAccountType.Depository, FatcaPreexisting).WithOrder("073909523/4417209358", "US", active: false));
+            Account(AccountType.Depository, FatcaPreexisting).WithOrder("073909523/4417209358", "US", active: false));
         Assert.DoesNotContain(Run(after).Indicia, h => h.RuleId == RuleIds.FatcaStandingOrder);
     }
 
@@ -96,29 +98,29 @@ public class FatcaIndiciaTests
     [Fact]
     public void Only_address_in_care_of_on_a_new_account_is_an_indicium_in_any_country()
     {
-        var o = Run(RoResident().WithOnlyAddress(SubjectAddressKind.InCareOf, "IT"));
+        var o = Run(RoResident().WithOnlyAddress(AddressKind.InCareOf, "IT"));
         Assert.Equal(RuleBasis.Interpretation, HitOf(o, RuleIds.FatcaInCareOf).Basis);
         Assert.Equal(Decision.FatcaAlert, o.Decision);
     }
 
     [Theory]
-    [InlineData(SubjectAddressKind.InCareOf, "IT")]
-    [InlineData(SubjectAddressKind.HoldMail, "IT")]
-    [InlineData(SubjectAddressKind.HoldMail, "US")]
-    public void Lower_value_preexisting_account_clears_non_us_in_care_of_and_hold_mail(SubjectAddressKind kind, string country)
+    [InlineData(AddressKind.InCareOf, "IT")]
+    [InlineData(AddressKind.HoldMail, "IT")]
+    [InlineData(AddressKind.HoldMail, "US")]
+    public void Lower_value_preexisting_account_clears_non_us_in_care_of_and_hold_mail(AddressKind kind, string country)
     {
-        var after = RoResident().WithAccounts(Account(SubjectAccountType.Depository, FatcaPreexisting, balance: 42_300m))
+        var after = RoResident().WithAccounts(Account(AccountType.Depository, FatcaPreexisting, balance: 42_300m))
             .WithOnlyAddress(kind, country);
         var o = Run(after);
         Assert.DoesNotContain(o.Indicia, h => h.RuleId == RuleIds.FatcaInCareOf);
-        Assert.Contains("valoare mică", Assert.Single(o.Cleared, c => c.RuleId == RuleIds.FatcaInCareOf).Explanation);
+        Assert.Contains("valoare mică", Assert.Single(o.Cleared, c => c.RuleId == RuleIds.FatcaInCareOf).ExplanationRo);
     }
 
     [Fact]
     public void Lower_value_preexisting_account_with_a_us_in_care_of_address_is_still_an_indicium()
     {
-        var after = RoResident().WithAccounts(Account(SubjectAccountType.Depository, FatcaPreexisting, balance: 42_300m))
-            .WithOnlyAddress(SubjectAddressKind.InCareOf, "US");
+        var after = RoResident().WithAccounts(Account(AccountType.Depository, FatcaPreexisting, balance: 42_300m))
+            .WithOnlyAddress(AddressKind.InCareOf, "US");
         Assert.Equal(RuleBasis.Verified, HitOf(Run(after), RuleIds.FatcaInCareOf).Basis);
     }
 
@@ -127,8 +129,8 @@ public class FatcaIndiciaTests
     [InlineData(1_000, "JPY")] // unknown currency: never assumed lower value
     public void High_value_or_unknown_currency_keeps_the_in_care_of_indicium(int balance, string currency)
     {
-        var after = RoResident().WithAccounts(Account(SubjectAccountType.Depository, FatcaPreexisting, balance: balance, currency: currency))
-            .WithOnlyAddress(SubjectAddressKind.InCareOf, "IT");
+        var after = RoResident().WithAccounts(Account(AccountType.Depository, FatcaPreexisting, balance: balance, currency: currency))
+            .WithOnlyAddress(AddressKind.InCareOf, "IT");
         HitOf(Run(after), RuleIds.FatcaInCareOf);
     }
 
@@ -154,7 +156,7 @@ public class FatcaIndiciaTests
     [Fact]
     public void Account_opened_between_the_cutoffs_is_new_for_fatca_and_preexisting_for_crs()
     {
-        var account = Account(SubjectAccountType.Custodial, new DateOnly(2015, 3, 1))
+        var account = Account(AccountType.Custodial, new DateOnly(2015, 3, 1))
             .WithOrder("073909523/4417209358", "US").WithOrder("DE02700100800918273645", "DE");
         var o = Run(RoResident().WithAccounts(account));
         Assert.Equal(RuleBasis.Interpretation, HitOf(o, RuleIds.FatcaStandingOrder).Basis);

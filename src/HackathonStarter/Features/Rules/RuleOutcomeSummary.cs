@@ -9,7 +9,7 @@ public sealed record RuleFinding(string RuleId, string Jurisdiction, string Titl
 /// </summary>
 public sealed record RuleOutcomeSummary(
     Decision Decision,
-    Regime? CaseRegime,
+    Regime? Regime,
     IReadOnlyList<RuleFinding> OpenIndicia,
     IReadOnlyList<RuleFinding> CoveredIndicia,
     IReadOnlyList<RuleFinding> Cleared,
@@ -27,18 +27,18 @@ public static class RuleOutcomeSummaries
         RuleFinding Finding(RuleHit h)
         {
             var rule = RuleCatalog.Get(h.RuleId);
-            return new RuleFinding(h.RuleId, h.Jurisdiction, en ? rule.TitleEn : rule.Title,
-                en && h.ExplanationEn.Length > 0 ? h.ExplanationEn : h.Explanation, h.GuidePage, rule.LegalBasis, h.CoveredBy, h.Basis);
+            return new RuleFinding(h.RuleId, h.Jurisdiction, en ? rule.Title : rule.TitleRo,
+                en ? h.Explanation : h.ExplanationRo, h.GuidePage, rule.LegalBasis, h.CoveredBy, h.Basis);
         }
 
         return new RuleOutcomeSummary(
             outcome.Decision,
-            outcome.CaseRegime,
+            outcome.Regime,
             [.. outcome.Indicia.Where(h => h.CoveredBy == Coverage.None).Take(MaxPerList).Select(Finding)],
             [.. outcome.Indicia.Where(h => h.CoveredBy != Coverage.None).Take(MaxPerList).Select(Finding)],
             [.. outcome.Cleared.Take(MaxPerList).Select(Finding)],
             outcome.ReportableFor,
-            en && outcome.ExplanationEn.Length > 0 ? outcome.ExplanationEn : outcome.Explanation,
+            en ? outcome.Explanation : outcome.ExplanationRo,
             outcome.EngineVersion,
             outcome.Indicia.Any(h => h.CoveredBy == Coverage.None && h.Basis != RuleBasis.Verified));
     }

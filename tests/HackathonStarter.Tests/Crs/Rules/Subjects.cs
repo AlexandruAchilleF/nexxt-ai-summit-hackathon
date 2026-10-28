@@ -1,4 +1,6 @@
 using HackathonStarter.Features.Rules;
+using AccountType = HackathonStarter.Features.Clients.AccountType;
+using AddressKind = HackathonStarter.Features.Clients.AddressKind;
 
 namespace HackathonStarter.Tests.Crs.Rules;
 
@@ -23,9 +25,9 @@ internal static class Subjects
             BirthDate = born,
             BirthCountry = "RO",
             Citizenships = ["RO"],
-            Addresses = [new SubjectAddress(SubjectAddressKind.Residence, "RO", Text: residence)],
+            Addresses = [new SubjectAddress(AddressKind.Residence, "RO", Text: residence)],
             Phones = [new SubjectPhone(phone, "RO")],
-            Accounts = [new SubjectAccount(iban, SubjectAccountType.Depository, opened, 18_450m, "RON", "Cont curent")],
+            Accounts = [new SubjectAccount(iban, AccountType.Depository, opened, 18_450m, "RON", "Cont curent")],
             // Signed when the first account was opened (GOLDEN-CASES 1).
             SelfCertifications = [SelfCert(opened.ToDateTime(new TimeOnly(9, 0), DateTimeKind.Utc), new SubjectTaxResidence("RO", cnp)) with
             {
@@ -46,18 +48,18 @@ internal static class Subjects
     /// <summary>Moves the residence: the current residences become non-current and the new one is current.</summary>
     public static RuleSubject MovedTo(this RuleSubject s, string country, string text = "") => s with
     {
-        Addresses = [.. s.Addresses.Select(a => a.Kind == SubjectAddressKind.Residence ? a with { IsCurrent = false } : a),
-            new SubjectAddress(SubjectAddressKind.Residence, country, Text: text)],
+        Addresses = [.. s.Addresses.Select(a => a.Kind == AddressKind.Residence ? a with { IsCurrent = false } : a),
+            new SubjectAddress(AddressKind.Residence, country, Text: text)],
     };
 
-    public static RuleSubject WithAddress(this RuleSubject s, SubjectAddressKind kind, string country, bool current = true,
+    public static RuleSubject WithAddress(this RuleSubject s, AddressKind kind, string country, bool current = true,
         bool serviceProvider = false, string text = "") => s with
     {
         Addresses = [.. s.Addresses, new SubjectAddress(kind, country, current, text, serviceProvider)],
     };
 
     /// <summary>The given address becomes the only current one (the old ones stay on file as non-current).</summary>
-    public static RuleSubject WithOnlyAddress(this RuleSubject s, SubjectAddressKind kind, string country, string text = "") => s with
+    public static RuleSubject WithOnlyAddress(this RuleSubject s, AddressKind kind, string country, string text = "") => s with
     {
         Addresses = [.. s.Addresses.Select(a => a with { IsCurrent = false }), new SubjectAddress(kind, country, Text: text)],
     };
@@ -78,7 +80,7 @@ internal static class Subjects
 
     public static RuleSubject WithAccounts(this RuleSubject s, params SubjectAccount[] accounts) => s with { Accounts = accounts };
 
-    public static SubjectAccount Account(SubjectAccountType type, DateOnly openedOn, string number = "RO46RZBR0000060019823746",
+    public static SubjectAccount Account(AccountType type, DateOnly openedOn, string number = "RO46RZBR0000060019823746",
         decimal balance = 10_000m, string currency = "RON") => new(number, type, openedOn, balance, currency);
 
     public static SubjectAccount WithOrder(this SubjectAccount account, string beneficiaryAccount, string country,

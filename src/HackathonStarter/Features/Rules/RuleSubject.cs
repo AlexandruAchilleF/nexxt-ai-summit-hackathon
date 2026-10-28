@@ -1,16 +1,13 @@
+using HackathonStarter.Features.Clients;
+
 namespace HackathonStarter.Features.Rules;
 
 // What the engine reads about a client: an immutable view with no EF, no clock and no raw values it does not need.
 // SubjectMapper builds it from the shared ClientSnapshot (docs/PLAN.md 7.1); tests and the golden cases can build it
-// directly. Countries are ISO 3166-1 alpha-2, derived upstream (from the phone prefix, the IBAN, the address).
+// directly. Countries are ISO 3166-1 alpha-2, derived upstream (from the phone prefix, the IBAN, the address). The enums
+// are the shared ones from Features/Clients.
 
-public enum SubjectAddressKind { Residence, Mailing, InCareOf, HoldMail }
-
-public enum SubjectAccountType { Depository, Custodial, Insurance, Other }
-
-public enum SubjectNoTinReason { None, CountryDoesNotIssue, UnableToObtain, NotRequired }
-
-public sealed record SubjectAddress(SubjectAddressKind Kind, string Country, bool IsCurrent = true, string Text = "",
+public sealed record SubjectAddress(AddressKind Kind, string Country, bool IsCurrent = true, string Text = "",
     bool IsServiceProvider = false);
 
 public sealed record SubjectPhone(string Number, string Country, bool IsCurrent = true, bool IsServiceProvider = false);
@@ -18,7 +15,7 @@ public sealed record SubjectPhone(string Number, string Country, bool IsCurrent 
 public sealed record SubjectStandingOrder(string BeneficiaryAccount, string BeneficiaryCountry, bool IsActive = true,
     string Beneficiary = "");
 
-public sealed record SubjectAccount(string Number, SubjectAccountType Type, DateOnly OpenedOn, decimal Balance = 0m,
+public sealed record SubjectAccount(string Number, AccountType Type, DateOnly OpenedOn, decimal Balance = 0m,
     string Currency = "RON", string Product = "")
 {
     public IReadOnlyList<SubjectStandingOrder> StandingOrders { get; init; } = [];
@@ -27,7 +24,7 @@ public sealed record SubjectAccount(string Number, SubjectAccountType Type, Date
 public sealed record SubjectPowerOfAttorney(string HolderName, string HolderCountry, bool IsActive = true);
 
 public sealed record SubjectTaxResidence(string Country, string? Tin,
-    SubjectNoTinReason NoTinReason = SubjectNoTinReason.None, string? NoTinExplanation = null);
+    NoTinReason NoTinReason = NoTinReason.None, string? NoTinExplanation = null);
 
 /// <summary>A self-certification as received. IsValid = the bank currently relies on it (Status Valid in the shared model).</summary>
 public sealed record SubjectSelfCertification(DateTime SignedAt, IReadOnlyList<SubjectTaxResidence> Residences,

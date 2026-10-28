@@ -75,7 +75,7 @@ Varianta fără răspuns: la ziua 91 cazul trece în `Expired`, cu consecința d
 | PDF cu text alb ascuns („ignoră instrucțiunile…”) | Scutul îl scoate înainte de model | `ShieldAlert`, textul nu ajunge la model |
 | Autocertificare cu TIN italian greșit | Formatul TIN pe țară | `Clarification` |
 
-Toate cele 18 cazuri-etalon, cu rezultatul așteptat, sunt în `docs/PLAN.md` secțiunea 16.1.
+Toate cele 21 de cazuri-etalon, cu datele și rezultatul așteptat, sunt în `docs/GOLDEN-CASES.md` (rezumat în `docs/PLAN.md` secțiunea 16.1).
 
 ## 5. Piesele și cine le construiește
 
@@ -98,12 +98,12 @@ Toate cele 18 cazuri-etalon, cu rezultatul așteptat, sunt în `docs/PLAN.md` se
 | 2 · Termene și cazuri | Data simulată, termene, stările cazului, memento/escaladare/expirare, dovada | cazurile 16–18 trec |
 | 3 · Încredere | Scutul, verificarea citatelor, formatul TIN, TIN on Europa, jurnalul | cazul 10 trece, „Tamper” arată intrarea |
 | 4 · Agent și AI | Agentul, uneltele, aprobările, mock-ul, Bedrock, verificările, înregistrările | Maria cap-coadă pe mock și o dată live |
-| 5 · Date și livrare | Cele 18 cazuri, 50 de clienți sintetici, PDF-uri, metrici, documente, video | `/metrics` din rulări reale |
+| 5 · Date și livrare | Cele 21 de cazuri-etalon, 50 de clienți sintetici, PDF-uri, metrici, documente, video | `/metrics` din rulări reale |
 
 **Nota asupra termenelor:** Calculul termenului diferă între conturile noi și preexistente:
 - **Cont nou:** DueAt = data la care banca știe de schimbare + 90 zile calendaristice (p. 20–21, 35–36)
-- **Cont preexistent:** ghidul spune „până la sfârșitul anului sau 90 de zile” (p. 29); implementăm cea mai târzie dintre ele.
-  NEVERIFICAT: „sau” vs. „cea mai târzie”, îl confirmă colegul din domeniu
+- **Cont preexistent:** ghidul spune „până la sfârșitul anului sau 90 de zile” (p. 29); implementăm cea mai târzie dintre ele,
+  cum scrie legea (Codul de procedură fiscală, Anexa nr. 2 pct. 1) și Comentariul OCDE (Secțiunea III, pct. 13). Detalii în README.
 - **Preexistent se calculează pe regim** (CRS = 31 dec. 2015, FATCA = 30 iunie 2014), nu pe tipul contului (depozit/custodie). Același cont poate fi nou pentru CRS și preexistent pentru FATCA.
 
 ## 6. Agentul, pe scurt (Persoana 4)
@@ -135,8 +135,9 @@ Ce nu detectăm și spunem deschis: text acoperit de o formă desenată peste el
 
 ## 8. Data simulată și jurnalul
 
-- **Data simulată** (`SimClock`): în bara de sus, „Azi: … (+85 zile)”, cu butoane +1 / +30 / +85 / resetare. Tot sistemul citește
-  timpul de aici, deci în 3 minute de video arătăm 90 de zile.
+- **Data simulată** (`SimClock`): în bara de sus, „Azi: … (+85 zile)”, cu butoane +1 / +30 / +85 / resetare. Tot codul CRS (cazuri,
+  termene, jurnal) citește timpul de aici, deci în 3 minute de video arătăm 90 de zile. Restul aplicației (login, chei,
+  ștergerea rulărilor) rămâne pe ceasul real, ca să nu expire nimic la „+85 zile”.
 - **Jurnalul** (`AuditLog`): fiecare pas (modificare, regulă, dovadă, aprobare, memento, închidere) e o intrare cu
   `Hash = SHA-256(hash-ul anterior + conținut)`. Dacă cineva modifică o intrare, „Verifică” arată exact unde s-a rupt lanțul.
 

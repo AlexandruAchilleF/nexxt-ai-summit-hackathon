@@ -1,4 +1,6 @@
 using HackathonStarter.Features.Rules;
+using AccountType = HackathonStarter.Features.Clients.AccountType;
+using HackathonStarter.Features.Tin;
 using static HackathonStarter.Tests.Crs.Rules.Subjects;
 
 namespace HackathonStarter.Tests.Crs.Rules;
@@ -24,19 +26,19 @@ public class GoldenEngineTests
         foreach (var (ruleId, jurisdiction) in c.ClearedAtLeast)
             Assert.Contains(outcome.Cleared, x => x.RuleId == ruleId && x.Jurisdiction == jurisdiction);
         if (c.ReportableFor is not null) Assert.Equal(c.ReportableFor, outcome.ReportableFor);
-        Assert.Equal(c.CaseRegime, outcome.CaseRegime);
-        var said = string.Join(" ", outcome.Cleared.Select(x => x.Explanation).Prepend(outcome.Explanation));
+        Assert.Equal(c.Regime, outcome.Regime);
+        var said = string.Join(" ", outcome.Cleared.Select(x => x.ExplanationRo).Prepend(outcome.ExplanationRo));
         foreach (var phrase in c.Says ?? []) Assert.Contains(phrase, said);
 
         Assert.Equal(CrsRuleEngine.Version, outcome.EngineVersion);
+        Assert.False(string.IsNullOrWhiteSpace(outcome.ExplanationRo));
         Assert.False(string.IsNullOrWhiteSpace(outcome.Explanation));
-        Assert.False(string.IsNullOrWhiteSpace(outcome.ExplanationEn));
         Assert.All(outcome.Indicia.Concat(outcome.Cleared), h =>
         {
             Assert.True(RuleCatalog.Contains(h.RuleId), h.RuleId);
             Assert.Equal(RuleCatalog.Get(h.RuleId).GuidePage, h.GuidePage);
+            Assert.False(string.IsNullOrWhiteSpace(h.ExplanationRo), h.RuleId);
             Assert.False(string.IsNullOrWhiteSpace(h.Explanation), h.RuleId);
-            Assert.False(string.IsNullOrWhiteSpace(h.ExplanationEn), h.RuleId);
         });
     }
 
@@ -45,14 +47,14 @@ public class GoldenEngineTests
     {
         var outcome = Engine.Evaluate(EngineCases.MariaBefore, EngineCases.MariaAfter, new RuleChange("AddressChanged"));
 
-        Assert.Equal(Regime.Crs, outcome.CaseRegime);
-        Assert.Equal(2, outcome.Uncovered.Count);
+        Assert.Equal(Regime.Crs, outcome.Regime);
+        Assert.Equal(2, outcome.Uncovered.Count());
         Assert.Contains(outcome.Indicia, h => h.RuleId == RuleIds.CrsAddress && h.SourceField == "Addresses/Residence");
         Assert.Contains(outcome.Indicia, h => h.RuleId == RuleIds.CrsPhone && h.SourceField == "Phones");
         // New account: the indicia are our "reason to know" reading, and the explanation says so.
         Assert.All(outcome.Indicia, h => Assert.Equal(RuleBasis.Interpretation, h.Basis));
-        Assert.All(outcome.Indicia, h => Assert.Contains("GEN-NEW-ACCOUNT", h.Explanation));
-        Assert.Contains("Cont nou", outcome.Explanation);
+        Assert.All(outcome.Indicia, h => Assert.Contains("GEN-NEW-ACCOUNT", h.ExplanationRo));
+        Assert.Contains("Cont nou", outcome.ExplanationRo);
         Assert.Empty(outcome.ReportableFor);
     }
 
@@ -62,9 +64,9 @@ public class GoldenEngineTests
         var outcome = Engine.Evaluate(EngineCases.MariaAfter, EngineCases.MariaAfterResponse, new RuleChange("SelfCertSubmitted"));
 
         Assert.Equal(Decision.Compliant, outcome.Decision);
-        Assert.Null(outcome.CaseRegime);
-        Assert.Contains("SC-CONSISTENT", outcome.Explanation);
-        Assert.All(outcome.Indicia, h => Assert.Contains("exista și înainte", h.Explanation));
+        Assert.Null(outcome.Regime);
+        Assert.Contains("SC-CONSISTENT", outcome.ExplanationRo);
+        Assert.All(outcome.Indicia, h => Assert.Contains("exista și înainte", h.ExplanationRo));
     }
 
     [Fact]
@@ -75,7 +77,7 @@ public class GoldenEngineTests
         Assert.Equal(Decision.NoCase, outcome.Decision);
         Assert.Empty(outcome.Indicia);
         Assert.Equal(RuleBasis.Verified, Assert.Single(outcome.Cleared, x => x.RuleId == RuleIds.SelfCertValid).Basis);
-        Assert.Contains("format valid", Assert.Single(outcome.Cleared, x => x.RuleId == RuleIds.TinFormat).Explanation);
+        Assert.Contains("format valid", Assert.Single(outcome.Cleared, x => x.RuleId == RuleIds.TinFormat).ExplanationRo);
         Assert.Equal(["DE"], outcome.ReportableFor);
     }
 
@@ -85,8 +87,8 @@ public class GoldenEngineTests
         var outcome = Engine.Evaluate(EngineCases.Get("5a").Before, EngineCases.Get("5a").After, new RuleChange("StandingOrderCreated"));
         var cleared = Assert.Single(outcome.Cleared, x => x.RuleId == RuleIds.CrsStandingOrder);
 
-        Assert.Contains("cont de depozit", cleared.Explanation);
-        Assert.Contains("depository account", cleared.ExplanationEn);
+        Assert.Contains("cont de depozit", cleared.ExplanationRo);
+        Assert.Contains("depository account", cleared.Explanation);
         Assert.Equal("StandingOrders", cleared.SourceField);
     }
 
@@ -96,9 +98,9 @@ public class GoldenEngineTests
         var c = EngineCases.Get("5c");
         var outcome = Engine.Evaluate(c.Before, c.After, c.Change);
 
-        Assert.Equal(Regime.Fatca, outcome.CaseRegime);
-        Assert.Contains("excepția CRS", Assert.Single(outcome.Indicia).Explanation);
-        Assert.Contains("SUA nu e jurisdicție CRS", Assert.Single(outcome.Cleared, x => x.RuleId == RuleIds.CrsStandingOrder).Explanation);
+        Assert.Equal(Regime.Fatca, outcome.Regime);
+        Assert.Contains("excepția CRS", Assert.Single(outcome.Indicia).ExplanationRo);
+        Assert.Contains("SUA nu e jurisdicție CRS", Assert.Single(outcome.Cleared, x => x.RuleId == RuleIds.CrsStandingOrder).ExplanationRo);
     }
 
     [Fact]
@@ -106,7 +108,7 @@ public class GoldenEngineTests
     {
         var c = EngineCases.Get("13");
         var cleared = Assert.Single(Engine.Evaluate(c.Before, c.After, c.Change).Cleared, x => x.RuleId == RuleIds.CrsPhone);
-        Assert.Contains("telefon actual în România", cleared.Explanation);
+        Assert.Contains("telefon actual în România", cleared.ExplanationRo);
     }
 
     [Fact]
@@ -117,7 +119,7 @@ public class GoldenEngineTests
 
         var domestic = Assert.Single(outcome.Cleared);
         Assert.Equal(RuleIds.Domestic, domestic.RuleId);
-        Assert.Contains("Noua adresă e în România", domestic.Explanation);
+        Assert.Contains("Noua adresă e în România", domestic.ExplanationRo);
         Assert.Equal(RuleBasis.Interpretation, domestic.Basis);
     }
 
@@ -127,13 +129,13 @@ public class GoldenEngineTests
         var c = EngineCases.Get("17b");
         var hit = Assert.Single(Engine.Evaluate(c.Before, c.After, c.Change).Indicia);
         Assert.Equal(RuleBasis.Verified, hit.Basis);
-        Assert.DoesNotContain("GEN-NEW-ACCOUNT", hit.Explanation);
+        Assert.DoesNotContain("GEN-NEW-ACCOUNT", hit.ExplanationRo);
     }
 
     [Fact]
     public void Standing_order_from_a_preexisting_custodial_account_is_verified_law()
     {
-        var custodial = Account(SubjectAccountType.Custodial, new DateOnly(2014, 3, 1), "RO88RZBR0000069004471852");
+        var custodial = Account(AccountType.Custodial, new DateOnly(2014, 3, 1), "RO88RZBR0000069004471852");
         var before = RoResident().WithAccounts(custodial);
         var after = RoResident().WithAccounts(custodial.WithOrder("DE02700100800918273645", "DE"));
 
@@ -148,9 +150,9 @@ public class GoldenEngineTests
         var outcome = Engine.Evaluate(c.Before, c.After, c.Change);
 
         var hit = Assert.Single(outcome.Indicia);
-        Assert.Contains("cont nedocumentat", hit.Explanation);
+        Assert.Contains("cont nedocumentat", hit.ExplanationRo);
         Assert.Equal(RuleBasis.Interpretation, hit.Basis); // the old Cluj address is on file, but not current (Q6)
-        Assert.Contains("valoare mică", Assert.Single(outcome.Cleared, x => x.RuleId == RuleIds.FatcaInCareOf).Explanation);
+        Assert.Contains("valoare mică", Assert.Single(outcome.Cleared, x => x.RuleId == RuleIds.FatcaInCareOf).ExplanationRo);
     }
 
     [Fact]
@@ -160,17 +162,19 @@ public class GoldenEngineTests
         var outcome = Engine.Evaluate(c.Before, c.After, c.Change);
 
         Assert.Empty(outcome.ReportableFor);
-        Assert.Contains("Student", Assert.Single(outcome.Cleared, x => x.RuleId == RuleIds.Explanation).Explanation);
+        Assert.Contains("Student", Assert.Single(outcome.Cleared, x => x.RuleId == RuleIds.Explanation).ExplanationRo);
     }
 }
 
-/// <summary>R3's TinFormat stand-in for the golden cases: only the Italian codice fiscale length (16) is checked.</summary>
-internal sealed class FakeTinFormat : ITinFormatCheck
+/// <summary>R3's ITinFormat stand-in for the golden cases: Italian codice fiscale length (16), German IdNr (11 digits).</summary>
+internal sealed class FakeTinFormat : ITinFormat
 {
-    public bool? HasValidFormat(string country, string tin) => country switch
+    public TinCheck Check(string country, string tin) => country switch
     {
-        "IT" => tin.Length == 16,
-        "DE" => tin.Length == 11 && tin.All(char.IsDigit),
-        _ => null,
+        "IT" => new(country, tin, tin.Length == 16, TinCheckSource.LocalRules, ""),
+        "DE" => new(country, tin, tin.Length == 11 && tin.All(char.IsDigit), TinCheckSource.LocalRules, ""),
+        _ => new(country, tin, false, TinCheckSource.NotChecked, ""),
     };
+
+    public bool? IssuesTinToAllResidents(string country) => null;
 }

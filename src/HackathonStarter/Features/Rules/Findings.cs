@@ -10,7 +10,7 @@ internal sealed class Findings
         RuleBasis basis = RuleBasis.Verified)
     {
         var rule = RuleCatalog.Get(ruleId);
-        var hit = new RuleHit(ruleId, rule.Regime, jurisdiction, ro, rule.GuidePage, sourceField, Coverage.None, en, basis);
+        var hit = new RuleHit(ruleId, rule.Regime, jurisdiction, en, ro, rule.GuidePage, sourceField, Coverage.None, basis);
         var index = Hits.FindIndex(h => h.RuleId == ruleId && h.Jurisdiction == jurisdiction);
         if (index < 0) Hits.Add(hit);
         else if (basis == RuleBasis.Verified && Hits[index].Basis != RuleBasis.Verified) Hits[index] = hit; // keep the firmest ground
@@ -21,7 +21,7 @@ internal sealed class Findings
     {
         if (Cleared.Any(c => c.RuleId == ruleId && c.Jurisdiction == jurisdiction)) return;
         var rule = RuleCatalog.Get(ruleId);
-        Cleared.Add(new RuleHit(ruleId, rule.Regime, jurisdiction, ro, rule.GuidePage, sourceField, Coverage.None, en, basis));
+        Cleared.Add(new RuleHit(ruleId, rule.Regime, jurisdiction, en, ro, rule.GuidePage, sourceField, Coverage.None, basis));
     }
 
     /// <summary>A rule that hit for a jurisdiction is not also "cleared" for it (e.g. two orders, only one from a deposit account).</summary>

@@ -1,4 +1,6 @@
 using HackathonStarter.Features.Rules;
+using AccountType = HackathonStarter.Features.Clients.AccountType;
+using AddressKind = HackathonStarter.Features.Clients.AddressKind;
 using static HackathonStarter.Tests.Crs.Rules.Subjects;
 
 namespace HackathonStarter.Tests.Crs.Rules;
@@ -7,12 +9,12 @@ namespace HackathonStarter.Tests.Crs.Rules;
 public sealed record ExpectedHit(string RuleId, string Jurisdiction, Coverage CoveredBy = Coverage.None, string? SourceField = null);
 
 /// <summary>
-/// CaseRegime is compared always (null = no case). Says: phrases the spec quotes, found in the outcome explanation or
+/// Regime is compared always (null = no case). Says: phrases the spec quotes, found in the outcome explanation or
 /// in a Cleared explanation.
 /// </summary>
 public sealed record EngineCase(string Id, string Title, RuleSubject Before, RuleSubject After, RuleChange Change,
     Decision Expected, ExpectedHit[] Hits, (string RuleId, string Jurisdiction)[] ClearedAtLeast, string[]? ReportableFor = null,
-    Regime? CaseRegime = null, string[]? Says = null);
+    Regime? Regime = null, string[]? Says = null);
 
 /// <summary>
 /// The engine layer of the golden cases, with the data from docs/GOLDEN-CASES.md (R5). R5's GoldenCases.cs (shared
@@ -37,10 +39,10 @@ internal static class EngineCases
     public static RuleSubject MariaAfterResponse => MariaAfter.WithSelfCert(MariaResponseForm);
 
     // Cases 5a / 5b / 5c: Radu Ionescu (CL-0005), a current account (2017) and a custodial account (2020), both new.
-    private static SubjectAccount RaduCurrent => Account(SubjectAccountType.Depository, new DateOnly(2017, 5, 2),
+    private static SubjectAccount RaduCurrent => Account(AccountType.Depository, new DateOnly(2017, 5, 2),
         "RO46RZBR0000060019823746", 12_000m, "EUR") with { Product = "Cont curent EUR" };
 
-    private static SubjectAccount RaduCustodial => Account(SubjectAccountType.Custodial, new DateOnly(2020, 9, 10),
+    private static SubjectAccount RaduCustodial => Account(AccountType.Custodial, new DateOnly(2020, 9, 10),
         "RO88RZBR0000069004471852", 25_000m) with { Product = "Cont de instrumente financiare" };
 
     public static RuleSubject Radu(SubjectAccount current, SubjectAccount custodial) =>
@@ -78,7 +80,7 @@ internal static class EngineCases
     // Case 12: Petru Sârbu (CL-0012), preexisting lower value account, no phone.
     public static RuleSubject PetruBefore => RoResident("CL-0012", "1610403121731", new DateOnly(2011, 5, 16), fullName: "Petru Sârbu",
             birthDate: new DateOnly(1961, 4, 3), residence: "Str. Horea 5, 400174 Cluj-Napoca").WithoutPhones()
-        .WithAccounts(Account(SubjectAccountType.Depository, new DateOnly(2011, 5, 16), "RO20RZBR0000060118852290", 42_300m));
+        .WithAccounts(Account(AccountType.Depository, new DateOnly(2011, 5, 16), "RO20RZBR0000060118852290", 42_300m));
 
     // Case 18 / 16: Teodora Iliescu (CL-0018), student in München, Romanian phone stays current.
     private static RuleSubject TeodoraBefore => RoResident("CL-0018", "6040502401181", new DateOnly(2022, 9, 1), "+40731904226",
@@ -125,12 +127,12 @@ internal static class EngineCases
         new("5b", "Same order from a custodial account",
             Radu(RaduCurrent, RaduCustodial), Radu(RaduCurrent, RaduCustodial.WithKellerOrder()),
             Change("StandingOrderCreated"), Decision.Clarification, [new(RuleIds.CrsStandingOrder, "DE", SourceField: "StandingOrders")],
-            [], CaseRegime: Regime.Crs),
+            [], Regime: Regime.Crs),
 
         new("5c", "Standing order to a US account from a current account",
             Radu(RaduCurrent, RaduCustodial), Radu(RaduCurrent.WithUsOrder(), RaduCustodial),
             Change("StandingOrderCreated"), Decision.FatcaAlert, [new(RuleIds.FatcaStandingOrder, "US", SourceField: "StandingOrders")],
-            [(RuleIds.CrsStandingOrder, "US")], CaseRegime: Regime.Fatca,
+            [(RuleIds.CrsStandingOrder, "US")], Regime: Regime.Fatca,
             Says: ["SUA nu e jurisdicție CRS raportabilă", "cont de depozit"]),
 
         new("13", "Andrei: DE phone next to the RO phone", AndreiBefore, AndreiBefore.WithPhone("+4915144201187", "DE"),
@@ -148,41 +150,41 @@ internal static class EngineCases
 
         new("6", "US place of birth from the passport", Alexandra.BornIn(null), Alexandra.BornIn("US"),
             Change("DocumentUploaded", summary: "pasaport-alexandra.pdf"), Decision.FatcaAlert,
-            [new(RuleIds.FatcaBirthPlace, "US", SourceField: "BirthCountry")], [], CaseRegime: Regime.Fatca),
+            [new(RuleIds.FatcaBirthPlace, "US", SourceField: "BirthCountry")], [], Regime: Regime.Fatca),
 
         new("7", "US citizenship (second passport), born in RO", Marius, Marius.WithCitizenships("RO", "US"),
             Change("DocumentUploaded", summary: "pasaport-us-marius.pdf"), Decision.FatcaAlert,
-            [new(RuleIds.FatcaCitizenship, "US", SourceField: "Citizenships")], [], CaseRegime: Regime.Fatca),
+            [new(RuleIds.FatcaCitizenship, "US", SourceField: "Citizenships")], [], Regime: Regime.Fatca),
 
         new("9", "Dual residence RO + DE declared, second residence in DE",
-            SorinBefore, SorinBefore.WithAddress(SubjectAddressKind.Residence, "DE", text: "Kastanienallee 30, 10435 Berlin"),
+            SorinBefore, SorinBefore.WithAddress(AddressKind.Residence, "DE", text: "Kastanienallee 30, 10435 Berlin"),
             Change("AddressAdded"), Decision.Compliant, [new(RuleIds.CrsAddress, "DE", Coverage.SelfCertification)],
             [(RuleIds.SelfCertConsistent, "DE")], ["DE"], Says: ["SC-CONSISTENT"]),
 
         new("11", "Power of attorney to a person with an address in AT", Doina, Doina.WithPowerOfAttorney("Matei Cazacu", "AT"),
             Change("PowerOfAttorneyGranted", "ghișeu", "Împuternicit Matei Cazacu, Mariahilfer Straße 45, 1060 Wien, AT"),
             Decision.Clarification, [new(RuleIds.CrsPowerOfAttorney, "AT", SourceField: "PowersOfAttorney")], [],
-            CaseRegime: Regime.Crs),
+            Regime: Regime.Crs),
 
         new("12", "In-care-of address in IT, the only address (preexisting, lower value)",
-            PetruBefore, PetruBefore.WithOnlyAddress(SubjectAddressKind.InCareOf, "IT", "c/o Studio Legale Bianchi, Via Roma 10, 10121 Torino"),
+            PetruBefore, PetruBefore.WithOnlyAddress(AddressKind.InCareOf, "IT", "c/o Studio Legale Bianchi, Via Roma 10, 10121 Torino"),
             Change("AddressChanged", "poștă", "Vă rog să trimiteți corespondența la avocatul meu din Torino."),
             Decision.Clarification, [new(RuleIds.CrsInCareOf, "IT", SourceField: "Addresses/InCareOf")], [(RuleIds.FatcaInCareOf, "US")],
-            CaseRegime: Regime.Crs, Says: ["Cont preexistent cu valoare mică: o adresă «în grija» din afara SUA nu e indiciu FATCA"]),
+            Regime: Regime.Crs, Says: ["Cont preexistent cu valoare mică: o adresă «în grija» din afara SUA nu e indiciu FATCA"]),
 
         new("14", "US phone next to the RO phone", Lucian, Lucian.WithPhone("+13125550147", "US"),
             Change("PhoneAdded", summary: "+13125550147"), Decision.FatcaAlert, [new(RuleIds.FatcaPhone, "US", SourceField: "Phones")],
-            [(RuleIds.CrsPhone, "US")], CaseRegime: Regime.Fatca),
+            [(RuleIds.CrsPhone, "US")], Regime: Regime.Fatca),
 
         new("16", "Move to Spain, new account (engine part of 16 / 17a)", Irina, Irina.MovedTo("ES", "Calle de Alcalá 120, 28009 Madrid"),
-            Change("AddressChanged"), Decision.Clarification, [new(RuleIds.CrsAddress, "ES")], [], CaseRegime: Regime.Crs),
+            Change("AddressChanged"), Decision.Clarification, [new(RuleIds.CrsAddress, "ES")], [], Regime: Regime.Crs),
 
         new("17b", "Move to Spain, preexisting account (engine part)", Gheorghe,
             Gheorghe.MovedTo("ES", "Avenida Diagonal 450, 08006 Barcelona"), Change("AddressChanged", "ghișeu"),
-            Decision.Clarification, [new(RuleIds.CrsAddress, "ES")], [], CaseRegime: Regime.Crs),
+            Decision.Clarification, [new(RuleIds.CrsAddress, "ES")], [], Regime: Regime.Crs),
 
         new("18", "Student in DE: before the explanation", TeodoraBefore, TeodoraAfter, Change("AddressChanged"),
-            Decision.Clarification, [new(RuleIds.CrsAddress, "DE")], [], CaseRegime: Regime.Crs),
+            Decision.Clarification, [new(RuleIds.CrsAddress, "DE")], [], Regime: Regime.Crs),
 
         // The response is an explanation, not a self-certification; ChangeKind has no value for it, so R2 decides the kind.
         new("18-explained", "Student in DE: explanation accepted", TeodoraAfter, TeodoraAfter.WithExplanation("DE", "Student"),

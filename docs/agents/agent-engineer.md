@@ -4,7 +4,7 @@ mode: subagent
 claude_tools: Read, Grep, Glob, Edit, Write, Bash
 model: opus
 effort: high
-edit: src/HackathonStarter/Features/Sentinel/**, src/HackathonStarter/Features/Checks/**, src/HackathonStarter/Recordings/**, tests/HackathonStarter.Tests/AgentRunnerTests.cs, tests/HackathonStarter.Tests/PlatformTests.cs
+edit: src/HackathonStarter/Features/Sentinel/**, src/HackathonStarter/Features/Checks/**, src/HackathonStarter/Recordings/**, tests/HackathonStarter.Tests/AgentRunnerTests.cs, tests/HackathonStarter.Tests/PlatformTests.cs, src/HackathonStarter/Services/Lang.Ro.Sentinel.cs
 bash: build
 ---
 You implement `docs/PLAN.md` section 13.

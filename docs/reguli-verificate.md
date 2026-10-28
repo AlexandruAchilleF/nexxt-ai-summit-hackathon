@@ -63,7 +63,7 @@ In MVP folosim indiciile ca criterii prin care banca "stie sau are motive sa sti
 | Nationalitatea nu e indiciu CRS; cetatenia SUA e indiciu FATCA | CONFIRMAT prin listele de la p.29 si p.31 |
 | Salariul din alta tara nu e indiciu | CONFIRMAT: nu apare in nicio lista |
 | CRS se aplica prin DAC2, transpusa in Legea 207/2015; DAC8 transpusa prin OUG 71/2025 | CONFIRMAT, Ghid p.4 |
-| Formularul F3000 si termenul 15 mai | NEVERIFICAT: nu apar in ghid; de verificat in OPANAF 1711/2022 |
-| Cuantumul amenzilor | NEVERIFICAT in ghid: ghidul citeaza OUG 102/2022 doar ca baza legala; cifrele vin din EY, sursa secundara |
-| Retinerea de 30% FATCA | NEVERIFICAT: nu apare in ghid |
+| Formularul F3000 si termenul 15 mai | CONFIRMAT din lege, nu din ghid: Codul de procedura fiscala, art. 62 alin. (7); OPANAF 1711/2022 aproba doar formularele F3000 DAC2/CRS si F3000 FATCA |
+| Cuantumul amenzilor | CONFIRMAT din lege, nu din ghid: art. 336 alin. (2) lit. k^1) 2.000-5.000 lei si lit. k^2) 5.000-10.000 lei "pentru fiecare cont care face obiectul raportarii" (introduse prin OUG 102/2022) |
+| Retinerea de 30% FATCA | CONFIRMAT din Acordul FATCA, nu din ghid: banca conforma nu e supusa retinerii (art. 4(1)); doar dupa o neconformare semnificativa nerezolvata in 18 luni (art. 5(2)(b)); cota de 30% e in 26 U.S.C. 1471(a). Nu o spunem in pitch |
 | TIN on Europa verifica doar structura si sintaxa | CONFIRMAT prin apel real: raspunsul contine doar validStructure si validSyntax |

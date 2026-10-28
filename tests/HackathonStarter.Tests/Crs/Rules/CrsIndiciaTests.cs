@@ -1,4 +1,6 @@
 using HackathonStarter.Features.Rules;
+using AccountType = HackathonStarter.Features.Clients.AccountType;
+using AddressKind = HackathonStarter.Features.Clients.AddressKind;
 using static HackathonStarter.Tests.Crs.Rules.Subjects;
 
 namespace HackathonStarter.Tests.Crs.Rules;
@@ -29,7 +31,7 @@ public class CrsIndiciaTests
     {
         var o = Run(RoResident().WithRecordedResidence("AE"));
         Assert.Equal(Decision.NoCase, o.Decision);
-        Assert.Contains("nu fac obiectul raportării", ClearedOf(o, RuleIds.CrsResidence).Explanation);
+        Assert.Contains("nu fac obiectul raportării", ClearedOf(o, RuleIds.CrsResidence).ExplanationRo);
     }
 
     // lit. b)
@@ -44,7 +46,7 @@ public class CrsIndiciaTests
     [Fact]
     public void Mailing_address_abroad_is_its_own_rule()
     {
-        var o = Run(RoResident().WithAddress(SubjectAddressKind.Mailing, "FR"));
+        var o = Run(RoResident().WithAddress(AddressKind.Mailing, "FR"));
         Assert.Equal(("FR", "Addresses/Mailing"), (HitOf(o, RuleIds.CrsMailing).Jurisdiction, HitOf(o, RuleIds.CrsMailing).SourceField));
         Assert.DoesNotContain(o.Indicia, h => h.RuleId == RuleIds.CrsAddress);
     }
@@ -52,7 +54,7 @@ public class CrsIndiciaTests
     [Fact]
     public void A_foreign_address_that_is_no_longer_current_is_not_an_indicium()
     {
-        Assert.Equal(Decision.NoCase, Run(RoResident().WithAddress(SubjectAddressKind.Residence, "DE", current: false)).Decision);
+        Assert.Equal(Decision.NoCase, Run(RoResident().WithAddress(AddressKind.Residence, "DE", current: false)).Decision);
     }
 
     [Fact]
@@ -60,21 +62,21 @@ public class CrsIndiciaTests
     {
         var o = Run(RoResident().MovedTo("AE"));
         Assert.Equal(Decision.NoCase, o.Decision);
-        Assert.Contains("nu fac obiectul raportării", ClearedOf(o, RuleIds.CrsAddress).Explanation);
+        Assert.Contains("nu fac obiectul raportării", ClearedOf(o, RuleIds.CrsAddress).ExplanationRo);
     }
 
     [Fact]
     public void A_service_providers_address_is_ignored_when_there_are_others()
     {
-        var o = Run(RoResident().WithAddress(SubjectAddressKind.Mailing, "DE", serviceProvider: true));
+        var o = Run(RoResident().WithAddress(AddressKind.Mailing, "DE", serviceProvider: true));
         Assert.Equal(Decision.NoCase, o.Decision);
-        Assert.Contains("prestator de servicii", ClearedOf(o, RuleIds.CrsMailing).Explanation);
+        Assert.Contains("prestator de servicii", ClearedOf(o, RuleIds.CrsMailing).ExplanationRo);
     }
 
     [Fact]
     public void A_service_providers_address_counts_when_it_is_the_only_one()
     {
-        var only = RoResident() with { Addresses = [new SubjectAddress(SubjectAddressKind.Mailing, "DE", IsServiceProvider: true)] };
+        var only = RoResident() with { Addresses = [new SubjectAddress(AddressKind.Mailing, "DE", IsServiceProvider: true)] };
         Assert.Equal(Decision.Clarification, Run(only).Decision);
     }
 
@@ -110,7 +112,7 @@ public class CrsIndiciaTests
         var preexisting = RoResident(openedOn: Preexisting);
         var replaced = HitOf(Run(preexisting.ReplacePhone("+33612345678", "FR"), "PhoneChanged"), RuleIds.CrsPhone);
         Assert.Equal(RuleBasis.Interpretation, replaced.Basis);
-        Assert.Contains("nu mai e actual", replaced.Explanation);
+        Assert.Contains("nu mai e actual", replaced.ExplanationRo);
 
         var neverRomanian = HitOf(Run(preexisting.WithoutPhones().WithPhone("+33612345678", "FR"), "PhoneAdded"), RuleIds.CrsPhone);
         Assert.Equal(RuleBasis.Verified, neverRomanian.Basis);
@@ -120,15 +122,15 @@ public class CrsIndiciaTests
     public void A_service_providers_phone_is_ignored_when_there_are_other_numbers()
     {
         var o = Run(RoResident().WithPhone("+4930123456", "DE", serviceProvider: true), "PhoneAdded");
-        Assert.Contains("prestator de servicii", ClearedOf(o, RuleIds.CrsPhone).Explanation);
+        Assert.Contains("prestator de servicii", ClearedOf(o, RuleIds.CrsPhone).ExplanationRo);
     }
 
     // lit. d)
     [Theory]
-    [InlineData(SubjectAccountType.Custodial)]
-    [InlineData(SubjectAccountType.Insurance)]
-    [InlineData(SubjectAccountType.Other)]
-    public void Standing_order_from_a_non_deposit_account_is_an_indicium(SubjectAccountType type)
+    [InlineData(AccountType.Custodial)]
+    [InlineData(AccountType.Insurance)]
+    [InlineData(AccountType.Other)]
+    public void Standing_order_from_a_non_deposit_account_is_an_indicium(AccountType type)
     {
         var after = RoResident().WithAccounts(Account(type, Preexisting).WithOrder("DE02700100800918273645", "DE"));
         Assert.Equal(RuleBasis.Verified, HitOf(Run(after, "StandingOrderCreated"), RuleIds.CrsStandingOrder).Basis);
@@ -137,28 +139,28 @@ public class CrsIndiciaTests
     [Fact]
     public void Standing_order_from_a_deposit_account_is_cleared()
     {
-        var after = RoResident().WithAccounts(Account(SubjectAccountType.Depository, Preexisting).WithOrder("DE02700100800918273645", "DE"));
+        var after = RoResident().WithAccounts(Account(AccountType.Depository, Preexisting).WithOrder("DE02700100800918273645", "DE"));
         var o = Run(after, "StandingOrderCreated");
         Assert.Equal(Decision.NoCase, o.Decision);
-        Assert.Contains("exceptat la CRS", ClearedOf(o, RuleIds.CrsStandingOrder).Explanation);
+        Assert.Contains("exceptat la CRS", ClearedOf(o, RuleIds.CrsStandingOrder).ExplanationRo);
     }
 
     [Fact]
     public void An_inactive_standing_order_is_cleared()
     {
         var after = RoResident().WithAccounts(
-            Account(SubjectAccountType.Custodial, Preexisting).WithOrder("DE02700100800918273645", "DE", active: false));
+            Account(AccountType.Custodial, Preexisting).WithOrder("DE02700100800918273645", "DE", active: false));
         var o = Run(after, "StandingOrderCreated");
         Assert.Equal(Decision.NoCase, o.Decision);
-        Assert.Contains("nu mai e activ", ClearedOf(o, RuleIds.CrsStandingOrder).Explanation);
+        Assert.Contains("nu mai e activ", ClearedOf(o, RuleIds.CrsStandingOrder).ExplanationRo);
     }
 
     [Fact]
     public void One_custodial_and_one_deposit_order_to_the_same_country_give_only_the_hit()
     {
         var after = RoResident().WithAccounts(
-            Account(SubjectAccountType.Depository, Preexisting).WithOrder("DE02700100800918273645", "DE"),
-            Account(SubjectAccountType.Custodial, Preexisting, "RO88RZBR0000069004471852").WithOrder("DE02700100800918273645", "DE"));
+            Account(AccountType.Depository, Preexisting).WithOrder("DE02700100800918273645", "DE"),
+            Account(AccountType.Custodial, Preexisting, "RO88RZBR0000069004471852").WithOrder("DE02700100800918273645", "DE"));
         var o = Run(after, "StandingOrderCreated");
         Assert.Single(o.Indicia);
         Assert.DoesNotContain(o.Cleared, h => h.RuleId == RuleIds.CrsStandingOrder);
@@ -177,36 +179,36 @@ public class CrsIndiciaTests
     {
         var o = Run(RoResident().WithPowerOfAttorney("Persoană Sintetică", "AT", active: false), "PowerOfAttorneyGranted");
         Assert.Equal(Decision.NoCase, o.Decision);
-        Assert.Contains("nu mai e valabilă", ClearedOf(o, RuleIds.CrsPowerOfAttorney).Explanation);
+        Assert.Contains("nu mai e valabilă", ClearedOf(o, RuleIds.CrsPowerOfAttorney).ExplanationRo);
     }
 
     // lit. f)
     [Theory]
-    [InlineData(SubjectAddressKind.InCareOf)]
-    [InlineData(SubjectAddressKind.HoldMail)]
-    public void In_care_of_or_hold_mail_as_the_only_address_is_an_indicium(SubjectAddressKind kind)
+    [InlineData(AddressKind.InCareOf)]
+    [InlineData(AddressKind.HoldMail)]
+    public void In_care_of_or_hold_mail_as_the_only_address_is_an_indicium(AddressKind kind)
     {
-        var only = RoResident().WithAccounts(Account(SubjectAccountType.Depository, Preexisting)) with
+        var only = RoResident().WithAccounts(Account(AccountType.Depository, Preexisting)) with
         {
             Addresses = [new SubjectAddress(kind, "IT")],
         };
         var hit = HitOf(Run(only), RuleIds.CrsInCareOf);
         Assert.Equal(RuleBasis.Verified, hit.Basis); // preexisting account, truly no other address
-        Assert.Contains("cont nedocumentat", hit.Explanation);
+        Assert.Contains("cont nedocumentat", hit.ExplanationRo);
     }
 
     [Fact]
     public void In_care_of_next_to_another_current_address_is_cleared()
     {
-        var o = Run(RoResident().WithAddress(SubjectAddressKind.InCareOf, "IT"));
+        var o = Run(RoResident().WithAddress(AddressKind.InCareOf, "IT"));
         Assert.Equal(Decision.NoCase, o.Decision);
-        Assert.Contains("altă adresă actuală", ClearedOf(o, RuleIds.CrsInCareOf).Explanation);
+        Assert.Contains("altă adresă actuală", ClearedOf(o, RuleIds.CrsInCareOf).ExplanationRo);
     }
 
     [Fact]
     public void In_care_of_is_not_a_residence_or_mailing_indicium()
     {
-        var o = Run(RoResident().WithOnlyAddress(SubjectAddressKind.InCareOf, "IT"));
+        var o = Run(RoResident().WithOnlyAddress(AddressKind.InCareOf, "IT"));
         Assert.DoesNotContain(o.Indicia, h => h.RuleId is RuleIds.CrsAddress or RuleIds.CrsMailing);
     }
 
@@ -214,9 +216,9 @@ public class CrsIndiciaTests
     [Fact]
     public void Romanian_data_never_produces_an_indicium()
     {
-        var after = RoResident().MovedTo("RO").WithAddress(SubjectAddressKind.Mailing, "RO").WithPhone("+40733000000", "RO")
+        var after = RoResident().MovedTo("RO").WithAddress(AddressKind.Mailing, "RO").WithPhone("+40733000000", "RO")
             .WithPowerOfAttorney("Persoană Sintetică", "RO")
-            .WithAccounts(Account(SubjectAccountType.Custodial, Preexisting).WithOrder("RO49AAAA1B31007593840000", "RO"));
+            .WithAccounts(Account(AccountType.Custodial, Preexisting).WithOrder("RO49AAAA1B31007593840000", "RO"));
         var o = Run(after);
         Assert.Equal(Decision.NoCase, o.Decision);
         Assert.Equal(RuleIds.Domestic, Assert.Single(o.Cleared).RuleId);
@@ -228,7 +230,7 @@ public class CrsIndiciaTests
         var after = RoResident().MovedTo("US").ReplacePhone("+13125550147", "US").WithPowerOfAttorney("Persoană Sintetică", "US");
         var o = Run(after);
         Assert.DoesNotContain(o.Indicia, h => h.Regime == Regime.Crs);
-        Assert.All(o.Cleared.Where(c => c.Regime == Regime.Crs), c => Assert.Contains("SUA", c.Explanation));
+        Assert.All(o.Cleared.Where(c => c.Regime == Regime.Crs), c => Assert.Contains("SUA", c.ExplanationRo));
     }
 
     // Coverage and decision
@@ -260,7 +262,7 @@ public class CrsIndiciaTests
     {
         var hit = HitOf(Run(RoResident(openedOn: new DateOnly(2020, 1, 1)).MovedTo("AT")), RuleIds.CrsAddress);
         Assert.Equal(RuleBasis.Interpretation, hit.Basis);
-        Assert.Contains("GEN-NEW-ACCOUNT", hit.Explanation);
+        Assert.Contains("GEN-NEW-ACCOUNT", hit.ExplanationRo);
     }
 
     [Fact]
@@ -268,7 +270,7 @@ public class CrsIndiciaTests
     {
         var o = Run(RoResident().MovedTo("DE").WithoutPhones().WithPhone("+13125550147", "US"));
         Assert.Equal(Decision.FatcaAlert, o.Decision);
-        Assert.Equal(Regime.Both, o.CaseRegime);
-        Assert.Contains("Clarificare CRS", o.Explanation);
+        Assert.Equal(Regime.Both, o.Regime);
+        Assert.Contains("Clarificare CRS", o.ExplanationRo);
     }
 }

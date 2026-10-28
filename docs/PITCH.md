@@ -13,7 +13,7 @@ CRS Sentinel transformă fiecare modificare de date într-o decizie CRS/FATCA, �
 
 | Timp | Ce se vede | Ce se spune |
 | --- | --- | --- |
-| 0:00–0:20 | Titlul, apoi coada de cazuri | Problema: fiecare modificare trebuie evaluată; doar cele relevante fiscal pornesc un termen (90 de zile pe un cont nou, Ghid ANAF p. 35–36). Cifrele ANAF despre verificări: doar după ce le citim din sursă (azi NEVERIFICAT). |
+| 0:00–0:20 | Titlul, apoi coada de cazuri | Problema: fiecare modificare trebuie evaluată; doar cele relevante fiscal pornesc un termen (90 de zile pe un cont nou, Ghid ANAF p. 35–36). În primul semestru din 2025, după 3.204 verificări ANAF la 28 de instituții, 891 de înregistrări au fost corectate (Raportul de activitate ANAF S1 2025). |
 | 0:20–0:45 | Maria (cont nou) se mută la München; caz deschis cu termen | Codul găsește două indicii, fiecare cu regula și pagina. Termenul pornește singur. |
 | 0:45–1:05 | Pagina cazului: dovezi cu „citat verificat”, semnalul „salariu de la o firmă germană” separat | AI-ul citește documentele și citează; codul verifică fiecare citat. Salariul e doar semnal, fără alertă. |
 | 1:05–1:20 | Cererea către client, butonul de aprobare; data simulată +85 zile, memento și escaladare | Omul aprobă; abia atunci cererea pleacă. Sistemul ține minte termenul și escaladează la timp. |
@@ -21,7 +21,7 @@ CRS Sentinel transformă fiecare modificare de date într-o decizie CRS/FATCA, �
 | 1:35–1:50 | Trei capcane: Cluj → Iași, ordin din cont curent, telefon străin + RO | Fără alarme false, fiecare cu explicația de ce nu e indiciu. |
 | 1:50–2:10 | PDF cu text alb ascuns; semnal roșu de la scut | Un document poate încerca să manipuleze modelul. Scutul scoate textul ascuns înainte ca modelul să-l vadă. |
 | 2:10–2:30 | Diagrama: cod / AI / om; jurnalul, „Tamper”, intrarea ruptă | Codul decide, AI-ul explică, omul aprobă. Orice modificare a jurnalului se vede. |
-| 2:30–2:50 | `/metrics` | Cifrele reale pe cele 18 cazuri-etalon și cei 50 de clienți sintetici: prinse, ratate, alarme false. Ce nu prindem încă. |
+| 2:30–2:50 | `/metrics` | Cifrele reale pe cele 21 de cazuri-etalon și cei 50 de clienți sintetici: prinse, ratate, alarme false. Ce nu prindem încă. |
 | 2:50–3:00 | Logo | Fraza de final. |
 
 ## Fraza de final (variante)
@@ -35,7 +35,7 @@ CRS Sentinel transformă fiecare modificare de date într-o decizie CRS/FATCA, �
 2. **Deciziile sunt cod verificabil**, cu ID și pagina din Ghidul ANAF; AI-ul nu decide nimic.
 3. **Capcanele sunt testate**: excepția conturilor de depozit, telefonul străin cu telefon RO, mutarea în țară. Alte semnale (venitul din străinătate) sunt testate ca non-indicii, fără alertă.
 4. **Încredere**: scut împotriva textului ascuns, citate verificate, jurnal cu lanț de hash-uri, aprobare umană.
-5. **Merge fără internet**: replay și mock, aceleași unelte reale.
+5. **Merge fără internet**: mock-ul cheamă aceleași unelte reale; înregistrările doar pentru întrebările care citesc.
 
 ## Întrebări probabile și răspunsuri
 
@@ -43,7 +43,7 @@ CRS Sentinel transformă fiecare modificare de date într-o decizie CRS/FATCA, �
 | --- | --- |
 | „Raiffeisen are deja asta?” | Întrebarea pusă mentorului (P5). Răspunsul îl trecem aici înainte de filmare. |
 | „Ce se întâmplă dacă modelul greșește?” | Modelul nu decide: regulile sunt cod testat, citatele sunt verificate, acțiunile cer aprobare. |
-| „GDPR?” | Obligație legală (art. 6 alin. 1 lit. c, trimiterea exactă NEVERIFICAT); date personale mascate înainte de model; doar date sintetice. |
+| „GDPR?” | Temeiul e obligația legală (art. 6 alin. (1) lit. (c)). Art. 22 nu se aplică: decide omul. CNP, IBAN, card, e-mail și telefon sunt mascate înainte de model (minimizare, art. 5; securitate, art. 32). Doar date sintetice. |
 | „De ce us-west-2?” | Contul de workshop blochează Bedrock în UE; datele sunt sintetice. În producție: regiune UE sau on-prem. |
 | „Ce nu prindeți?” | Text acoperit de forme în PDF; persoanele juridice; generarea F3000. Spus deschis. |
 
@@ -51,5 +51,5 @@ CRS Sentinel transformă fiecare modificare de date într-o decizie CRS/FATCA, �
 
 - [ ] Cifrele din `/metrics` (rulare reală, cu data rulării).
 - [ ] Răspunsul mentorului.
-- [ ] Cifrele ANAF, doar dacă le citim din raportul original (altfel scoatem).
+- [x] Cifrele ANAF, confirmate din rapoartele originale (S1 2025 și 2024; linkurile în `RESEARCH-CRS.md`).
 - [ ] Textul final citit cu voce tare și cronometrat.

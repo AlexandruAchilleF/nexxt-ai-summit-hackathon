@@ -29,10 +29,10 @@ public class RuleCatalogTests
     {
         foreach (var rule in RuleCatalog.All)
         {
+            Assert.False(string.IsNullOrWhiteSpace(rule.TitleRo), rule.Id);
             Assert.False(string.IsNullOrWhiteSpace(rule.Title), rule.Id);
-            Assert.False(string.IsNullOrWhiteSpace(rule.TitleEn), rule.Id);
+            Assert.False(string.IsNullOrWhiteSpace(rule.DescriptionRo), rule.Id);
             Assert.False(string.IsNullOrWhiteSpace(rule.Description), rule.Id);
-            Assert.False(string.IsNullOrWhiteSpace(rule.DescriptionEn), rule.Id);
             Assert.False(string.IsNullOrWhiteSpace(rule.LegalBasis), rule.Id);
             Assert.False(string.IsNullOrWhiteSpace(rule.GuidePage), rule.Id);
             Assert.NotEqual("?", rule.GuidePage);

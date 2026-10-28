@@ -1,5 +1,6 @@
 using System.Text.Json;
 using HackathonStarter.Features.Rules;
+using HackathonStarter.Features.Tin;
 using Microsoft.Extensions.DependencyInjection;
 using static HackathonStarter.Tests.Crs.Rules.Subjects;
 
@@ -63,18 +64,24 @@ public class EngineInvariantTests
         Assert.Equal(outcome.Decision, back.Decision);
         Assert.Equal(outcome.Indicia, back.Indicia);
         Assert.Equal(outcome.Explanation, back.Explanation);
-        Assert.Contains("\"CaseRegime\"", json);
-        Assert.DoesNotContain("\"Uncovered\"", json);
+        Assert.Equal(outcome.ExplanationRo, back.ExplanationRo);
+        Assert.Equal(outcome.Regime, back.Regime);
+        Assert.Contains("\"Regime\"", json);
     }
 
     [Fact]
-    public void Add_rules_registers_the_engine_and_keeps_r3s_tin_check()
+    public void Add_rules_registers_one_engine_behind_the_shared_contract_and_uses_r3s_tin_format()
     {
-        var provider = new ServiceCollection().AddSingleton<ITinFormatCheck, FakeTinFormat>().AddRules().BuildServiceProvider();
+        var provider = new ServiceCollection().AddRules().AddSingleton<ITinFormat, FakeTinFormat>().BuildServiceProvider();
         var engine = provider.GetRequiredService<CrsRuleEngine>();
-        Assert.Same(engine, provider.GetRequiredService<CrsRuleEngine>());
-        Assert.IsType<FakeTinFormat>(provider.GetRequiredService<ITinFormatCheck>());
-        Assert.Equal(RuleCatalog.All, engine.Catalog);
+        Assert.Same(engine, provider.GetRequiredService<ICrsRuleEngine>());
+        Assert.Same(RuleCatalog.All, engine.Catalog);
+
+        var wrongFormat = SelfCert(ChangeAt, new SubjectTaxResidence("IT", "DBRCST90A41Z129"));
+        Assert.Equal(Decision.Clarification, engine.EvaluateSelfCertification(RoResident(), wrongFormat).Decision);
+
+        var withoutR3 = new ServiceCollection().AddRules().BuildServiceProvider().GetRequiredService<ICrsRuleEngine>();
+        Assert.Equal(Decision.NoCase, ((CrsRuleEngine)withoutR3).EvaluateSelfCertification(RoResident(), wrongFormat).Decision);
     }
 
     [Fact]

@@ -9,6 +9,7 @@ permission:
     "src/HackathonStarter/Recordings/**": allow
     "tests/HackathonStarter.Tests/AgentRunnerTests.cs": allow
     "tests/HackathonStarter.Tests/PlatformTests.cs": allow
+    "src/HackathonStarter/Services/Lang.Ro.Sentinel.cs": allow
   bash:
     "*": ask
     "dotnet build*": allow
@@ -38,7 +39,7 @@ You implement `docs/PLAN.md` section 13.
 - New checks: `evidence-quoted`, `signals-never-alert`, `no-tin-valid-claim`, `rule-cited`, each with pass and fail tests.
 - Keep the chain live -> `Recordings/crs-sentinel.json` -> mock. Maria's case end to end with `FakeChatClient`, no network.
 
-You may edit only: src/HackathonStarter/Features/Sentinel/**, src/HackathonStarter/Features/Checks/**, src/HackathonStarter/Recordings/**, tests/HackathonStarter.Tests/AgentRunnerTests.cs, tests/HackathonStarter.Tests/PlatformTests.cs.
+You may edit only: src/HackathonStarter/Features/Sentinel/**, src/HackathonStarter/Features/Checks/**, src/HackathonStarter/Recordings/**, tests/HackathonStarter.Tests/AgentRunnerTests.cs, tests/HackathonStarter.Tests/PlatformTests.cs, src/HackathonStarter/Services/Lang.Ro.Sentinel.cs.
 
 ## Shared rules (every agent)
 
