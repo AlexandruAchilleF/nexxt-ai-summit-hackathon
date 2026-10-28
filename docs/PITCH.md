@@ -21,10 +21,10 @@ muta data simulată și folosi „Tamper”.
 | S4 | 1:05–1:24 | Maria: ziua 85, răspunsul, închiderea | 37 | 39 | ≈ 18,0 s | live sau mock |
 | S5 | 1:24–1:46 | Trei capcane | 45 | 45 | ≈ 20,8 s | fără agent (codul) |
 | S6 | 1:46–1:58 | Scutul | 25 | 25 | ≈ 11,5 s | fără agent (codul) |
-| S7 | 1:58–2:20 | Arhitectura și jurnalul | 47 | 47 | ≈ 21,7 s | fără agent |
+| S7 | 1:58–2:20 | Arhitectura și jurnalul | 45 | 45 | ≈ 20,8 s | fără agent |
 | S8 | 2:20–2:46 | Metricile și domeniul MVP | 46 | 56 | ≈ 25,8 s | doar citire |
 | S9 | 2:46–3:00 | Fraza de final | 29 | 29 | ≈ 13,4 s | fără agent |
-| | | **Total** | **351** | **377** | **≈ 2:54** | |
+| | | **Total** | **349** | **375** | **≈ 2:53** | |
 
 Cum am numărat (28.10.2026): cuvintele scrise = `wc -w` pe textul vocii. Cuvintele rostite = aceleași, cu cifrele citite
 în litere: „2,4” = 3 („două virgulă patru”), „2025” = 5, „3.204” = 5, „891” = 5, „85” = 3, „21” = 3, „F3000” = 3 („ef trei
@@ -139,9 +139,9 @@ deschide niciun caz.”, cu motivele „text alb” și „font < 2 pt”.
 
 ### S7 · 1:58–2:20 · Arhitectura și jurnalul
 
-**Vocea** (47 de cuvinte, ≈ 22 s):
+**Vocea** (45 de cuvinte, ≈ 21 s):
 
-> Un agent cu unelte, orchestrat de cod, cu omul la decizie. CNP-ul, IBAN-ul, cardul și e-mailul sunt mascate înainte de model. Jurnalul are lanț de hash-uri: modific o intrare și verificarea arată exact unde s-a rupt. Template-ul era gata; tot ce ține de CRS e scris în hackathon.
+> Un agent cu unelte, orchestrat de cod, cu omul la decizie. CNP-ul, IBAN-ul, cardul și e-mailul sunt mascate înainte de model. Jurnalul are lanț de hash-uri: modific o intrare și verificarea arată exact unde s-a rupt. Template-ul era gata; partea CRS e scrisă în hackathon.
 
 **Ce se vede:** `/architecture` (cod / AI / om). Apoi `/audit`: „Verifică” (după R3) → lanț întreg; „Tamper” (după R3) pe o
 intrare a cazului Mariei → „Verifică” → intrarea ruptă evidențiată, cu `Seq`-ul ei. Supratitrare: „Demo: doar date
