@@ -5,6 +5,7 @@
 @using HackathonStarter.Features.Rules
 @using HackathonStarter.Features.Shield
 @using HackathonStarter.Features.Tin
+@using HackathonStarter.Components.Trust
 @inject IClientService Clients
 @inject ICaseService Cases
 @inject IShieldedDocuments Shielded
@@ -227,6 +228,10 @@ else
                             </div>
                             <div class="client-row-tags">@ShieldPill(d.ShieldVerdict)</div>
                         </div>
+                        @if (d.ShieldVerdict == ShieldVerdict.NotScanned)
+                        {
+                            <ShieldScanButton ClientCode="@_client!.Code" DocumentId="d.Id" OnScanned="LoadAsync" />
+                        }
                         @if (d.ShieldVerdict == ShieldVerdict.HiddenTextRemoved)
                         {
                             @if (_hidden.TryGetValue(d.Id, out var fragments))

@@ -15,7 +15,9 @@ public static partial class Lang
         ro["Page {0}"] = "Pagina {0}";
         ro["Quote not found"] = "Citat negăsit";
         ro["Quote verified"] = "Citat verificat";
+        ro["Record the upload and scan"] = "Înregistrează încărcarea și scanează";
         ro["Red flag from the shield: {0} hidden fragment(s) removed"] = "Semnal roșu de la scut: {0} fragment(e) ascuns(e) eliminat(e)";
+        ro["Scanning…"] = "Se scanează…";
         ro["white text"] = "text alb";
     }
 }
