@@ -251,11 +251,11 @@ else
                         <div class="crs-verdict-deadline">
                             @if (recordedCase.DueAt is { } due)
                             {
-                                <b>@T("Deadline") @Format.Date(due)</b><span> · @T("{0} days", CrsUi.DaysBetween(recordedCase.OpenedAt, due))</span>
+                                <b>@T("Deadline") @CrsUi.Date(due)</b><span> · @T("{0} days", CrsUi.DaysBetween(recordedCase.OpenedAt, due))</span>
                                 <span> · <span class="crs-code">@recordedCase.DeadlineRuleId</span> · @CrsUi.Page(recordedCase.DeadlineGuidePage)</span>
                                 @if (recordedCase.RemindAt is { } reminder)
                                 {
-                                    <span> · @T("Reminder") @Format.Date(reminder)</span>
+                                    <span> · @T("Reminder") @CrsUi.Date(reminder)</span>
                                 }
                             }
                             else if (recordedCase.Regime == Regime.Fatca)
