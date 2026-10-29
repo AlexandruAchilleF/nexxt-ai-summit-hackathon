@@ -1,5 +1,6 @@
 using System.Text.Json;
 using HackathonStarter.Features.Changes;
+using HackathonStarter.Features.Clients;
 using HackathonStarter.Tests.Support;
 
 namespace HackathonStarter.Tests.Crs.Sentinel;
@@ -57,6 +58,63 @@ public class AgentExtractionTests
         Assert.Equal(new DateTime(2027, 1, 21, 0, 0, 0, DateTimeKind.Utc), change.SelfCertification!.SignedAt);
         var residence = Assert.Single(change.SelfCertification.Residences);
         Assert.Equal(("DE", "86095174223"), (residence.Country, residence.Tin));
+    }
+
+    [Fact]
+    public async Task Extraction_returns_the_saved_id_not_a_later_id_with_the_same_signing_date()
+    {
+        var world = new MariaWorld();
+        world.DeliverAnswer();
+        ChangeResult? recordedChange = null;
+        var getCallsBeforeReturn = -1;
+        world.Changes.AfterRecord = recorded =>
+        {
+            recordedChange = recorded;
+            var submitted = world.Clients.Maria.SelfCertifications.Single(s => s.Id == recorded.SelfCertificationId);
+            world.Clients.Maria.SelfCertifications.Add(new SelfCertification
+            {
+                Id = submitted.Id + 1, ClientId = submitted.ClientId, SignedAt = submitted.SignedAt, ReceivedAt = submitted.ReceivedAt,
+                Channel = submitted.Channel, DeclaresUsPerson = submitted.DeclaresUsPerson, Residences = [.. submitted.Residences],
+            });
+            getCallsBeforeReturn = world.Clients.GetCalls;
+            return recorded;
+        };
+        await using var host = await world.HostAsync();
+
+        var r = await host.ToolAsync("extractSelfCertification", new { caseCode = MariaWorld.CaseCode, documentId = MariaWorld.SelfCertDocumentId });
+
+        Assert.Single(world.Changes.Requests);
+        var change = Assert.IsType<ChangeResult>(recordedChange);
+        var saved = Assert.Single(world.Clients.Maria.SelfCertifications, s => s.Id == change.SelfCertificationId);
+        var later = Assert.Single(world.Clients.Maria.SelfCertifications, s => s.Id > saved.Id);
+        Assert.Equal(saved.SignedAt, later.SignedAt);
+        Assert.True(r.GetProperty("complete").GetBoolean());
+        Assert.True(r.GetProperty("recorded").GetBoolean());
+        Assert.Equal(saved.Id, r.GetProperty("selfCertificationId").GetInt32());
+        Assert.NotEqual(later.Id, r.GetProperty("selfCertificationId").GetInt32());
+        Assert.Equal(getCallsBeforeReturn, world.Clients.GetCalls);
+        Assert.Equal(["DE"], r.GetProperty("outcome").GetProperty("reportableFor").EnumerateArray().Select(x => x.GetString()));
+    }
+
+    [Fact]
+    public async Task A_saved_self_certification_without_a_returned_id_is_an_error_not_a_success()
+    {
+        var world = new MariaWorld();
+        world.DeliverAnswer();
+        world.Changes.AfterRecord = recorded => recorded with { SelfCertificationId = null };
+        await using var host = await world.HostAsync();
+
+        var r = await host.ToolAsync("extractSelfCertification", new { caseCode = MariaWorld.CaseCode, documentId = MariaWorld.SelfCertDocumentId });
+
+        Assert.Equal(MariaWorld.SelfCertDocumentId, Assert.Single(world.Changes.Requests).DocumentId);
+        Assert.Equal(2, Assert.Single(world.Clients.Maria.SelfCertifications, s => s.Status == SelfCertStatus.Valid).Id);
+        var error = r.GetProperty("error").GetString();
+        Assert.Contains("no selfCertificationId", error);
+        Assert.Contains("Do not call registerResponse or closeCase", error);
+        Assert.Contains("operator", error);
+        Assert.False(r.TryGetProperty("recorded", out var recordedFlag) && recordedFlag.ValueKind == JsonValueKind.True);
+        Assert.True(!r.TryGetProperty("selfCertificationId", out var id) || id.ValueKind == JsonValueKind.Null);
+        Assert.True(!r.TryGetProperty("next", out var next) || next.ValueKind == JsonValueKind.Null);
     }
 
     [Fact]

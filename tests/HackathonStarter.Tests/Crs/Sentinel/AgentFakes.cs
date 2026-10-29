@@ -106,6 +106,7 @@ public sealed class FakeClients : IClientService
     };
 
     public List<ClientDocument> Documents { get; } = [];
+    public int GetCalls { get; private set; }
 
     public FakeClients() =>
         AddDocument(MariaWorld.PayslipId, DocumentKind.Payslip, SyntheticPdfs.PayslipMaria, new DateTime(2026, 10, 20, 9, 0, 0, DateTimeKind.Utc));
@@ -118,7 +119,11 @@ public sealed class FakeClients : IClientService
         });
 
     public Task<List<Client>> ListAsync(string? search = null) => Task.FromResult(new List<Client> { Maria });
-    public Task<Client?> GetAsync(string code) => Task.FromResult(code == Maria.Code ? Maria : null);
+    public Task<Client?> GetAsync(string code)
+    {
+        GetCalls++;
+        return Task.FromResult(code == Maria.Code ? Maria : null);
+    }
 
     public Task<List<DocumentInfo>> ListDocumentsAsync(string clientCode) => Task.FromResult(
         clientCode == Maria.Code
@@ -281,6 +286,9 @@ public sealed class FakeChanges(FakeClients clients, CrsRuleEngine engine) : ICh
 {
     public List<ChangeRequest> Requests { get; } = [];
 
+    /// <summary>Runs after saving, before the result reaches the tool.</summary>
+    public Func<ChangeResult, ChangeResult>? AfterRecord { get; set; }
+
     public Task<ChangeResult> RecordAsync(ChangeRequest request)
     {
         if (request.Kind != ChangeKind.SelfCertSubmitted || request.SelfCertification is not { } sc)
@@ -289,19 +297,21 @@ public sealed class FakeChanges(FakeClients clients, CrsRuleEngine engine) : ICh
 
         var client = clients.Maria;
         foreach (var old in client.SelfCertifications) old.Status = SelfCertStatus.Superseded;
-        client.SelfCertifications.Add(new SelfCertification
+        var saved = new SelfCertification
         {
             Id = client.SelfCertifications.Max(s => s.Id) + 1, ClientId = client.Id, SignedAt = sc.SignedAt, ReceivedAt = MariaWorld.AnsweredAt,
             Channel = request.Channel, DeclaresUsPerson = sc.DeclaresUsPerson,
             Residences = [.. sc.Residences.Select(r => new TaxResidence { Country = r.Country, Tin = r.Tin, NoTinReason = r.NoTinReason, NoTinExplanation = r.NoTinExplanation })],
-        });
+        };
+        client.SelfCertifications.Add(saved);
 
         var outcome = engine.EvaluateSelfCertification(ClientSnapshot.From(client), sc);
         var change = new ChangeEvent
         {
             Id = Requests.Count + 1, ClientId = client.Id, Kind = request.Kind, SourceChannel = request.Channel, ReceivedAt = MariaWorld.AnsweredAt,
         };
-        return Task.FromResult(new ChangeResult(change, outcome, request.CaseCode));
+        var result = new ChangeResult(change, outcome, request.CaseCode) { SelfCertificationId = saved.Id };
+        return Task.FromResult(AfterRecord?.Invoke(result) ?? result);
     }
 
     public Task<List<ChangeEvent>> ListAsync(string? clientCode = null, int take = 50) => Task.FromResult(new List<ChangeEvent>());

@@ -31,7 +31,7 @@ public class DeadlineCalculatorTests
 
     /// <summary>
     /// DL-PRE-YEAR: the later of 31 Dec 23:59:59 Europe/Bucharest of the year the bank knew, and KnownAt + 90 days
-    /// (PLAN 9.2: our reading of the guide's "or", p. 29). Reminder 5 days before.
+    /// (PLAN 9.2: our interpretation for electronic indicia, CPF Annex 1 III.B(16)). Reminder 5 days before.
     /// </summary>
     [Theory]
     [InlineData("2026-03-10T08:00:00", "2026-12-31T21:59:59")] // golden case 17b: March, the year end wins (UTC+2 in winter)
@@ -44,9 +44,30 @@ public class DeadlineCalculatorTests
 
         Assert.Equal("DL-PRE-YEAR", result.RuleId);
         Assert.True(result.Preexisting);
-        Assert.True(result.DesignChoice, "\"The later date\" is our reading, not the guide's text");
+        Assert.True(result.DesignChoice, "For electronic indicia, the later-of reading is our interpretation (CPF Annex 1 III.B(16)).");
         Assert.Equal(Utc(dueAt), result.DueAt);
         Assert.Equal(Utc(dueAt).AddDays(-5), result.RemindAt);
+    }
+
+    [Fact]
+    public void Preexisting_explanation_distinguishes_electronic_indicia_from_the_residence_address_test()
+    {
+        var result = _calculator.Compute(new DeadlineInput(ChangeAt, Regime.Crs, PreexistingAccount));
+
+        Assert.Contains("electronic", result.Explanation);
+        Assert.Contains("our interpretation", result.Explanation);
+        Assert.Contains("Fiscal Procedure Code, Annex 1, Section III, subsection B, point 16", result.Explanation);
+        Assert.Contains("OECD Commentary on Section III, paragraph 16", result.Explanation);
+        Assert.Contains("residence address test", result.Explanation);
+        Assert.Contains("Annex 2, point 1", result.Explanation);
+        Assert.Contains("law", result.Explanation);
+        Assert.Contains("căutarea electronică", result.ExplanationRo);
+        Assert.Contains("interpretarea noastră", result.ExplanationRo);
+        Assert.Contains("Codul de procedură fiscală, Anexa nr. 1, secțiunea III, subsecțiunea B, pct. 16", result.ExplanationRo);
+        Assert.Contains("Comentariul OCDE la Secțiunea III, pct. 16", result.ExplanationRo);
+        Assert.Contains("testul adresei de rezidență", result.ExplanationRo);
+        Assert.Contains("Anexa nr. 2, pct. 1", result.ExplanationRo);
+        Assert.Contains("lege", result.ExplanationRo);
     }
 
     [Theory]

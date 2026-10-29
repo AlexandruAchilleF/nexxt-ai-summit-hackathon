@@ -73,6 +73,7 @@ public static partial class Lang
         ro["A case opens only when it matters"] = "Cazul se deschide doar când contează";
         ro["A depository account: a standing order from it is not a CRS indicium (guide p. 29, lit. d)."] = "Cont de depozit: un ordin permanent din el nu este indiciu CRS (ghid, p. 29, lit. d).";
         ro["A new phone replaces the current ones"] = "Un telefon nou le înlocuiește pe cele curente";
+        ro["A preexisting CRS account needs a new self-certification and documentary evidence (guide p. 29)."] = "Un cont CRS preexistent necesită o autocertificare nouă și un document justificativ (ghid, p. 29).";
         ro["Accounts"] = "Conturi";
         ro["Actions caught"] = "Acțiuni prinse";
         ro["Add a residence"] = "Adaugă o rezidență";
@@ -266,6 +267,7 @@ public static partial class Lang
         ro["No date"] = "Fără dată";
         ro["No deadline"] = "Fără termen";
         ro["No deadline in the guide: the case stays open until the answer"] = "Fără termen în ghid: cazul rămâne deschis până la răspuns";
+        ro["No documents are available for this client. Documentary evidence is required before registering this answer."] = "Nu există documente disponibile pentru acest client. Este necesar un document justificativ înainte de înregistrarea acestui răspuns.";
         ro["No indicium rule concerns this change."] = "Nicio regulă de indiciu nu privește această modificare.";
         ro["No input yet"] = "Fără date încă";
         ro["No jurisdiction"] = "Nicio jurisdicție";
@@ -355,6 +357,7 @@ public static partial class Lang
         ro["Save the follow-up draft"] = "Salvează ciorna completării";
         ro["Search by name or code"] = "Caută după nume sau cod";
         ro["See the client's data"] = "Vezi datele clientului";
+        ro["Select a document belonging to this client before registering documentary evidence."] = "Selectează un document care aparține acestui client înainte de înregistrarea dovezii documentare.";
         ro["Self-certification"] = "Autocertificare";
         ro["Send via"] = "Trimite prin";
         ro["Sent"] = "Trimisă";
@@ -402,6 +405,8 @@ public static partial class Lang
         ro["The real date. Move it forward to see reminders and expiries."] = "Data reală. Mut-o înainte ca să vezi mementourile și expirările.";
         ro["The rule checks of each change are hidden; they stay in the chain."] = "Verificările de reguli ale fiecărei modificări sunt ascunse; rămân în lanț.";
         ro["The rules of the guide"] = "Regulile din ghid";
+        ro["The self-certification ID was not returned. The answer was not registered."] = "Nu a fost returnat identificatorul autocertificării. Răspunsul nu a fost înregistrat.";
+        ro["The signing date cannot be after the receipt date (guide p. 34)."] = "Data semnării nu poate fi ulterioară datei primirii (ghid, p. 34).";
         ro["The TIN format is checked as you type: \"format valid\", never \"TIN valid\"."] = "Formatul TIN se verifică pe măsură ce scrii: „format valid”, niciodată „TIN valid”.";
         ro["Time per case"] = "Timp pe caz";
         ro["TIN format checked"] = "Format TIN verificat";

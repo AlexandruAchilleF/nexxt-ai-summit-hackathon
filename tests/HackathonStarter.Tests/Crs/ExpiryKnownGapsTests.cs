@@ -1,3 +1,4 @@
+using HackathonStarter.Features.Audit;
 using HackathonStarter.Features.Cases;
 using HackathonStarter.Features.Clients;
 using static HackathonStarter.Tests.Crs.R2WorkflowHost;
@@ -5,9 +6,8 @@ using static HackathonStarter.Tests.Crs.R2WorkflowHost;
 namespace HackathonStarter.Tests.Crs;
 
 /// <summary>
-/// Two P0 gaps from the legal review of the "client does not answer" route, pinned as they behave today so the demo build
-/// stays green. Each test asserts the CURRENT behaviour; when the workflow is fixed, the test fails and is rewritten to the
-/// expected behaviour in its comment. Owner: R2, triage with the domain analyst. No fix before the demo.
+/// The no-initial-request expiry gap remains pinned to current behaviour pending separate legal review by R2 and the domain analyst.
+/// The insufficient-response freeze is fixed: registration rejects the answer without mutation and expiry still runs.
 /// </summary>
 public class ExpiryKnownGapsTests
 {
@@ -24,6 +24,7 @@ public class ExpiryKnownGapsTests
         var code = (await host.MoveAsync("CL-0016", "ES")).CaseCode!; // Open: no request drafted or approved
         var cases = host.As(Viewer).Cases;
 
+        host.SetNow(Utc("2027-01-26T07:00:01"));
         Assert.Equal(new DeadlineTick(0, 0, 1), await cases.TickAsync(Utc("2027-01-26T07:00:01")));
 
         var item = (await cases.GetAsync(code))!;
@@ -35,7 +36,7 @@ public class ExpiryKnownGapsTests
     }
 
     [Fact]
-    public async Task KnownGap_an_insufficient_answer_stops_the_expiry_for_good()
+    public async Task An_insufficient_answer_is_rejected_without_freezing_expiry()
     {
         await using var host = await CreateAsync();
         await host.SeedClientAsync("CL-0016", NewAccount);
@@ -43,13 +44,33 @@ public class ExpiryKnownGapsTests
         var cases = host.As(Viewer).Cases;
 
         host.SetNow(Utc("2027-01-10T08:00:00"));
-        await host.As(Member).Cases.RegisterResponseAsync(code, Explanation(ExplanationCategory.Other)); // not enough to close
-        Assert.Equal(CaseStatus.ResponseReceived, (await cases.GetAsync(code))!.Status);
+        var auditCount = host.Audit.Entries.Count;
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            host.As(Member).Cases.RegisterResponseAsync(code, Explanation(ExplanationCategory.Other)));
 
-        // Today: ResponseReceived is outside the tick, so the case never expires, even a year after the deadline. Expected:
-        // an answer that does not resolve the case keeps the deadline (expiry, or an escalation to the operator).
-        Assert.Equal(new DeadlineTick(0, 0, 0), await cases.TickAsync(Utc("2027-01-26T07:00:01")));
+        var waiting = (await cases.GetAsync(code))!;
+        Assert.Equal(CaseStatus.AwaitingClient, waiting.Status);
+        Assert.Empty(waiting.Responses);
+        Assert.Equal(auditCount, host.Audit.Entries.Count);
+
+        host.SetNow(Utc("2027-01-26T07:00:01"));
+        Assert.Equal(new DeadlineTick(0, 0, 1), await cases.TickAsync(Utc("2027-01-26T07:00:01")));
+        var expired = (await cases.GetAsync(code))!;
+        Assert.Equal(CaseStatus.Expired, expired.Status);
+        Assert.Equal("DL-EXPIRED-NEW", expired.OutcomeRuleId);
+        Assert.Equal(host.Clock.UtcNow, expired.ExpiredAt);
+        var expiry = Assert.Single(host.Audit.OfKind(AuditKinds.CaseExpired));
+        Assert.Equal(expired.Id, expiry.CaseId);
+        Assert.Equal(CaseService.SystemActor, expiry.Actor);
+        Assert.Equal(host.Clock.UtcNow, expiry.At);
+
+        auditCount = host.Audit.Entries.Count;
+        host.SetNow(Utc("2028-01-26T07:00:01"));
         Assert.Equal(new DeadlineTick(0, 0, 0), await cases.TickAsync(Utc("2028-01-26T07:00:01")));
-        Assert.Equal(CaseStatus.ResponseReceived, (await cases.GetAsync(code))!.Status);
+        var unchanged = (await cases.GetAsync(code))!;
+        Assert.Equal((expired.Status, expired.ExpiredAt, expired.OutcomeRuleId),
+            (unchanged.Status, unchanged.ExpiredAt, unchanged.OutcomeRuleId));
+        Assert.Empty(unchanged.Responses);
+        Assert.Equal(auditCount, host.Audit.Entries.Count);
     }
 }

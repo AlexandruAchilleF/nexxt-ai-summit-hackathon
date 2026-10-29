@@ -89,6 +89,14 @@ public class ChangeService(
             if (!answered.IsOpen)
                 throw new InvalidOperationException($"Case {caseCode} is {answered.Status}: a self-certification can no longer answer it.");
         }
+        if (request.Kind == ChangeKind.SelfCertSubmitted)
+        {
+            // Check the client, not just CaseCode: omitting it must not supersede an answer awaiting operator approval.
+            var pending = await db.Cases.AsNoTracking().Where(c => c.ClientId == client.Id && c.Status == CaseStatus.ResponseReceived)
+                .OrderBy(c => c.Id).Select(c => c.Code).FirstOrDefaultAsync();
+            if (pending is not null)
+                throw new InvalidOperationException($"Case {pending} is ResponseReceived: approve the pending answer or send a follow-up before submitting another self-certification.");
+        }
         if (request.DocumentId is { } documentId && !await db.ClientDocuments.AnyAsync(d => d.Id == documentId && d.ClientId == client.Id))
             throw new KeyNotFoundException($"Document {documentId} not found for client {client.Code}.");
         var shielded = request.Kind == ChangeKind.DocumentUploaded
@@ -168,7 +176,7 @@ public class ChangeService(
                 hiddenFragments = shielded.Result.Hidden.Count, pages = shielded.Result.Hidden.Select(h => h.Page).Distinct().Order().ToArray(),
             });
 
-        return new ChangeResult(change, outcome, resultCase);
+        return new ChangeResult(change, outcome, resultCase) { SelfCertificationId = applied.SelfCertification?.Id };
     }
 
     public async Task<List<ChangeEvent>> ListAsync(string? clientCode = null, int take = 50)

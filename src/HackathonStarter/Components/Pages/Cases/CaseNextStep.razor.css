@@ -1,0 +1,22 @@
+.crs-response-document {
+    min-width: 0;
+}
+
+.crs-response-document ::deep .mud-select {
+    min-width: 0;
+    max-width: 100%;
+}
+
+/* MudBlazor renders a selected item in a one-line div, not the empty input. */
+.crs-response-document ::deep .mud-select-input > div.mud-input-slot {
+    height: auto;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    overflow: visible;
+    text-overflow: clip;
+}
+
+.crs-response-document-label {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}

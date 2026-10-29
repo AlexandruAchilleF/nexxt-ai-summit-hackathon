@@ -270,6 +270,12 @@ public class GoldenCasesDataTests
                     Assert.Null(deadline.DueAt);
                     Assert.Null(deadline.RemindAt);
                     break;
+                case "FATCA-SC":
+                    // Guide p. 38: metadata for the absence of a deadline, not a borrowed CRS 90-day clock.
+                    Assert.Equal(Regime.Fatca, c.ExpectedRegime);
+                    Assert.Null(deadline.DueAt);
+                    Assert.Null(deadline.RemindAt);
+                    break;
                 case "DL-NEW-90":
                     Assert.False(deadline.Preexisting);
                     Assert.Equal(c.ReceivedAt!.Value.AddDays(90), deadline.DueAt);
@@ -282,6 +288,9 @@ public class GoldenCasesDataTests
                     var yearEnd = new DateTime(received.Year, 12, 31, 21, 59, 59, DateTimeKind.Utc);
                     Assert.Equal(yearEnd > received.AddDays(90) ? yearEnd : received.AddDays(90), deadline.DueAt);
                     Assert.Equal(deadline.DueAt!.Value.AddDays(-5), deadline.RemindAt);
+                    break;
+                default:
+                    Assert.Fail($"case {c.Id}: no deadline convention for rule {deadline.RuleId}");
                     break;
             }
             if (c.Response is { } r && deadline.DueAt is { } due)

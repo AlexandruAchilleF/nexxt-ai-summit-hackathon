@@ -336,9 +336,10 @@ public sealed class SentinelTools(IServiceProvider services)
         {
             var recorded = await services.GetRequiredService<IChangeService>().RecordAsync(new ChangeRequest(
                 c.ClientCode, ChangeKind.SelfCertSubmitted, "online", SelfCertification: check.Snapshot, DocumentId: doc.DocumentId, CaseCode: c.Code));
+            selfCertificationId = recorded.SelfCertificationId;
+            if (selfCertificationId is null)
+                return Error("The self-certification was saved, but the change service returned no selfCertificationId. Do not call registerResponse or closeCase; ask an operator to resolve the missing ID.");
             outcome = Outcome(recorded.Outcome);
-            selfCertificationId = (await Clients.GetAsync(c.ClientCode))?.SelfCertifications
-                .OrderByDescending(s => s.SignedAt == check.Snapshot!.SignedAt).ThenByDescending(s => s.Id).FirstOrDefault()?.Id;
         }
 
         return new

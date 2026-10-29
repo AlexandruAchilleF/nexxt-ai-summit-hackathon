@@ -444,6 +444,9 @@ public class GoldenWorkflowTests(ITestOutputHelper output)
                 $"Golden case {_card.Id}: {answer.Kind}", documentId, SelfCertificationId: selfCertificationId));
             Assert.Equal(answer.ReceivedAt, response.ReceivedAt);
             Assert.Equal(CaseStatus.ResponseReceived, (await CaseAsync()).Status);
+            // An explanation is assessed on the declaration on file (the oracle refuses any other form): it was, before registering.
+            if (_oracle is not null && answer.Kind == ResponseKind.ReasonableExplanation)
+                Assert.NotEmpty(_oracle.SelfCertifications);
             Trail(OperatorActor, AuditKinds.ResponseRegistered);
             Log($"{answer.Kind} ({answer.Category}) received at {Iso(answer.ReceivedAt)} via {answer.Channel}");
 
@@ -637,10 +640,14 @@ public class GoldenWorkflowTests(ITestOutputHelper output)
     /// <summary>
     /// The card as the rule engine (R2 alone, no R1): the change gets the card's outcome; once the card's answer is in the
     /// client's snapshot (its new self-certification, or an accepted explanation in its category for every uncovered CRS
-    /// jurisdiction) every call gets the covered outcome the card states. Records the change and self-certification calls.
+    /// jurisdiction) every call gets the covered outcome the card states. The form an explanation relies on gets its own
+    /// assessment (<see cref="DeclarationOnFile"/>). Records the change and self-certification calls.
     /// </summary>
     private sealed class CardEngine(GoldenCase card) : ICrsRuleEngine
     {
+        /// <summary>The CRS indicia that come from an address on the bank's file (p. 29 b, f): what a declaration can contradict.</summary>
+        private static readonly string[] AddressIndicia = [RuleIds.CrsAddress, RuleIds.CrsMailing, RuleIds.CrsInCareOf];
+
         public List<(ClientSnapshot Before, ClientSnapshot After, ChangeKind Kind)> Changes { get; } = [];
         public List<(ClientSnapshot Client, SelfCertificationSnapshot SelfCertification)> SelfCertifications { get; } = [];
 
@@ -657,7 +664,37 @@ public class GoldenWorkflowTests(ITestOutputHelper output)
         public RuleOutcome EvaluateSelfCertification(ClientSnapshot client, SelfCertificationSnapshot selfCertification)
         {
             SelfCertifications.Add((client, selfCertification));
+            // An explanation replaces no form: the code assesses the declaration the explanation relies on.
+            if (card.Response is { Kind: ResponseKind.ReasonableExplanation }) return DeclarationOnFile(client, selfCertification);
             return card.Response?.SelfCertification is { } answer && Same(answer, selfCertification) ? AfterTheAnswer() : AtTheChange();
+        }
+
+        /// <summary>
+        /// The form an explanation relies on: the declaration on file when the case opened (the card's Before), checked
+        /// against the bank's file after the change (the card's After; the explanation is only a candidate on it). Its
+        /// structure is valid (SC-VALID cleared, p. 34), but each jurisdiction where the card's change put an uncovered address
+        /// indicium the declaration does not name is a residence discrepancy: SC-CONSISTENT from "Addresses" (p. 36, example
+        /// 1), never the change's CRS-IND-* indicium. Only R2 may set that finding aside, and only where the current
+        /// evaluation covers the jurisdiction by the explanation (p. 35 b, 37). Any other form or file is a wrong input: the
+        /// oracle fails instead of answering.
+        /// </summary>
+        private RuleOutcome DeclarationOnFile(ClientSnapshot client, SelfCertificationSnapshot selfCertification)
+        {
+            if (card.Before?.SelfCertification is not { } original || !Same(original, selfCertification))
+                throw new Xunit.Sdk.XunitException($"case {card.Id}: an explanation is assessed on the declaration on file (the card's Before), not on another form.");
+            if (Canonical(client with { AcceptedExplanations = [] }) != Canonical(card.After!))
+                throw new Xunit.Sdk.XunitException($"case {card.Id}: the declaration on file is checked against the bank's file after the change (the card's After), not another one.");
+
+            List<GoldenHit> discrepancies =
+            [
+                .. card.ExpectedIndicia
+                    .Where(h => h.CoveredBy == Coverage.None && AddressIndicia.Contains(h.RuleId) && h.Jurisdiction is { } country
+                                && !original.Residences.Any(r => r.Country == country))
+                    .Select(h => h.Jurisdiction).Distinct()
+                    .Select(country => new GoldenHit(RuleIds.SelfCertConsistent, country, "Addresses")),
+            ];
+            return Outcome(discrepancies.Count > 0 ? Decision.Clarification : Decision.NoCase, discrepancies,
+                [new GoldenHit(RuleIds.SelfCertValid, null, "SelfCertification")], []);
         }
 
         /// <summary>The card's outcome. ReportableFor: the declared jurisdictions (PLAN 7.2); the card's of 17a and 17b is the case's after expiry.</summary>

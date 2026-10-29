@@ -58,7 +58,8 @@ public interface ICaseService
     /// open case, the new indicia are added and the deadline stays (design choice: the guide is silent, PLAN 9.2, NEVERIFICAT).
     /// </summary>
     /// <param name="logChange">Called with the case id once the case is saved and before the case's own audit entry, so the
-    /// change's entries come first in the log and carry the case id (ChangeService). The case's entry is written even if it throws.</param>
+    /// change's entries come first in the log and carry the case id (ChangeService). A callback failure aborts and rolls
+    /// back the shared business/audit operation.</param>
     Task<Case> OpenAsync(ChangeEvent change, RuleOutcome outcome, Func<int, Task>? logChange = null);
 
     /// <summary>Saves a quote; code verifies it against the visible (shielded) text of the document page.</summary>
@@ -77,7 +78,7 @@ public interface ICaseService
     /// <summary>Open → AwaitingClient, or ResponseReceived → AwaitingClient for a follow-up after an insufficient answer. Operator only.</summary>
     Task<ClientRequest> ApproveRequestAsync(string caseCode, int requestId, string channel);
     Task<ClientRequest> RejectRequestAsync(string caseCode, int requestId, string reason);
-    /// <summary>AwaitingClient / Reminded / Escalated → ResponseReceived.</summary>
+    /// <summary>AwaitingClient / Reminded / Escalated → ResponseReceived, only for a sufficient answer; closing still needs operator approval.</summary>
     Task<ClientResponse> RegisterResponseAsync(string caseCode, NewResponse response);
     /// <summary>
     /// ResponseReceived → Closed, only if code finds the response enough for the regime and account age (new CRS:
@@ -88,7 +89,7 @@ public interface ICaseService
                           ConfirmationEvidenceKind evidenceKind = ConfirmationEvidenceKind.SignedDocument, string? collectionSteps = null);
     Task<Case> EscalateAsync(string caseCode, string reason);
 
-    /// <summary>Reminders, escalations and expiries due at <paramref name="now"/>. Called by DeadlineWatcher and by tests.</summary>
+    /// <summary>Reminders, escalations and expiries due at <paramref name="now"/> (never later than ISimClock.UtcNow). Called by DeadlineWatcher and by tests.</summary>
     Task<DeadlineTick> TickAsync(DateTime now);
 }
 
@@ -120,6 +121,7 @@ public class CaseService(
     };
 
     private static readonly SemaphoreSlim Writer = new(1, 1);
+    private static readonly TimeZoneInfo Bucharest = TimeZoneInfo.FindSystemTimeZoneById("Europe/Bucharest");
 
     // ---- Queries (any role, the viewer included) ----
 
@@ -479,6 +481,8 @@ public class CaseService(
             var request = FindRequest(item, requestId);
             if (request.Status != RequestStatus.Draft)
                 throw new InvalidOperationException($"Request {requestId} is {request.Status}: only a draft can be approved.");
+            if (request.Kind == RequestKind.Reminder && item.Status == CaseStatus.ResponseReceived)
+                throw Invalid(item, "approve a Reminder request (a sufficient response is awaiting operator approval)");
 
             var from = item.Status;
             if (request.Kind == RequestKind.Reminder && item.Status is CaseStatus.AwaitingClient or CaseStatus.Reminded or CaseStatus.Escalated)
@@ -519,7 +523,7 @@ public class CaseService(
             request.Status = RequestStatus.Rejected;
             request.RejectedBy = user.Name;
             request.RejectedAt = clock.UtcNow;
-            request.RejectionReason = reason.Trim();
+            request.RejectionReason = PiiVault.ForStorage().Mask(reason.Trim());
             await db.SaveChangesAsync();
 
             await audit.AppendAsync(Actor(user), AuditKinds.RequestRejected, new
@@ -544,31 +548,37 @@ public class CaseService(
             var item = await FindCaseAsync(db, caseCode);
             if (item.Status is not (CaseStatus.AwaitingClient or CaseStatus.Reminded or CaseStatus.Escalated))
                 throw Invalid(item, "register a response");
-            if (response.DocumentId is { } documentId)
-            {
-                var owner = await db.ClientDocuments.Where(d => d.Id == documentId).Select(d => (int?)d.ClientId).FirstOrDefaultAsync()
-                    ?? throw new KeyNotFoundException($"Document {documentId} not found.");
-                if (owner != item.ClientId) throw new InvalidOperationException($"Document {documentId} does not belong to client {item.ClientCode}.");
-            }
-            if (response.SelfCertificationId is { } selfCertId)
-            {
-                var selfCert = await db.SelfCertifications.AsNoTracking().FirstOrDefaultAsync(s => s.Id == selfCertId)
-                    ?? throw new KeyNotFoundException($"Self-certification {selfCertId} not found.");
-                RequireAnswerSelfCertification(item, selfCert);
-                RequireDatedByReceipt(item, selfCert.SignedAt, selfCert.ReceivedAt); // checked again at closing
-            }
-
-            var from = item.Status;
+            var now = clock.UtcNow;
+            // Keep the candidate untracked until all structural and rule-engine checks pass. An insufficient answer must
+            // not stop expiry, withdraw a reminder or save an AcceptedExplanation before an operator closes the case.
             var saved = new ClientResponse
             {
-                Kind = response.Kind, Category = response.Category, Channel = response.Channel.Trim(), ReceivedAt = clock.UtcNow,
+                Kind = response.Kind, Category = response.Category, Channel = response.Channel.Trim(), ReceivedAt = now,
                 DocumentId = response.DocumentId, SelfCertificationId = response.SelfCertificationId,
-                HasDocumentaryEvidence = response.HasDocumentaryEvidence, Summary = response.Summary?.Trim() ?? "",
+                HasDocumentaryEvidence = response.HasDocumentaryEvidence, Summary = PiiVault.ForStorage().Mask(response.Summary?.Trim()),
             };
+            var client = await ClientService.Full(db).FirstOrDefaultAsync(c => c.Id == item.ClientId)
+                ?? throw new KeyNotFoundException($"Client {item.ClientCode} not found.");
+            await AssessResponseAsync(db, item, saved, client, now);
+
+            var from = item.Status;
+            var reminders = item.Requests.Where(r => r.Kind == RequestKind.Reminder && r.Status == RequestStatus.Draft).OrderBy(r => r.Id).ToList();
+            foreach (var reminder in reminders)
+            {
+                reminder.Status = RequestStatus.Rejected;
+                reminder.RejectedBy = SystemActor;
+                reminder.RejectedAt = now;
+                reminder.RejectionReason = "response.received"; // a code, never the client's free-text answer
+            }
             item.Responses.Add(saved);
             item.Status = CaseStatus.ResponseReceived;
             await db.SaveChangesAsync();
 
+            foreach (var reminder in reminders)
+                await audit.AppendAsync(SystemActor, AuditKinds.RequestRejected, new
+                {
+                    code = item.Code, requestId = reminder.Id, kind = reminder.Kind.ToString(), status = item.Status.ToString(), reason = reminder.RejectionReason,
+                }, item.Id);
             await audit.AppendAsync(ActingAs(user, response.Actor), AuditKinds.ResponseRegistered, new
             {
                 code = item.Code, responseId = saved.Id, kind = saved.Kind.ToString(), category = saved.Category.ToString(),
@@ -594,39 +604,10 @@ public class CaseService(
             var client = await ClientService.Full(db).AsTracking().FirstOrDefaultAsync(c => c.Id == item.ClientId)
                 ?? throw new KeyNotFoundException($"Client {item.ClientCode} not found.");
 
-            var explanation = IsExplanationEnough(item, response);
-            SelfCertification? selfCert = null;
-            if (!explanation)
-            {
-                selfCert = client.SelfCertifications.FirstOrDefault(s => s.Id == response.SelfCertificationId)
-                    ?? throw new InvalidOperationException($"Self-certification {response.SelfCertificationId} does not belong to client {client.Code}.");
-                RequireAnswerSelfCertification(item, selfCert); // again: a later submission may have superseded it
-            }
-
+            var now = clock.UtcNow;
+            var (explanation, selfCert, outcome, accepted) = await AssessResponseAsync(db, item, response, client, now);
             var datedAt = selfCert?.SignedAt ?? response.ReceivedAt;
             var receivedAt = selfCert?.ReceivedAt ?? response.ReceivedAt;
-            RequireDatedByReceipt(item, datedAt, receivedAt);
-
-            var now = clock.UtcNow;
-            var snapshot = ClientSnapshot.From(client);
-            var accepted = new List<AcceptedExplanation>();
-            if (explanation)
-            {
-                accepted = item.Indicia.Where(i => i.Regime != Regime.Fatca).Select(i => i.Jurisdiction).Distinct().Order(StringComparer.Ordinal)
-                    .Select(j => new AcceptedExplanation { ClientId = client.Id, Jurisdiction = j, Category = response.Category, CaseCode = item.Code, AcceptedAt = now })
-                    .ToList();
-                snapshot = snapshot with
-                {
-                    AcceptedExplanations = [.. snapshot.AcceptedExplanations, .. accepted.Select(a => new AcceptedExplanationSnapshot(a.Jurisdiction, a.Category, a.CaseCode, a.AcceptedAt))],
-                };
-            }
-
-            // Code re-evaluates the client before closing; a model never decides that the answer is enough.
-            var outcome = engine.EvaluateCurrent(snapshot);
-            var open = outcome.Uncovered.Select(h => $"{h.RuleId}:{h.Jurisdiction}").ToList();
-            if (open.Count > 0 || outcome.Decision is Decision.Clarification or Decision.FatcaAlert or Decision.ShieldAlert)
-                throw new InvalidOperationException(
-                    $"Case {item.Code}: re-evaluation gives {outcome.Decision}{(open.Count > 0 ? " (" + string.Join(", ", open) + ")" : "")}; it stays {item.Status}. Ask the client for a follow-up.");
 
             var (sha, reference) = await EvidenceHashAsync(db, client.Id, response, selfCert, item.Code);
             var lastSent = item.Requests.Where(r => r.Status == RequestStatus.Sent).OrderBy(r => r.ApprovedAt).ThenBy(r => r.Id).LastOrDefault();
@@ -668,6 +649,87 @@ public class CaseService(
         });
     }
 
+    /// <summary>Shared registration/closing checks against the latest stored state under Writer. Returned explanations are untracked candidates.</summary>
+    private async Task<(bool Explanation, SelfCertification? SelfCert, RuleOutcome Outcome, List<AcceptedExplanation> Accepted)> AssessResponseAsync(
+        AppDbContext db, Case item, ClientResponse response, Client client, DateTime now)
+    {
+        var explanation = IsExplanationEnough(item, response);
+        RequireReceivedByNow(item, response.ReceivedAt, now, "response");
+        if (response.HasDocumentaryEvidence && response.DocumentId is null)
+            throw new InvalidOperationException($"Case {item.Code}: documentary evidence requires an existing document belonging to the client, not just a flag.");
+        if (response.DocumentId is { } documentId)
+        {
+            var owner = await db.ClientDocuments.Where(d => d.Id == documentId).Select(d => (int?)d.ClientId).FirstOrDefaultAsync()
+                ?? throw new KeyNotFoundException($"Document {documentId} not found.");
+            if (owner != item.ClientId) throw new InvalidOperationException($"Document {documentId} does not belong to client {item.ClientCode}.");
+        }
+
+        var current = client.SelfCertifications.Where(s => s.Status == SelfCertStatus.Valid).OrderByDescending(s => s.SignedAt).FirstOrDefault();
+        SelfCertification? selfCert = null;
+        if (response.SelfCertificationId is { } selfCertId)
+        {
+            selfCert = await db.SelfCertifications.AsNoTracking().FirstOrDefaultAsync(s => s.Id == selfCertId)
+                ?? throw new KeyNotFoundException($"Self-certification {selfCertId} not found.");
+            RequireAnswerSelfCertification(item, selfCert);
+            if (current?.Id != selfCert.Id)
+                throw new InvalidOperationException($"Case {item.Code}: self-certification {selfCert.Id} is not the client's current self-certification.");
+        }
+
+        // An explanation confirms a declaration (p. 35(b)); it cannot replace an absent or unassessable current form.
+        // Do not silently substitute a historical row based on application status flags: the operator must clarify it.
+        var reliedOn = (explanation ? current : selfCert)
+            ?? throw new InvalidOperationException($"Case {item.Code}: no current self-certification is available to assess; operator clarification is required.");
+        RequireReceivedByNow(item, reliedOn.ReceivedAt, now, $"self-certification {reliedOn.Id}");
+        RequireDatedByReceipt(item, reliedOn.SignedAt, reliedOn.ReceivedAt);
+
+        var snapshot = ClientSnapshot.From(client);
+        var accepted = new List<AcceptedExplanation>();
+        if (explanation)
+        {
+            accepted = item.Indicia.Where(i => i.Regime != Regime.Fatca).Select(i => i.Jurisdiction).Distinct().Order(StringComparer.Ordinal)
+                .Select(j => new AcceptedExplanation { ClientId = client.Id, Jurisdiction = j, Category = response.Category, CaseCode = item.Code, AcceptedAt = now })
+                .ToList();
+            snapshot = snapshot with
+            {
+                AcceptedExplanations = [.. snapshot.AcceptedExplanations, .. accepted.Select(a => new AcceptedExplanationSnapshot(a.Jurisdiction, a.Category, a.CaseCode, a.AcceptedAt))],
+            };
+        }
+
+        // The dated overload evaluates a renewed FATCA form against when the bank learned of the change. A finding on
+        // the answering form is not a new change of circumstances (ICrsRuleEngine's contract).
+        var knownAt = item.Indicia.Where(i => !RuleIds.IsSelfCertificationFinding(i.RuleId)).Select(i => i.AddedAt).DefaultIfEmpty(item.OpenedAt).Max();
+        var outcome = engine.EvaluateCurrent(snapshot, knownAt);
+        RequireSufficientOutcome(item, outcome);
+        var form = engine.EvaluateSelfCertification(snapshot, SelfCertificationSnapshot.From(reliedOn));
+        RequireSufficientForm(item, form, outcome, explanation);
+        return (explanation, explanation ? null : selfCert, outcome, accepted);
+    }
+
+    private static void RequireSufficientForm(Case item, RuleOutcome form, RuleOutcome current, bool explanation)
+    {
+        // Only the residence discrepancy may be explained (p. 35(b), 37), and only where the current evaluation actually
+        // used the explanation. Never discard validity/TIN findings or decide from historical case indicia.
+        if (explanation && form.Decision == Decision.Clarification)
+        {
+            var explained = current.Indicia.Where(h => h.CoveredBy == Coverage.AcceptedExplanation)
+                .Select(h => h.Jurisdiction).ToHashSet(StringComparer.Ordinal);
+            var open = form.Uncovered.ToList();
+            if (open.Count > 0 && open.All(h => h.RuleId == RuleIds.SelfCertConsistent && h.Regime == Regime.Crs
+                    && (h.SourceField is "Addresses" or "SelfCertification/ResidenceAddress") && explained.Contains(h.Jurisdiction)))
+                return;
+        }
+        RequireSufficientOutcome(item, form);
+    }
+
+    private static void RequireSufficientOutcome(Case item, RuleOutcome outcome)
+    {
+        var open = outcome.Uncovered.Select(h => $"{h.RuleId}:{h.Jurisdiction}").ToList();
+        var noChecks = outcome.Indicia.Count == 0 && outcome.Cleared.Count == 0;
+        if (open.Count > 0 || outcome.Decision is not (Decision.NoCase or Decision.Compliant) || noChecks)
+            throw new InvalidOperationException(
+                $"Case {item.Code}: re-evaluation gives {outcome.Decision}{(open.Count > 0 ? " (" + string.Join(", ", open) + ")" : "")}{(noChecks ? " without any evaluated rules" : "")}; it stays {item.Status}. Ask the client for a follow-up.");
+    }
+
     /// <summary>
     /// The self-certification that answers a case: the client's own, still Valid (not superseded or doubtful) and received
     /// after the case opened. An older one is the declaration the change made unreliable (p. 35-36), never the answer.
@@ -684,12 +746,24 @@ public class CaseService(
                 $"Case {item.Code}: self-certification {selfCert.Id} was received before the case opened; the answer must be a new self-certification.");
     }
 
-    // Guide p. 34: the self-certification is dated at the latest on the date of receipt.
+    private static void RequireReceivedByNow(Case item, DateTime receivedAt, DateTime now, string subject)
+    {
+        var received = Utc(receivedAt);
+        var capturedNow = Utc(now);
+        if (received > capturedNow)
+            throw new InvalidOperationException(
+                $"Case {item.Code}: the {subject} was received at {received:O}, in the future relative to the simulated clock ({capturedNow:O}); operator clarification is required.");
+    }
+
+    private static DateTime Utc(DateTime value) => value.Kind == DateTimeKind.Local ? value.ToUniversalTime() : DateTime.SpecifyKind(value, DateTimeKind.Utc);
+
+    // Guide p. 34 compares calendar dates. Europe/Bucharest is our application convention, not a timezone prescribed by the guide.
     private static void RequireDatedByReceipt(Case item, DateTime datedAt, DateTime receivedAt)
     {
-        if (datedAt > receivedAt)
+        static DateTime Day(DateTime value) => TimeZoneInfo.ConvertTimeFromUtc(Utc(value), Bucharest).Date;
+        if (Day(datedAt) > Day(receivedAt))
             throw new InvalidOperationException(
-                $"Case {item.Code}: the self-certification is dated {datedAt:O}, after it was received ({receivedAt:O}); it must be dated at the latest on the date of receipt (guide p. 34).");
+                $"Case {item.Code}: the self-certification is dated {datedAt:O}, after the calendar date of receipt ({receivedAt:O}); it must be dated at the latest on the date of receipt (guide p. 34). Europe/Bucharest calendar dates are our application convention.");
     }
 
     /// <summary>True for an accepted explanation, false for a self-certification; throws when the response is not enough.</summary>
@@ -791,9 +865,11 @@ public class CaseService(
     public async Task<DeadlineTick> TickAsync(DateTime now)
     {
         now = now.Kind == DateTimeKind.Local ? now.ToUniversalTime() : DateTime.SpecifyKind(now, DateTimeKind.Utc);
+        RequireNotFutureTick(now);
 
         return await WriteAsync(async () =>
         {
+            RequireNotFutureTick(now); // the clock may have been reset while this tick waited for Writer
             await using var db = await dbFactory.CreateDbContextAsync();
             // DueAt null (FATCA, p. 38; self-certification checks) never reminds or expires; ResponseReceived is not expired
             // (the answer came in time).
@@ -880,6 +956,12 @@ public class CaseService(
             foreach (var (kind, payload, target) in entries) await audit.AppendAsync(SystemActor, kind, payload, target.Id);
             return new DeadlineTick(toRemind.Count, toRemind.Count, toExpire.Count);
         });
+    }
+
+    private void RequireNotFutureTick(DateTime now)
+    {
+        if (now > clock.UtcNow)
+            throw new ArgumentOutOfRangeException(nameof(now), now, "A deadline tick cannot be later than the simulated clock. Advance the clock through the admin control first.");
     }
 
     /// <summary>

@@ -61,8 +61,8 @@ else
     <div class="crs-stack">
         <MudPaper Outlined="true" Class="pa-4"><CaseStages Status="c.Status" /></MudPaper>
 
-        <CaseNextStep @ref="_next" Case="c" Now="_now" RequiredDocs="_requiredDocs" Current="_currentOutcome" IsOperator="_isOperator" IsEditor="_isEditor"
-                      User="_user" ClientName="@_client?.FullName" OnChanged="LoadAsync" />
+        <CaseNextStep @ref="_next" @key="c.Code" Case="c" Now="_now" RequiredDocs="_requiredDocs" Current="_currentOutcome" IsOperator="_isOperator" IsEditor="_isEditor"
+                      User="_user" ClientName="@_client?.FullName" Documents="_documents.Values" OnChanged="LoadAsync" />
 
         <CaseAgentPanel @ref="_agent" Case="c" IsEditor="_isEditor" User="_user" OnChanged="LoadAsync" />
 

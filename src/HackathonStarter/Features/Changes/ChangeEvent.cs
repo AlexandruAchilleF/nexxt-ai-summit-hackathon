@@ -60,4 +60,8 @@ public record ChangeRequest(
     string? Summary = null);
 
 /// <param name="CaseCode">The case opened (or extended) by this change; null when the decision needs no case.</param>
-public record ChangeResult(ChangeEvent Change, RuleOutcome Outcome, string? CaseCode);
+public record ChangeResult(ChangeEvent Change, RuleOutcome Outcome, string? CaseCode)
+{
+    /// <summary>The saved self-certification for SelfCertSubmitted; null for other changes. Pass it when registering the response.</summary>
+    public int? SelfCertificationId { get; init; }
+}

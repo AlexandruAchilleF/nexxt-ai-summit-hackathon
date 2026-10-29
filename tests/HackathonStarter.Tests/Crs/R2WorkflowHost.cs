@@ -20,7 +20,7 @@ namespace HackathonStarter.Tests.Crs;
 
 /// <summary>
 /// R2's test host: the CRS modules wired like Program.cs on a temp SQLite file, a simulated clock over a fixed real time
-/// (GOLDEN-CASES convention: 2026-10-28T07:00:00Z), a scripted rule engine (the real one is still a placeholder), a
+/// (GOLDEN-CASES convention: 2026-10-28T07:00:00Z), a scripted rule engine (or AddRules for real-engine tests), a
 /// recording audit log and a shield fake that returns the visible text set by the test. Synthetic data only.
 /// </summary>
 internal sealed class R2WorkflowHost : IAsyncDisposable
@@ -37,13 +37,14 @@ internal sealed class R2WorkflowHost : IAsyncDisposable
     public ManualTime Time { get; } = new(Base);
     public SimClock Clock { get; }
     public ScriptedRuleEngine Engine { get; } = new();
-    public RecordingAudit Audit { get; } = new();
+    public RecordingAudit Audit { get; }
     public Dictionary<int, ShieldResult> ShieldResults { get; } = [];
     public ServiceProvider Root { get; }
 
     private R2WorkflowHost(Action<IServiceCollection>? configure)
     {
         Clock = new SimClock(Time);
+        Audit = new RecordingAudit(Clock);
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddSingleton(TimeProvider.System);
@@ -164,9 +165,7 @@ internal sealed class R2WorkflowHost : IAsyncDisposable
             SelfCertification: new SelfCertificationSnapshot(signedAt, [.. countries.Select(c => new TaxResidenceSnapshot(c, c == "DE" ? "86095174223" : null,
                 c == "DE" ? NoTinReason.None : NoTinReason.B_UnableToObtain, c == "DE" ? null : "Synthetic reason"))], DeclaresUsPerson: false),
             DocumentId: documentId, CaseCode: caseCode));
-        await using var db = await DbAsync();
-        var clientId = await db.Clients.Where(c => c.Code == clientCode).Select(c => c.Id).SingleAsync();
-        return await db.SelfCertifications.Where(s => s.ClientId == clientId && s.Status == SelfCertStatus.Valid).Select(s => s.Id).SingleAsync();
+        return result.SelfCertificationId ?? throw new InvalidOperationException("The change did not return its saved self-certification id.");
     }
 
     public async ValueTask DisposeAsync()
@@ -262,7 +261,7 @@ internal sealed class ScriptedRuleEngine : ICrsRuleEngine
 }
 
 /// <summary>Keeps every entry in memory with a continuous Seq and a non-empty hash (the real hash chain is R3's).</summary>
-internal sealed class RecordingAudit : IAuditLog
+internal sealed class RecordingAudit(ISimClock clock) : IAuditLog
 {
     private readonly List<AuditEntry> _entries = [];
 
@@ -271,19 +270,21 @@ internal sealed class RecordingAudit : IAuditLog
 
     /// <summary>An entry kind whose append throws (a failing audit store), or null.</summary>
     public string? FailOn { get; set; }
+    public Func<string, Task>? BeforeAppendAsync { get; set; }
 
-    public Task<AuditEntry> AppendAsync(string actor, string kind, object? payload = null, int? caseId = null)
+    public async Task<AuditEntry> AppendAsync(string actor, string kind, object? payload = null, int? caseId = null)
     {
+        if (BeforeAppendAsync is { } before) await before(kind);
         if (kind == FailOn) throw new InvalidOperationException($"Synthetic audit failure on {kind}.");
         lock (_entries)
         {
             var entry = new AuditEntry
             {
-                Seq = _entries.Count + 1, Actor = actor, Kind = kind, CaseId = caseId, PayloadJson = JsonSerializer.Serialize(payload),
+                Seq = _entries.Count + 1, At = clock.UtcNow, Actor = actor, Kind = kind, CaseId = caseId, PayloadJson = JsonSerializer.Serialize(payload),
                 PrevHash = _entries.Count == 0 ? "GENESIS" : _entries[^1].Hash, Hash = $"h{_entries.Count + 1}",
             };
             _entries.Add(entry);
-            return Task.FromResult(entry);
+            return entry;
         }
     }
 
