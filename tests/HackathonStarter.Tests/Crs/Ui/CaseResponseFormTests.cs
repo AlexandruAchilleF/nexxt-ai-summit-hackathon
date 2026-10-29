@@ -292,7 +292,7 @@ public class CaseResponseFormTests
         public Task<List<Evidence>> ListEvidenceAsync(string clientCode) => throw Unexpected();
         public Task<List<ContextSignal>> ListSignalsAsync(string clientCode) => throw Unexpected();
         public Task<IReadOnlyList<string>> RequiredDocumentsAsync(string caseCode) => throw Unexpected();
-        public Task<ClientRequest> DraftRequestAsync(string caseCode, string language, string body, RequestKind kind = RequestKind.Initial) => throw Unexpected();
+        public Task<ClientRequest> DraftRequestAsync(string caseCode, string language, string body, RequestKind kind = RequestKind.Initial, string? actor = null) => throw Unexpected();
         public Task<ClientRequest> ApproveRequestAsync(string caseCode, int requestId, string channel) => throw Unexpected();
         public Task<ClientRequest> RejectRequestAsync(string caseCode, int requestId, string reason) => throw Unexpected();
         public Task<Case> CloseAsync(string caseCode, ConfirmationChannel channel,

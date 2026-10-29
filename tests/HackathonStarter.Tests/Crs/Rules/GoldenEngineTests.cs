@@ -163,8 +163,18 @@ public class GoldenEngineTests
         var cleared = Assert.Single(outcome.Cleared, x => x.RuleId == RuleIds.CrsStandingOrder);
 
         Assert.Contains("cont de depozit", cleared.ExplanationRo);
-        Assert.Contains("depository account", cleared.Explanation);
+        Assert.Contains("from a depository account", cleared.Explanation);
+        Assert.DoesNotContain("(depository account)", cleared.Explanation);
         Assert.Equal("StandingOrders", cleared.SourceField);
+    }
+
+    [Fact]
+    public void Golden_5a_does_not_repeat_the_account_type_in_english()
+    {
+        var cleared = Assert.Single(Run(GoldenCases.Get("5a")).Cleared, x => x.RuleId == RuleIds.CrsStandingOrder);
+
+        Assert.StartsWith("Standing order to Germany (DE) from a depository account: excepted under CRS", cleared.Explanation);
+        Assert.StartsWith("Ordin permanent către Germania (DE) dintr-un cont de depozit: exceptat la CRS", cleared.ExplanationRo);
     }
 
     [Fact]

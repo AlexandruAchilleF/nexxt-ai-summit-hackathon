@@ -319,6 +319,8 @@ aprobare (`PLAN.md` §6.3); deciziile `NoCase` și `Compliant` merg direct în j
 - [ ] Răspunsul mentorului trecut în tabelul de întrebări.
 - [ ] Textul citit cu voce tare și cronometrat: ≤ 3:00.
 - [ ] **Demo-ul de rezervă înregistrat** (până la 08:00), pe același traseu.
+- [ ] Traseul S1-S9 se poate rula automat, în ritmul vocii: [`tools/DemoFilm`](../tools/DemoFilm/README.md) (Playwright,
+      browser vizibil, cursor vizibil, capitolele pentru montaj în `film-chapters.txt`).
 
 ## 5. Ce ne diferențiază (pentru juriu și întrebări)
 

@@ -1012,6 +1012,28 @@ public class CaseServiceTests
     // ---- Transitions, roles, unknown codes ----
 
     [Fact]
+    public async Task An_agent_signs_its_steps_for_the_user_it_runs_as_and_never_for_someone_else()
+    {
+        await using var host = await CreateAsync();
+        await host.SeedClientAsync("CL-0016", NewAccount);
+        var code = (await host.MoveAsync("CL-0016", "ES")).CaseCode!;
+        var member = host.As(Member).Cases;
+        const string agent = "agent:crs-sentinel for user:member";
+
+        var drafts = new[]
+        {
+            await member.DraftRequestAsync(code, "ro", "Buna ziua", actor: agent),
+            await member.DraftRequestAsync(code, "ro", "Buna ziua", actor: "agent:crs-sentinel for user:admin"),
+            await member.DraftRequestAsync(code, "ro", "Buna ziua", actor: "user:admin"),
+            await member.DraftRequestAsync(code, "ro", "Buna ziua"),
+        };
+
+        string[] expected = [agent, "user:member", "user:member", "user:member"];
+        Assert.Equal(expected, drafts.Select(d => d.DraftedBy));
+        Assert.Equal(expected, host.Audit.OfKind(AuditKinds.RequestDrafted).Select(e => e.Actor));
+    }
+
+    [Fact]
     public async Task Transitions_follow_the_state_machine_and_invalid_ones_name_the_status()
     {
         await using var host = await CreateAsync();
@@ -1417,7 +1439,8 @@ public class CaseServiceTests
         public Task<List<Evidence>> ListEvidenceAsync(string clientCode) => throw new NotSupportedException();
         public Task<List<ContextSignal>> ListSignalsAsync(string clientCode) => throw new NotSupportedException();
         public Task<IReadOnlyList<string>> RequiredDocumentsAsync(string caseCode) => throw new NotSupportedException();
-        public Task<ClientRequest> DraftRequestAsync(string caseCode, string language, string body, RequestKind kind = RequestKind.Initial) => throw new NotSupportedException();
+        public Task<ClientRequest> DraftRequestAsync(string caseCode, string language, string body, RequestKind kind = RequestKind.Initial,
+                                                     string? actor = null) => throw new NotSupportedException();
         public Task<ClientRequest> ApproveRequestAsync(string caseCode, int requestId, string channel) => throw new NotSupportedException();
         public Task<ClientRequest> RejectRequestAsync(string caseCode, int requestId, string reason) => throw new NotSupportedException();
         public Task<ClientResponse> RegisterResponseAsync(string caseCode, NewResponse response) => throw new NotSupportedException();

@@ -289,7 +289,8 @@ public sealed class SentinelTools(IServiceProvider services)
                 Note = "The quote is not in the visible text: no signal was saved. Do not use this quote.",
             };
         // A free text from the model: saved masked, like an escalation reason (the quote is the verified evidence).
-        var s = await Cases.AddSignalAsync(new NewSignal(c.ClientCode, c.Code, PiiVault.ForStorage().Mask(description.Trim()), e.Id));
+        var s = await Cases.AddSignalAsync(new NewSignal(c.ClientCode, c.Code, PiiVault.ForStorage().Mask(description.Trim()), e.Id,
+            Actor: Actor(user)));
         return new { s.Id, EvidenceId = e.Id, e.Quote, Verified = true, Label = SentinelWording.SignalLabel, s.Description, e.Page };
     }
 
@@ -386,11 +387,11 @@ public sealed class SentinelTools(IServiceProvider services)
         [Description("The letter to the client: plain language, the exact documents and the due date")] string body,
         [Description("ro or en")] string language = "ro")
     {
-        if (await EditorAsync() is null) return Denied();
+        if (await EditorAsync() is not { } user) return Denied();
         if (await FindCaseAsync(caseCode) is not { } c) return NoCase(caseCode);
         if (string.IsNullOrWhiteSpace(body)) return Error("Write the letter in body.");
         var lang = language.Trim().ToLowerInvariant() is "en" ? "en" : "ro";
-        var r = await Cases.DraftRequestAsync(c.Code, lang, body.Trim());
+        var r = await Cases.DraftRequestAsync(c.Code, lang, body.Trim(), actor: Actor(user));
         if (FirstLine(r.Body) is { } line) _firstLines[r.Id] = line;
         return new
         {
@@ -429,7 +430,7 @@ public sealed class SentinelTools(IServiceProvider services)
         if (!TryEnum<ExplanationCategory>(string.IsNullOrWhiteSpace(category) ? "None" : category, out var cat))
             return Error($"Unknown category '{category}'. Use one of: {string.Join(", ", Enum.GetNames<ExplanationCategory>())}.");
 
-        if (await EditorAsync() is null) return Denied();
+        if (await EditorAsync() is not { } user) return Denied();
         if (await FindCaseAsync(caseCode) is not { } c) return NoCase(caseCode);
         if (documentId > 0 && await DocumentOfAsync(c, documentId) is { } wrong) return wrong;
         var owner = await Clients.GetAsync(c.ClientCode);
@@ -441,7 +442,7 @@ public sealed class SentinelTools(IServiceProvider services)
                 .Where(s => s.Status == SelfCertStatus.Valid && SentinelWording.Utc(s.ReceivedAt) >= SentinelWording.Utc(c.OpenedAt))
                 .OrderByDescending(s => s.ReceivedAt).ThenByDescending(s => s.Id).Select(s => s.Id).FirstOrDefault() ?? 0;
         var r = await Cases.RegisterResponseAsync(c.Code, new NewResponse(k, cat, channel.Trim(), PiiVault.ForStorage().Mask((summary ?? "").Trim()),
-            documentId > 0 ? documentId : null, SelfCertificationId: selfCertificationId > 0 ? selfCertificationId : null));
+            documentId > 0 ? documentId : null, SelfCertificationId: selfCertificationId > 0 ? selfCertificationId : null, Actor: Actor(user)));
         var toPerson = k == ResponseKind.Other || cat == ExplanationCategory.Other;
         return new
         {

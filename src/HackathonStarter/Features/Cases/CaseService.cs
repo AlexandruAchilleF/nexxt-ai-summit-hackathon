@@ -21,13 +21,17 @@ public record CaseQueueFilter(CaseStatus? Status = null, bool OpenOnly = true, s
 public record NewEvidence(string ClientCode, string? CaseCode, EvidenceSource Source, string Quote, int? DocumentId = null,
                           int? Page = null, string? LinkedRuleId = null, string RecordedBy = "agent");
 
-public record NewSignal(string ClientCode, string? CaseCode, string Description, int EvidenceId, SignalStrength Strength = SignalStrength.Weak);
+/// <param name="Actor">Who records it when not the signed-in user directly: an agent acting for that user
+/// (<c>agent:{name} for user:{id}</c>). Anything else is ignored, so nobody signs as someone else.</param>
+public record NewSignal(string ClientCode, string? CaseCode, string Description, int EvidenceId, SignalStrength Strength = SignalStrength.Weak,
+                        string? Actor = null);
 
 /// <param name="SelfCertificationId">A new self-certification is saved first through IChangeService (ChangeKind.SelfCertSubmitted),
 /// which owns client data; pass its id here. CaseService writes no client data except the AcceptedExplanation on close
 /// (see that class); there is no Cases -> Changes dependency.</param>
+/// <param name="Actor">As on <see cref="NewSignal"/>: an agent acting for the signed-in user, or null.</param>
 public record NewResponse(ResponseKind Kind, ExplanationCategory Category, string Channel, string Summary,
-                          int? DocumentId = null, bool HasDocumentaryEvidence = false, int? SelfCertificationId = null);
+                          int? DocumentId = null, bool HasDocumentaryEvidence = false, int? SelfCertificationId = null, string? Actor = null);
 
 /// <summary>What one pass of the deadline watcher changed.</summary>
 public record DeadlineTick(int Reminded, int Escalated, int Expired);
@@ -69,7 +73,8 @@ public interface ICaseService
     /// <summary>The documents the client must send, computed by code from the indicia, regime and account age (e.g. the visa for a student, p. 37).</summary>
     Task<IReadOnlyList<string>> RequiredDocumentsAsync(string caseCode);
     /// <summary>Saves the request written by the model; code attaches <see cref="RequiredDocumentsAsync"/>.</summary>
-    Task<ClientRequest> DraftRequestAsync(string caseCode, string language, string body, RequestKind kind = RequestKind.Initial);
+    Task<ClientRequest> DraftRequestAsync(string caseCode, string language, string body, RequestKind kind = RequestKind.Initial,
+                                          string? actor = null);
     /// <summary>Open → AwaitingClient, or ResponseReceived → AwaitingClient for a follow-up after an insufficient answer. Operator only.</summary>
     Task<ClientRequest> ApproveRequestAsync(string caseCode, int requestId, string channel);
     Task<ClientRequest> RejectRequestAsync(string caseCode, int requestId, string reason);
@@ -380,7 +385,7 @@ public class CaseService(
             db.Evidence.Add(saved);
             await db.SaveChangesAsync();
 
-            var actor = Actor(user);
+            var actor = ActingAs(user, evidence.RecordedBy);
             await audit.AppendAsync(actor, AuditKinds.EvidenceRecorded, new
             {
                 evidenceId = saved.Id, client = client.Code, source = saved.Source.ToString(), documentId = saved.DocumentId,
@@ -420,7 +425,7 @@ public class CaseService(
             db.ContextSignals.Add(saved);
             await db.SaveChangesAsync();
 
-            await audit.AppendAsync(Actor(user), AuditKinds.SignalRecorded, new
+            await audit.AppendAsync(ActingAs(user, signal.Actor), AuditKinds.SignalRecorded, new
             {
                 signalId = saved.Id, client = client.Code, evidenceId = evidence.Id, strength = saved.Strength.ToString(),
             }, item?.Id);
@@ -430,7 +435,8 @@ public class CaseService(
 
     // ---- Requests ----
 
-    public async Task<ClientRequest> DraftRequestAsync(string caseCode, string language, string body, RequestKind kind = RequestKind.Initial)
+    public async Task<ClientRequest> DraftRequestAsync(string caseCode, string language, string body, RequestKind kind = RequestKind.Initial,
+                                                       string? actor = null)
     {
         var user = await RequireEditor();
         var lang = (language ?? "").Trim().ToLowerInvariant();
@@ -450,12 +456,12 @@ public class CaseService(
             var request = new ClientRequest
             {
                 Kind = kind, Language = lang, Body = body.Trim(), RequestedDocuments = [.. Documents(item)], Status = RequestStatus.Draft,
-                DraftedBy = Actor(user), CreatedAt = clock.UtcNow,
+                DraftedBy = ActingAs(user, actor), CreatedAt = clock.UtcNow,
             };
             item.Requests.Add(request);
             await db.SaveChangesAsync();
 
-            await audit.AppendAsync(Actor(user), AuditKinds.RequestDrafted, new
+            await audit.AppendAsync(ActingAs(user, actor), AuditKinds.RequestDrafted, new
             {
                 code = item.Code, requestId = request.Id, kind = kind.ToString(), language = lang, documents = request.RequestedDocuments,
             }, item.Id);
@@ -573,7 +579,7 @@ public class CaseService(
                 {
                     code = item.Code, requestId = reminder.Id, kind = reminder.Kind.ToString(), status = item.Status.ToString(), reason = reminder.RejectionReason,
                 }, item.Id);
-            await audit.AppendAsync(Actor(user), AuditKinds.ResponseRegistered, new
+            await audit.AppendAsync(ActingAs(user, response.Actor), AuditKinds.ResponseRegistered, new
             {
                 code = item.Code, responseId = saved.Id, kind = saved.Kind.ToString(), category = saved.Category.ToString(),
                 documentId = saved.DocumentId, selfCertificationId = saved.SelfCertificationId,
@@ -1013,6 +1019,12 @@ public class CaseService(
     private Task<DemoUser> RequireEditor() => currentUser.Require(Roles.Admin, Roles.Member);
     private Task<DemoUser> RequireOperator() => currentUser.Require(Roles.Operator);
     private static string Actor(DemoUser user) => "user:" + user.Id;
+
+    // An agent signs its own steps, but only for the user it runs as ("agent:crs-sentinel for user:admin"); any other
+    // value falls back to the user, so a caller cannot write someone else's name into the record or the audit log.
+    private static string ActingAs(DemoUser user, string? actor) =>
+        actor is { Length: > 0 } a && a.StartsWith("agent:", StringComparison.Ordinal) && a.EndsWith(" for " + Actor(user), StringComparison.Ordinal)
+            ? a : Actor(user);
 
     private static async Task<T> WriteAsync<T>(Func<Task<T>> work)
     {
