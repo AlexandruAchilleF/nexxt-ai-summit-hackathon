@@ -623,6 +623,48 @@ a.app-list-row:active, .dense-row:active { background: var(--app-fill-strong); }
 .crs-bar.is-warning i { background: var(--mud-palette-warning); }
 .crs-bar.is-danger i { background: var(--mud-palette-error); }
 
+/* How CRS Sentinel decides (Pages/Architecture.razor): Maria's route as one numbered band; the tone says who acts (code, AI, a person). */
+.arch-flow { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 12px 0; }
+.arch-step { position: relative; display: flex; flex-direction: column; gap: 6px; padding-right: 12px; }
+.arch-step:not(:last-child)::after { content: ""; position: absolute; top: 13px; left: 34px; right: 4px; height: 2px; border-radius: 1px; background: var(--app-separator); }
+.arch-num { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.arch-text { min-height: 2.6em; font-size: 14px; line-height: 1.3; font-weight: 500; }
+.arch-who { font-size: 12px; color: var(--mud-palette-text-secondary); }
+.arch-code .arch-num { background: var(--app-accent-tint); color: var(--app-accent); }
+.arch-col.arch-code h2::before { background: var(--app-accent); }
+.arch-ai .arch-num { background: var(--app-fill-strong); color: var(--mud-palette-text-primary); }
+.arch-col.arch-ai h2::before { background: var(--mud-palette-text-secondary); }
+.arch-person .arch-num { background: var(--app-success-tint); color: var(--mud-palette-success); }
+.arch-col.arch-person h2::before { background: var(--mud-palette-success); }
+.arch-chain { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 14px; color: var(--mud-palette-text-secondary); }
+.arch-chain-link { text-decoration: none; }
+.arch-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.arch-col { display: flex; flex-direction: column; padding: 20px; border: 1px solid var(--mud-palette-lines-default); border-radius: var(--app-radius-md); }
+.arch-col h2 { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; font-size: 18px; font-weight: 600; }
+.arch-col h2::before { content: ""; width: 10px; height: 10px; border-radius: 50%; }
+.arch-col ul { margin: 0 0 12px; padding-left: 18px; font-size: 14px; line-height: 1.45; }
+.arch-col li + li { margin-top: 6px; }
+.arch-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.arch-tools-label { margin-right: 4px; font-size: 14px; font-weight: 600; }
+.arch-tools-note { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; font-size: 12px; color: var(--mud-palette-text-secondary); }
+.arch-tools-note .mud-icon-root { font-size: 14px; color: var(--mud-palette-success); }
+.arch-tool { display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 999px; background: var(--app-fill); font-family: var(--app-mono); font-size: 11.5px; }
+.arch-tool .mud-icon-root { font-size: 14px; }
+.arch-tool-gated { background: var(--app-success-tint); color: var(--mud-palette-success); }
+.arch-never { display: flex; align-items: center; gap: 8px; margin: auto 0 0; padding-top: 12px; border-top: 1px solid var(--app-separator); font-size: 14px; font-weight: 500; }
+.arch-never .mud-icon-root { color: var(--mud-palette-text-secondary); }
+@media (max-width: 1279.98px) {
+  .arch-flow { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .arch-step:nth-child(4n)::after { display: none; }
+}
+@media (max-width: 959.98px) { .arch-cols { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 599.98px) {
+  .arch-text { min-height: 0; }
+  .arch-flow { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .arch-step { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; column-gap: 10px; padding-right: 0; }
+  .arch-step:not(:last-child)::after { display: block; top: 32px; bottom: -8px; left: 13px; right: auto; width: 2px; height: auto; }
+}
+
 /* PWA install button: shown only when the browser can install the app (wwwroot/pwa.js). */
 .pwa-install { display: none !important; }
 html.pwa-installable .pwa-install { display: inline-flex !important; }

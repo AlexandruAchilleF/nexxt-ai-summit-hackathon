@@ -395,6 +395,7 @@ public static partial class Lang
         AddRoCrsUi(d);
         AddRoConnections(d);
         AddRoCaseAgent(d);
+        AddRoArchitecture(d);
         return d;
     }
 
@@ -410,4 +411,5 @@ public static partial class Lang
     static partial void AddRoCrsUi(Dictionary<string, string> ro);
     static partial void AddRoConnections(Dictionary<string, string> ro);
     static partial void AddRoCaseAgent(Dictionary<string, string> ro);
+    static partial void AddRoArchitecture(Dictionary<string, string> ro);
 }
