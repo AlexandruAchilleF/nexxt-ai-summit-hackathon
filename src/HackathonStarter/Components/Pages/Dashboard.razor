@@ -197,9 +197,9 @@ else
             static bool Operator(Case c) => c.Status is CaseStatus.Open or CaseStatus.ResponseReceived;
             _byWaiting =
             [
-                (T("The bank"), cases.Count(c => Operator(c)), "var(--app-accent)"),
-                (T("The client"), cases.Count(c => c.IsOpen && !Operator(c)), "var(--mud-palette-warning)"),
-                (T("Done"), cases.Count(c => !c.IsOpen), "color-mix(in srgb, var(--mud-palette-text-secondary) 40%, transparent)"),
+                (T("The bank"), cases.Count(c => Operator(c)), "var(--app-chart-bank)"),
+                (T("The client"), cases.Count(c => c.IsOpen && !Operator(c)), "var(--app-chart-client)"),
+                (T("Done"), cases.Count(c => !c.IsOpen), "var(--app-chart-done)"),
             ];
             _cases = cases;
         }

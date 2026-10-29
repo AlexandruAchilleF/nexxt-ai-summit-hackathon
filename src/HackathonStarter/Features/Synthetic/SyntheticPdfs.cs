@@ -231,7 +231,7 @@ public static class SyntheticPdfs
         public Sheet(string title)
         {
             _doc.DocumentInformation.Title = title;
-            _doc.DocumentInformation.Creator = "CRS Sentinel (date sintetice)";
+            _doc.DocumentInformation.Creator = $"{Config.SiteConfig.Name} (date sintetice)";
             _regular = _doc.AddTrueTypeFont(RegularFont);
             _bold = _doc.AddTrueTypeFont(BoldFont);
             NewPage();
@@ -326,7 +326,7 @@ public static class SyntheticPdfs
             for (var i = 0; i < _pages.Count; i++)
             {
                 _pages[i].SetTextAndFillColor(110, 110, 110);
-                _pages[i].AddText($"Document sintetic cu date fictive, generat de CRS Sentinel. Pagina {i + 1} din {_pages.Count}",
+                _pages[i].AddText($"Document sintetic cu date fictive, generat de {Config.SiteConfig.Name}. Pagina {i + 1} din {_pages.Count}",
                     7, new PdfPoint(Left, 40), _regular);
                 _pages[i].ResetColor();
             }

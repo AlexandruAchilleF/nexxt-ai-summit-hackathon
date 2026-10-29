@@ -18,11 +18,11 @@ public static partial class Lang
         ro["Code checks the answer again"] = "Codul verifică din nou răspunsul";
         ro["Code decides"] = "Codul decide";
         ro["Code decides. AI explains. A person approves."] = "Codul decide. AI-ul explică. Un om aprobă.";
-        ro["CRS Sentinel: {0} tools, {1} of them wait for a person"] = "CRS Sentinel: {0} unelte, dintre care {1} așteaptă un om";
+        ro["{0}: {1} tools, {2} of them wait for a person"] = "{0}: {1} unelte, dintre care {2} așteaptă un om";
         ro["Deadlines by rule: {0} for a new account, {1} for a pre-existing one"] = "Termene după regulă: {0} la un cont nou, {1} la unul preexistent";
         ro["Every quote is checked against the document's visible text"] = "Fiecare citat e verificat pe textul vizibil al documentului";
         ro["Every step is written to the hash-chained audit log."] = "Fiecare pas e scris în jurnalul cu lanț de hash-uri.";
-        ro["How CRS Sentinel decides"] = "Cum decide CRS Sentinel";
+        ro["How {0} decides"] = "Cum decide {0}";
         ro["In a bank"] = "Într-o bancă";
         ro["In the demo, the form simulates each change. In a bank, core banking would send every change to the same service, and the same rules would run."] =
             "În demo, formularul simulează fiecare schimbare. Într-o bancă, core banking-ul ar trimite fiecare schimbare la același serviciu, iar aceleași reguli ar rula.";

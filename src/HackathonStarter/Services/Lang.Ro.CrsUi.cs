@@ -7,6 +7,11 @@ public static partial class Lang
 {
     static partial void AddRoCrsUi(Dictionary<string, string> ro)
     {
+        ro["Operator"] = "Operator";
+        ro["Read-only access"] = "Doar consultare";
+        ro["Staff demo profiles"] = "Profiluri demo pentru angajați";
+        ro["Switch staff profile"] = "Schimbă profilul de angajat";
+        ro["Tax department"] = "Departament fiscal";
         // Approval checkpoints, the Demo menu and plain-language labels.
         ro["Add a note on the answer."] = "Adaugă o notă despre răspuns.";
         ro["Add at least one country of residence."] = "Adaugă cel puțin o țară de rezidență.";

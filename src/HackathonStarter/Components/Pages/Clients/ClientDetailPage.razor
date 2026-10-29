@@ -37,8 +37,9 @@ else
 {
     <PageHeader Title="@c.FullName" Description="@HeaderLine(c)" />
 
+    <div class="client-layout">
     <MudGrid Spacing="3" Class="client-grid">
-        <MudItem xs="12" md="6">
+        <MudItem xs="12" md="4" Class="client-grid-cell">
             <section class="app-card client-card" aria-labelledby="client-addresses">
                 <h2 id="client-addresses" class="app-card-title">@T("Addresses")</h2>
                 @if (c.Addresses.Count == 0)
@@ -61,7 +62,7 @@ else
             </section>
         </MudItem>
 
-        <MudItem xs="12" md="6">
+        <MudItem xs="12" md="4" Class="client-grid-cell">
             <section class="app-card client-card" aria-labelledby="client-phones">
                 <h2 id="client-phones" class="app-card-title">@T("Phones")</h2>
                 @if (c.Phones.Count == 0)
@@ -79,8 +80,10 @@ else
                     </div>
                 }
             </section>
+        </MudItem>
 
-            <section class="app-card client-card mt-3" aria-labelledby="client-poa">
+        <MudItem xs="12" md="4" Class="client-grid-cell">
+            <section class="app-card client-card" aria-labelledby="client-poa">
                 <h2 id="client-poa" class="app-card-title">@T("Powers of attorney")</h2>
                 @if (c.PowersOfAttorney.Count == 0)
                 {
@@ -102,7 +105,7 @@ else
             </section>
         </MudItem>
 
-        <MudItem xs="12">
+        <MudItem xs="12" Class="client-grid-cell">
             <section class="app-card client-card" aria-labelledby="client-accounts">
                 <h2 id="client-accounts" class="app-card-title">@T("Accounts and standing orders")</h2>
                 <p class="app-card-sub">@T("New or preexisting is computed per regime from the opening date (guide p. 20): CRS preexisting = held on 31 Dec 2015, FATCA preexisting = held on 30 Jun 2014.")</p>
@@ -142,7 +145,7 @@ else
             </section>
         </MudItem>
 
-        <MudItem xs="12" md="6">
+        <MudItem xs="12" md="6" Class="client-grid-cell">
             <section class="app-card client-card" aria-labelledby="client-selfcerts">
                 <h2 id="client-selfcerts" class="app-card-title">@T("Self-certifications")</h2>
                 <p class="app-card-sub">@T("TIN checks say \"format valid\": they check the format, not that the number exists.")</p>
@@ -188,30 +191,8 @@ else
             </section>
         </MudItem>
 
-        <MudItem xs="12" md="6">
-            <section class="app-card client-card" aria-labelledby="client-cases">
-                <h2 id="client-cases" class="app-card-title">@T("Cases")</h2>
-                @if (_cases.Count == 0)
-                {
-                    <p class="client-none">@T("No case for this client.")</p>
-                }
-                <div class="client-links">
-                    @foreach (var k in _cases)
-                    {
-                        <a class="app-list-row client-case" href="@($"/cases/{k.Code}")">
-                            <span class="app-list-main">
-                                <span class="app-list-title d-block mono">@k.Code</span>
-                                <span class="app-list-meta d-block">@RegimeLabel(k.Regime) · @string.Join(", ", k.Indicia.Select(i => i.RuleId).Distinct())</span>
-                                <span class="app-list-meta d-block">@CaseDates(k)</span>
-                            </span>
-                            @StatusPill(k.Status)
-                            <MudIcon Icon="@Icons.Material.Rounded.ChevronRight" Class="app-chevron" />
-                        </a>
-                    }
-                </div>
-            </section>
-
-            <section class="app-card client-card mt-3" aria-labelledby="client-documents">
+        <MudItem xs="12" md="6" Class="client-grid-cell">
+            <section class="app-card client-card" aria-labelledby="client-documents">
                 <h2 id="client-documents" class="app-card-title">@T("Documents")</h2>
                 <p class="app-card-sub">@T("The shield removes hidden text before any model reads a document.")</p>
                 @if (_documents.Count == 0)
@@ -259,7 +240,32 @@ else
                 }
             </section>
         </MudItem>
+
+        <MudItem xs="12" Class="client-grid-cell">
+            <section class="app-card client-card" aria-labelledby="client-cases">
+                <h2 id="client-cases" class="app-card-title">@T("Cases")</h2>
+                @if (_cases.Count == 0)
+                {
+                    <p class="client-none">@T("No case for this client.")</p>
+                }
+                <div class="client-links">
+                    @foreach (var k in _cases)
+                    {
+                        <a class="app-list-row client-case" href="@($"/cases/{k.Code}")">
+                            <span class="app-list-main">
+                                <span class="app-list-title d-block mono">@k.Code</span>
+                                <span class="app-list-meta d-block">@RegimeLabel(k.Regime) · @string.Join(", ", k.Indicia.Select(i => i.RuleId).Distinct())</span>
+                                <span class="app-list-meta d-block">@CaseDates(k)</span>
+                            </span>
+                            @StatusPill(k.Status)
+                            <MudIcon Icon="@Icons.Material.Rounded.ChevronRight" Class="app-chevron" />
+                        </a>
+                    }
+                </div>
+            </section>
+        </MudItem>
     </MudGrid>
+    </div>
 }
 
 @code {

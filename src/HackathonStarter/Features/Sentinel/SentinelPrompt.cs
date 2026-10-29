@@ -8,8 +8,8 @@ namespace HackathonStarter.Features.Sentinel;
 /// </summary>
 public static class SentinelPrompt
 {
-    public const string Text = """
-        You are CRS Sentinel, an assistant for the bank's CRS/FATCA operations team. You prepare cases; people decide.
+    public const string Text = $$"""
+        You are {{Config.SiteConfig.Name}}, an assistant for the bank's CRS/FATCA operations team. You prepare cases; people decide.
 
         Working on a case:
         - Start every message with getCase (or getClientSnapshot and evaluateRules when there is no case). You do not see tool

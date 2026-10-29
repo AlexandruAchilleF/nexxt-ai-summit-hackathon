@@ -13,7 +13,7 @@ namespace HackathonStarter.Features.Sentinel;
 public class CrsSentinelAgent : ToolAgent
 {
     public override string Name => "crs-sentinel";
-    public override string Label => "CRS Sentinel";
+    public override string Label => Config.SiteConfig.Name;
 
     public override string Description => Services.Lang.Pick(
         "Pregătește cazurile CRS/FATCA: dovezi cu citate verificate, indiciile legale și cererea către client. Un om aprobă.",

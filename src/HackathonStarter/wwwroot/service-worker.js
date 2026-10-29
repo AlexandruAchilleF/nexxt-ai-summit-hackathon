@@ -1,7 +1,7 @@
 // Minimal service worker: makes the app installable and shows /offline.html when there is no connection.
 // It deliberately caches nothing else: Blazor Server needs the live connection anyway, and stale
 // cached pages are the classic PWA bug you don't want on demo day.
-const CACHE = 'shell-v1';
+const CACHE = 'trace-shell-v2';
 const OFFLINE = '/offline.html';
 
 self.addEventListener('install', event => {

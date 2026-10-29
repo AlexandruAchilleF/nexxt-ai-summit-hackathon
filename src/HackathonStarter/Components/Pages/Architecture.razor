@@ -11,7 +11,7 @@
 <PageTitle>@T("Architecture") · @SiteConfig.Name</PageTitle>
 
 @* "How it works", filmed for the architecture part of the pitch (S7). Every number on it is read live. *@
-<PageHeader Title="@T("How CRS Sentinel decides")" Description="@T("Code decides. AI explains. A person approves.")" />
+<PageHeader Title="@T("How {0} decides", SiteConfig.Name)" Description="@T("Code decides. AI explains. A person approves.")" />
 
 <ol class="arch-flow mb-3" aria-label="@T("Maria's case, step by step")">
     @foreach (var (step, i) in Flow.Select((s, i) => (s, i)))
@@ -57,7 +57,7 @@
     <section class="arch-col arch-ai">
         <h2>@T("AI explains")</h2>
         <ul>
-            <li>@T("CRS Sentinel: {0} tools, {1} of them wait for a person", _tools.Count, _tools.Count(t => t.NeedsApproval))</li>
+            <li>@T("{0}: {1} tools, {2} of them wait for a person", SiteConfig.Name, _tools.Count, _tools.Count(t => t.NeedsApproval))</li>
             <li>@T("Reads the documents, quotes the evidence and drafts the letter in the client's language")</li>
             <li>@ModelLine</li>
             <li>@T("{0} checks on every answer: no personal data, every quote verified", _checks)</li>

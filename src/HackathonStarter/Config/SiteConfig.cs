@@ -10,17 +10,17 @@ namespace HackathonStarter.Config;
 /// </summary>
 public static class SiteConfig
 {
-    // Working name: change it here (and in the PWA icons) once the team picks the final one.
-    public const string Name = "CRS Sentinel";
+    public const string Name = "TRACE";
+    public const string FullName = "Tax Residency Anomaly Correlation Engine";
     public static string Description => Lang.Pick(
         ro: "Fiecare modificare de date a clientului devine o decizie CRS/FATCA, înainte să expire termenul legal.",
         en: "Every change to a customer's data becomes a CRS/FATCA decision before the legal deadline.");
-    public const string Logo = "/icons/icon.svg"; // a path in wwwroot like "/logo.svg", or an emoji
+    public const string Logo = "/icons/icon.svg";
 
     /// <summary>Brand color (hex): filled buttons and selection. Keep white text on it at 4.5:1 or more. The MudBlazor theme is derived from it.</summary>
-    public const string PrimaryColor = "#0071E3";
-    public const string SecondaryColor = "#C93400";
-    public const bool DarkModeByDefault = true;
+    public const string PrimaryColor = "#2563EB";
+    public const string SecondaryColor = "#17468F";
+    public const bool DarkModeByDefault = false;
 
     /// <summary>UI language for first-time visitors, "ro" or "en". Visitors switch with the RO/EN button (Services/Lang.cs).</summary>
     public const string DefaultLanguage = "ro";
@@ -177,14 +177,14 @@ public static class SiteConfig
     /// Installable app (PWA): "Install" in Chrome/Edge (desktop + Android), "Add to Home Screen" on iPhone.
     /// Opens in its own window with this name and icon. Icons: wwwroot/icons (replace them with your logo).
     /// </summary>
-    public static readonly Pwa Pwa = new(Enabled: true, ShortName: Name, StartUrl: "/dashboard", BackgroundColor: "#000000");
+    public static readonly Pwa Pwa = new(Enabled: true, ShortName: Name, StartUrl: "/dashboard", BackgroundColor: "#F3F6FA");
 
     /// <summary>Demo users replace login: pick one from the app bar. The first one is the default.</summary>
     public static readonly DemoUser[] Users =
     [
-        new("admin", "Ana Admin", "ana@example.com", Roles.Admin, "#16a34a"),
-        new("member", "Mihai Member", "mihai@example.com", Roles.Member, "#ea580c"),
-        new("viewer", "Vera Viewer", "vera@example.com", Roles.Viewer, "#9333ea"),
+        new("admin", "Ana Popa", "ana@example.com", Roles.Admin, "#2563EB"),
+        new("member", "Mihai Stan", "mihai@example.com", Roles.Member, "#17468F"),
+        new("viewer", "Vera Ionescu", "vera@example.com", Roles.Viewer, "#63758A"),
     ];
 }
 
