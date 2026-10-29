@@ -7,6 +7,20 @@ public static partial class Lang
 {
     static partial void AddRoCrsUi(Dictionary<string, string> ro)
     {
+        // Public landing and its illustrative case workflow.
+        ro["A relevant customer change can make the existing tax-residency declaration unreliable. The bank needs to reassess the file, collect evidence and track the applicable deadline."] = "O modificare relevantă a datelor clientului poate face nesigură declarația existentă de rezidență fiscală. Banca trebuie să reevalueze dosarul, să adune dovezi și să urmărească termenul aplicabil.";
+        ro["A verifiable audit trail"] = "Un jurnal de audit verificabil";
+        ro["Case changes and approvals are recorded in a hash-chained log. The chain can be checked for altered entries."] = "Modificările cazurilor și aprobările sunt înregistrate într-un jurnal cu lanț de hash-uri. Lanțul poate fi verificat pentru a identifica intrările modificate.";
+        ro["Changes and approvals are recorded in the audit log."] = "Modificările și aprobările sunt înregistrate în jurnalul de audit.";
+        ro["CRS/FATCA operations"] = "Operațiuni CRS/FATCA";
+        ro["Customer change"] = "Modificarea datelor clientului";
+        ro["Demonstration with synthetic customer data."] = "Demonstrație cu date de client sintetice.";
+        ro["Evidence and draft"] = "Dovezi și ciornă";
+        ro["From customer changes to a documented review"] = "De la modificarea datelor la o analiză documentată";
+        ro["Illustrative CRS/FATCA workflow"] = "Exemplu de flux CRS/FATCA";
+        ro["New CRS account: 90 calendar days."] = "Cont CRS nou: 90 de zile calendaristice.";
+        ro["Synthetic customer data"] = "Date de client sintetice";
+        ro["The compliance problem"] = "Problema de conformitate";
         ro["Operator"] = "Operator";
         ro["Read-only access"] = "Doar consultare";
         ro["Staff demo profiles"] = "Profiluri demo pentru angajați";

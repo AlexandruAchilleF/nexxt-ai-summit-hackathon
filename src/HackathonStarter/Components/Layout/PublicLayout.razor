@@ -1,7 +1,7 @@
 @inherits LayoutComponentBase
 
-@* Public pages outside the app (privacy, contact, legal): the landing page's header and footer, always dark. *@
-<MudThemeProvider Theme="AppTheme.Theme" IsDarkMode="true" />
+@* Public pages share the landing page's light palette, header and footer. *@
+<MudThemeProvider Theme="AppTheme.Theme" IsDarkMode="false" />
 <MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />

@@ -1,46 +1,46 @@
-@* Static picture of the app for the landing page: real nav labels, sample content from SiteConfig.Landing.Preview. *@
-<div class="lp-preview" aria-hidden="true">
-    <aside class="lp-preview-side">
-        <div class="lp-preview-brand"><span class="brand-logo-mark">@if (SiteConfig.Logo.StartsWith('/')) { <img src="@SiteConfig.Logo" alt="" /> } else { @SiteConfig.Logo }</span>@SiteConfig.Name</div>
+@* An illustrative Maria workflow, not a live case or an interactive agent session. *@
+<section class="lp-preview" aria-labelledby="landing-workflow">
+    <aside class="lp-preview-side" aria-hidden="true">
+        <div class="lp-preview-brand"><img src="@SiteConfig.Logo" alt="" />@SiteConfig.Name</div>
         @foreach (var item in SiteConfig.Nav.Take(7))
         {
-            <div class="lp-preview-link@(item == SiteConfig.Nav[0] ? " active" : "")"><MudIcon Icon="@item.Icon" Size="Size.Small" />@T(item.Label)</div>
+            <div class="lp-preview-link@(item.Href == "/cases" ? " active" : "")"><MudIcon Icon="@item.Icon" Size="Size.Small" />@T(item.Label)</div>
         }
     </aside>
 
-    <section class="lp-preview-main">
-        <div class="lp-preview-bar">
-            <span class="lp-mono">@P.ItemId</span>
-            <span>@P.ItemTitle</span>
-            <MudIcon Icon="@Icons.Material.Filled.Star" Size="Size.Small" Style="color:#F2C94C" />
-            <span class="lp-dim">···</span>
-            <span class="lp-dim ml-auto">1 / 12</span>
-        </div>
-        <div class="lp-preview-body">
-            <h3>@P.ItemTitle</h3>
-            <p class="lp-dim">@P.ItemDescription</p>
-            <h4>@T("Activity")</h4>
-            <ul class="lp-preview-activity">
-                @foreach (var (line, i) in P.Activity.Select((l, i) => (l, i)))
-                {
-                    <li><span class="lp-dot"></span>@line<span class="lp-dim"> · @T("{0} min ago", P.Activity.Length - i)</span></li>
-                }
-            </ul>
-        </div>
-    </section>
+    <div class="lp-preview-content">
+        <header class="lp-preview-heading">
+            <h2 id="landing-workflow">@T("Illustrative CRS/FATCA workflow")</h2>
+            <span class="lp-preview-badge">@T("Synthetic customer data")</span>
+        </header>
+        <div class="lp-preview-panels">
+            <section class="lp-preview-case">
+                <p class="lp-preview-overline">@T("Customer change")</p>
+                <h3>@P.ItemTitle</h3>
+                <p class="lp-dim">@P.ItemDescription</p>
+                <div class="lp-preview-rule">
+                    <MudIcon Icon="@Icons.Material.Outlined.Gavel" />
+                    <div>
+                        <h4>@T("Code applies the rules")</h4>
+                        <div class="lp-preview-codes"><code>CRS-IND-ADDR</code><code>CRS-IND-PHONE</code></div>
+                        <p class="lp-preview-deadline">@T("New CRS account: 90 calendar days.")</p>
+                    </div>
+                </div>
+            </section>
 
-    <section class="lp-preview-agent">
-        <div class="lp-preview-agent-head"><span class="brand-logo-mark">@if (SiteConfig.Logo.StartsWith('/')) { <img src="@SiteConfig.Logo" alt="" /> } else { @SiteConfig.Logo }</span>@T("Agent")<span class="lp-dim ml-auto">— ⤢ ×</span></div>
-        <div class="lp-preview-prompt">@P.Prompt</div>
-        <div class="lp-dim lp-small">@T("Worked for {0} sec", 4) ▸</div>
-        <p>@P.Reply</p>
-        <div class="lp-preview-result">
-            <div><strong>@P.ResultTitle</strong> <span class="lp-dim">@P.ResultDetail</span></div>
-            <span class="lp-preview-approve">@T("Approve")</span>
+            <section class="lp-preview-agent">
+                <div class="lp-preview-agent-head"><MudIcon Icon="@Icons.Material.Outlined.SmartToy" /><h3>@SiteConfig.Name · @T("Evidence and draft")</h3></div>
+                <p class="lp-preview-task">@P.Prompt</p>
+                <p class="lp-preview-evidence">@P.Reply</p>
+                <div class="lp-preview-result">
+                    <MudIcon Icon="@Icons.Material.Outlined.HowToReg" />
+                    <div><h4>@T("Human approval")</h4><p>@P.ResultTitle · @P.ResultDetail</p></div>
+                </div>
+            </section>
         </div>
-        <div class="lp-preview-reply lp-dim">@T("Reply…")</div>
-    </section>
-</div>
+        <div class="lp-preview-audit"><MudIcon Icon="@Icons.Material.Outlined.VerifiedUser" Size="Size.Small" />@T("Changes and approvals are recorded in the audit log.")</div>
+    </div>
+</section>
 
 @code {
     private static LandingPreview P => SiteConfig.Landing.Preview;
