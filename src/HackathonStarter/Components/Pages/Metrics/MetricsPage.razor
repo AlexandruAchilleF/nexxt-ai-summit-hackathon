@@ -160,7 +160,7 @@ else
 
     /// <summary>"DL-NEW-90, 26 Jan 2027"; no rule = the guide gives no deadline (FATCA, Q1).</summary>
     private static string DeadlineText(string? ruleId, DateTime? dueAt) =>
-        string.Join(", ", new[] { ruleId ?? T("no deadline from the guide"), dueAt is { } d ? Format.Date(DateTime.SpecifyKind(d, DateTimeKind.Utc)) : null }.OfType<string>());
+        string.Join(", ", new[] { ruleId ?? T("no deadline from the guide"), dueAt is { } d ? CrsUi.Date(d) : null }.OfType<string>());
 
     private static string OrDash(string text) => string.IsNullOrEmpty(text) ? "—" : text;
 

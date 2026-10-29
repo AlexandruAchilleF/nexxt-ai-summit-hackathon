@@ -2,8 +2,8 @@
 
 Datele exacte pentru cele 21 de cazuri din [`PLAN.md` §16.1](PLAN.md#161-cazurile-etalon-specificația): intrarea
 (snapshot înainte / după, schimbarea), rezultatul așteptat și pagina din
-[Ghidul ANAF DAC2/CRS/FATCA, 29.12.2025](ghid/). Se transcriu în `Features/Evaluation/GoldenCases.cs` după
-Faza 0, ca `GoldenCase(Id, Title, Before, After, Change, Expected, ExpectedHits, ExpectedCleared)`.
+[Ghidul ANAF DAC2/CRS/FATCA, 29.12.2025](ghid/). Sunt transcrise în `Features/Evaluation/GoldenCases.cs`, ca
+`GoldenCase(Id, Title, Before, After, Change, Expected, ExpectedHits, ExpectedCleared)`.
 
 **Stare:** fiecare caz are o stare: `PROPUS` (scris de R5), `APROBAT R5`, `VALIDAT` (de colegul din domeniu,
 cu ora). Un caz `VALIDAT` nu se mai schimbă fără anunț pe chat: cineva are deja teste pe el. Pe 28.10, la 19:00, colegul
@@ -18,14 +18,14 @@ Toate datele sunt sintetice. CNP-urile, IBAN-urile, TIN-urile și numărul ABA a
 | Ce | Regula |
 | --- | --- |
 | Momentul schimbării | Fix, în UTC. Implicit **`2026-10-28T07:00:00Z`** (09:00 la București). Termenele se calculează din el. |
-| Termen, cont nou | `DueAt = ReceivedAt + 90 de zile` → **`2027-01-26T07:00Z`**; `RemindAt = DueAt − 5 zile` → **`2027-01-21T07:00Z`** (ziua 85). Precizia (ora exactă vs. sfârșitul zilei) o decide R2: vezi Î5. |
+| Termen, cont nou | `DueAt = ReceivedAt + 90 de zile` → **`2027-01-26T07:00Z`**; `RemindAt = DueAt − 5 zile` → **`2027-01-21T07:00Z`** (ziua 85). Precizia (ora exactă, nu sfârșitul zilei): vezi Î5. |
 | `ExpectedHits` | Comparat **exact**, pe perechea (RuleId, Jurisdiction), cu `CoveredBy`. La `Evaluate` conține doar indicii (`*-IND-*`); la `EvaluateSelfCertification`, regulile `SC-*` aplicate. |
 | `ExpectedCleared` | Comparat ca **submulțime**: listăm regula-capcană (cea a cărei explicație contează), nu tot ce nu s-a aplicat. |
 | `GEN-DOMESTIC` | Stă în `Cleared` (are explicație, nu e indiciu). `GEN-CHANGE-CIRC` nu se așteaptă nicăieri explicit. |
 | Termenul | Coloane separate: regula (`DL-*` sau metadatele `FATCA-SC` fără termen), `Preexisting`, `DueAt`, `RemindAt`. Nu e în `ExpectedHits`. Regula de la expirare (`DL-EXPIRED-*`, `Case.OutcomeRuleId`) stă separat, în `ExpectedOutcomeRuleId` (17a, 17b). |
 | FATCA fără termen | În cazurile 5c, 6, 7 și 14, `ExpectedDeadlineRule` și `ExpectedDeadline.RuleId` sunt `FATCA-SC` (p. 38), iar `DueAt` și `RemindAt` rămân `null`. „Fără termen din ghid” (Î1, cu `NEVERIFICAT` afișat) nu înseamnă lipsa metadatelor regulii. Paragraful despre modificarea circumstanțelor nu fixează un termen; nu i se aplică cele 90 de zile CRS sau termenul FATCA din paragraful separat despre încetarea exceptării. |
 | „Rezident RO standard” | Adresă de reședință în RO (curentă), un mobil RO (curent), cetățenie `[RO]`, `BirthCountry = RO`, autocertificare `Valid` cu `[RO, TIN = CNP]`, `DeclaresUsPerson = false`, semnată la deschiderea primului cont, la ghișeu. Fișele trec doar ce diferă. |
-| Canalul | Fișele scriu în română („la ghișeu”, „online”, „call center”). În cod: `branch` / `online` / `call center` (`ChangeEvent.SourceChannel`, `SelfCertification.Channel`); „ghișeu” e doar textul afișat în română. Cazul 12 („prin poștă”) are încă `poștă`: valoarea în cod e deschisă. |
+| Canalul | Fișele scriu în română („la ghișeu”, „online”, „call center”). În cod: `branch` / `online` / `call center` (`ChangeEvent.SourceChannel`, `SelfCertification.Channel`); „ghișeu” e doar textul afișat în română. Cazul 12 („prin poștă”) are în cod valoarea `poștă`. |
 | Conturi | `Depository` = cont curent / economii / depozit; `Custodial` = cont de instrumente financiare. Preexistent se calculează din `OpenedOn` (CRS ≤ 31.12.2015, FATCA ≤ 30.06.2014, p. 20). |
 | Coduri | Clientul cazului *n* are codul `CL-00nn`, cu excepțiile: Maria = `CL-0001` (din machetă), cazul 1 refolosește clientul `CL-0015`, cazul 8 refolosește `CL-0013`, cazul 17a refolosește `CL-0016`. |
 
@@ -158,7 +158,7 @@ Ioana după mutarea la Iași (After din cazul 15). **Change:** `PhoneChanged` `+
 | **Expected** | `Compliant` · hits: `SC-TIN-MISSING` (AT), acceptat: fișa OCDE AT (Q1 „Individuals No”; „TINs are only issued to individuals who are liable to tax.”) · motivul B înregistrat · ReportableFor `[AT]` |
 | Condiția | `Compliant` se sprijină pe fișa OCDE AT, salvată în [`surse/oecd-tin-at.md`](surse/oecd-tin-at.md) (URL, data accesării, citatele). Dacă fișa n-ar permite lipsa TIN-ului: `Clarification`. |
 | Decis | Motivul B („nu poate obține”, Î8, p. 53). A („țara nu emite”) ar contrazice explicația clientului. |
-| ÎNTREBARE | Ce are Before? Fișa nu decide. Deocamdată: rezident RO standard, cu o adresă în Brașov adăugată de R5. |
+| Before | Fișa nu îl fixează. În cod (`GoldenClients.cs`): rezident RO standard, cu adresă în Brașov (varianta implicită, neconfirmată de mentor; nu schimbă rezultatul așteptat). |
 
 ### Cazul 6: Alexandra Vlad (`CL-0006`) · VALIDAT (28.10, 19:00)
 
@@ -224,7 +224,7 @@ schimbării, deci termenul rămâne 2027-01-26.
 | **Before** | Reședință: Str. Horea 5, 400174 Cluj-Napoca, RO (curentă) |
 | **Change** | `AddressChanged`, prin poștă: „Nu mai locuiesc la Cluj. Vă rog să trimiteți corespondența la avocatul meu din Torino.” |
 | **After** | Singura adresă curentă: `InCareOf` „c/o Studio Legale Bianchi, Via Roma 10, 10121 Torino, IT”; adresa din Cluj necurentă |
-| De ce scrisoarea spune „nu mai locuiesc la Cluj” | O adresă „în atenția” nu e adresă de rezidență (p. 48). Fără fraza asta, Clujul ar rămâne adresa curentă de reședință, banca ar avea altă adresă și lit. f nu s-ar aplica. Varianta A: o confirmă Alexandru cu colegul din domeniu; așteptările sunt aceleași. |
+| De ce scrisoarea spune „nu mai locuiesc la Cluj” | O adresă „în atenția” nu e adresă de rezidență (p. 48). Fără fraza asta, Clujul ar rămâne adresa curentă de reședință, banca ar avea altă adresă și lit. f nu s-ar aplica. Varianta A, implicită în cod, neconfirmată de mentor; așteptările sunt aceleași. |
 | **Expected** | `Clarification` · hits: `CRS-IND-CO` (IT), `CRS-IND-MAIL` (IT) · Cleared ⊇ `FATCA-IND-CO`: „cont preexistent cu valoare mică: o adresă «în grija» din afara SUA nu e indiciu FATCA” (p. 31) · `DL-PRE-YEAR`: max(2026-12-31, 2027-01-26) = `2027-01-26T07:00Z` |
 | Interpretări | „Nicio altă adresă la dosar” (p. 29 lit. f) = nicio altă adresă **curentă**: interpretare de design, aplicată și la telefoane (Î6). Adresa c/o declanșează și `CRS-IND-MAIL` (p. 29 lit. b, Î10). „Cea mai târzie” dintre 31.12 și +90 de zile e interpretarea noastră pe ruta indiciilor (N1). |
 | De ce preexistent | Pe un cont nou, `FATCA-IND-CO` s-ar aplica (adresa c/o e singura, iar regula FATCA nu cere SUA) → `FatcaAlert`, nu `Clarification`. Contul preexistent cu valoare mică face din asta o capcană în plus. |
@@ -259,7 +259,7 @@ nu e jurisdicție CRS raportabilă” (motivul din ghid întâi, Î12) · termen
 | **Change** | `AddressChanged`, la ghișeu, **`2026-03-10T08:00Z`**: Avenida Diagonal 450, 08006 Barcelona, ES |
 | **Expected** | `Clarification` · hits: `CRS-IND-ADDR` (ES) · `DL-PRE-YEAR`, Preexisting = true · DueAt = max(**2026-12-31**, 2026-06-08) = 2026-12-31 · RemindAt 2026-12-26 |
 | Expirare | Tick după 31.12.2026 → `Expired` · `DL-EXPIRED-PRE`: rezident **cel puțin** în ES → ReportableFor ⊇ `[ES]` · p. 29, exemplul 2 |
-| Decis | Cazul pornește din indiciul `CRS-IND-ADDR` (căutarea electronică). Cea mai târzie dintre 31.12 și +90 de zile e interpretarea noastră (N1): legea spune doar „ori” (Codul de procedură fiscală, Anexa nr. 1, secț. III, subsecț. B, pct. 16), Comentariul OCDE „until the later of” (Secțiunea III, pct. 16, p. 116); ghidul (p. 29) spune „sau”. Varianta A (ruta indiciilor, ca la N1): o confirmă Alexandru cu colegul din domeniu. Ora de pe 31.12: Î5 |
+| Decis | Cazul pornește din indiciul `CRS-IND-ADDR` (căutarea electronică). Cea mai târzie dintre 31.12 și +90 de zile e interpretarea noastră (N1): legea spune doar „ori” (Codul de procedură fiscală, Anexa nr. 1, secț. III, subsecț. B, pct. 16), Comentariul OCDE „until the later of” (Secțiunea III, pct. 16, p. 116); ghidul (p. 29) spune „sau”. Varianta A (ruta indiciilor, ca la N1), implicită în cod, neconfirmată de mentor. Ora de pe 31.12: Î5 |
 
 ### Cazul 18: Teodora Iliescu (`CL-0018`) · VALIDAT (28.10, 19:00)
 
@@ -285,7 +285,7 @@ nu e jurisdicție CRS raportabilă” (motivul din ghid întâi, Î12) · termen
 | Î2 | Ordin permanent: ce țară contează? SUA nu are IBAN (5c) | Țara în care e ținut contul beneficiarului, nu adresa lui; `StandingOrder.BeneficiaryAccount` + `BeneficiaryCountry` explicit | 29 lit. d; 31 |
 | Î3 | Maria schimbă adresa și telefonul deodată; `ChangeEvent` are un singur `Kind` | Un singur eveniment `AddressChanged`; motorul evaluează tot snapshot-ul `after`; un singur termen | 30 |
 | Î4 | Același client, cont nou și cont preexistent: ce cont dă termenul? | Cel mai devreme dintre termene: alegere prudentă, de design. Niciun caz actual nu se schimbă. | 20 lit. b |
-| Î5 | Ora termenului | Acum: + 90 × 24 h; 31.12 la 23:59:59 ora României. Alternativa: o singură regulă, sfârșitul zilei (`2027-01-26T21:59:59Z`). Decide R2; până atunci rămâne prima. | 29; 36 |
+| Î5 | Ora termenului | În cod (`DeadlineCalculator`): + 90 × 24 h; 31.12 la 23:59:59, ora României. Alternativa, nefolosită: o singură regulă, sfârșitul zilei (`2027-01-26T21:59:59Z`). Varianta implicită, neconfirmată de mentor. | 29; 36 |
 | Î6 | „Nicio altă adresă la dosar” (lit. f) include adresele necurente? | Doar adresele și telefoanele **curente**: interpretare de design, spusă deschis | 29 lit. b, c, f; 31; 48 |
 | Î7 | Cazul 18: DE nu cere viză unui cetățean UE | Rămâne DE; dovada e adeverința de student (viza doar „dacă este cazul”) | 35 lit. b; 37 pct. 1 |
 | Î8 | Cazul 3: motivul A sau B pentru AT? | B. A ar însemna că AT nu emite deloc TIN, ceea ce contrazice explicația clientului. Fișa OCDE AT: [`surse/oecd-tin-at.md`](surse/oecd-tin-at.md). | 53; 37 |
@@ -299,9 +299,9 @@ nu e jurisdicție CRS raportabilă” (motivul din ghid întâi, Î12) · termen
 | N1 | Contul preexistent pe ruta căutării electronice (indicii) | Păstrăm „cea mai târzie” dintre 31.12 și +90 de zile, scrisă deschis ca **interpretarea noastră**. Codul de procedură fiscală, Anexa nr. 1, secț. III, subsecț. B, pct. 16: banca „poate considera titularul [...] ca având aceeași situație ca cea anterioară modificării circumstanțelor până cel mai târziu în ultima zi a anului calendaristic relevant [...] ori în 90 de zile calendaristice de la data la care indiciul a fost descoperit”, fără „mai recentă”. Comentariul OCDE, Secțiunea III, pct. 16 (p. 116): „until the later of”. Doar pe ruta testului adresei de rezidență o spune legea (Anexa nr. 2 pct. 1: „oricare dintre acestea este mai recentă”). | Cazurile 12 și 17b |
 | N2 | Contul preexistent cu valoare mare (peste 1.000.000 USD) | În afara MVP, spus în README §7. Comentariul OCDE, Secțiunea III, pct. 49 (p. 125): doar „during the 90 calendar days following the date that the indicium was identified”. | Niciun caz actual (12: 42.300 RON; 17b: 33.540 RON) |
 
-**Mai rămân deschise:**
+**Rămase pe varianta implicită din cod** (nu schimbă rezultatele așteptate; neconfirmate de mentor):
 
-- **ÎNTREBARE, cazul 3:** ce are Before? Fișa nu decide. Deocamdată: rezident RO standard, cu o adresă în Brașov.
-- **Variantele A/B** (nu schimbă așteptările; implicit A până confirmă Alexandru cu colegul din domeniu): la 12, scrisoarea
-  spune și „nu mai locuiesc la Cluj”, iar After rămâne cu c/o curent și Clujul necurent; la 17b, ruta indiciilor, ca la
-  N1; la Î5, orele de mai sus, până le schimbă R2.
+- cazul 3: Before = rezident RO standard, cu adresă în Brașov (`GoldenClients.cs`);
+- varianta A la cazul 12: scrisoarea spune și „nu mai locuiesc la Cluj”, iar After are c/o curent și Clujul necurent;
+- varianta A la cazul 17b: ruta indiciilor, ca la N1;
+- Î5: +90 de zile × 24 h și 31.12 la 23:59:59, ora României (`DeadlineCalculator.cs`).

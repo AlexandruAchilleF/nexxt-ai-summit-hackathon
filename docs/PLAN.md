@@ -1,5 +1,7 @@
 # CRS Sentinel: planul de implementare
 
+> Produsul: **TRACE**. „CRS Sentinel” e numele de lucru din plan și din cod (`CrsSentinelAgent`). Planul a fost scris înaintea implementării; starea finală e în [`README.md`](../README.md).
+
 > NEXXT AI Hackathon 2026 · Raiffeisen Bank · **AI for Operational Efficiency**
 > Predare: **joi, 29 oct. 2026, ora 11:00** (noi: 10:30). Code freeze: **joi, 08:00**.
 > Documentul de context pentru toată echipa și pentru agenții AI ai fiecăruia. Citește-l o dată cap-coadă,
@@ -34,8 +36,8 @@
 22. [Cum lucrăm cu AI: subagenți și Tech Lead](#22-cum-lucrăm-cu-ai-subagenți-și-tech-lead)
 23. [Riscuri](#23-riscuri)
 24. [Ce nu spunem și ce mai verificăm](#24-ce-nu-spunem-și-ce-mai-verificăm)
-25. [Checklist de predare](#25-checklist-de-predare)
-26. [Decizii deschise](#26-decizii-deschise)
+25. [Checklist de predare (istoric)](#25-checklist-de-predare-istoric)
+26. [Decizii deschise (istoric)](#26-decizii-deschise-istoric)
 
 ---
 
@@ -534,6 +536,7 @@ are motive să știe” că autocertificarea e contrazisă (rezonabilitate, schi
 | --- | --- | --- | --- |
 | `GEN-DOMESTIC` | — | Schimbarea rămâne în România (ex. Cluj → Iași): niciun indiciu din lista închisă → `NoCase` | interpretare de design: nicio regulă din p. 29–31 nu se aplică |
 | `GEN-CHANGE-CIRC` | CRS | Schimbare de situație: orice informație nouă relevantă sau contradictorie, inclusiv la conturile asociate → evaluare | 30, 35–36 |
+| `GEN-NEW-ACCOUNT` | CRS și FATCA | Indicii pe un cont nou: lista de indicii e procedura conturilor preexistente; pe conturile noi o folosim ca „motive să știe” că autocertificarea e contrazisă | 29, 33, 35–36 (interpretare de design) |
 | `CRS-IND-RES` | CRS | Titularul e identificat ca rezident al unei jurisdicții raportabile | 29 (lit. a) |
 | `CRS-IND-ADDR` | CRS | Adresă de reședință curentă (inclusiv căsuță poștală) într-o jurisdicție raportabilă | 29 (lit. b) |
 | `CRS-IND-MAIL` | CRS | Adresă de corespondență curentă într-o jurisdicție raportabilă | 29 (lit. b) |
@@ -549,6 +552,8 @@ are motive să știe” că autocertificarea e contrazisă (rezonabilitate, schi
 | `FATCA-IND-POA` | FATCA | Împuternicire / drept de semnătură pentru o persoană cu adresă în SUA | 31 |
 | `FATCA-IND-CO` | FATCA | Adresă „în grija” / „păstrare corespondență”, singura adresă la dosar (excepție: la contul preexistent de valoare mică, c/o din afara SUA nu e indiciu) | 31 |
 | `FATCA-SC` | FATCA | Schimbare de situație: autocertificare nouă; fără ea, contul e raportabil SUA | 38 |
+| `FATCA-TIN` | FATCA | Autocertificarea declară rezidență fiscală în SUA sau statut de persoană SUA, dar nu dă TIN-ul SUA: contul e tratat drept raportabil SUA, iar banca obține o autocertificare cu TIN-ul SUA (W-9 sau un formular similar agreat); motivele A, B și C de la CRS nu îl înlocuiesc. TIN SUA în format greșit → clarificare (politică: verificare de format) | 38 |
+| `FATCA-SCOPE-ALL` | FATCA | Banca nu aplică pragurile de 50.000 USD (conturi preexistente și conturi de depozit noi): toate conturile persoanelor fizice sunt verificate | 25 (politica băncii) |
 | `SC-VALID` | CRS | Autocertificarea e validă doar dacă e semnată sau confirmată, datată și are: nume, adresă de rezidență, jurisdicțiile, TIN pentru fiecare jurisdicție raportabilă, data nașterii | 34 |
 | `SC-TIN-FORMAT` | CRS | TIN în format greșit pentru țara declarată → `Clarification` | 36–37 (rezonabilitate); formatul din fișele OCDE |
 | `SC-TIN-MISSING` | CRS | TIN lipsă: acceptat doar cu motiv valid (A/B/C). Fără TIN, deși fișa OCDE spune că țara emite TIN tuturor: declarație nesigură | 53, 37 |
@@ -557,7 +562,7 @@ are motive să știe” că autocertificarea e contrazisă (rezonabilitate, schi
 | `DL-PRE-YEAR` | CRS | Cont preexistent: cea mai târzie dintre 31.12 și +90 de zile. Lege la contul documentat prin adresa de rezidență (Codul de procedură fiscală, Anexa nr. 2 pct. 1), ca în Comentariul OCDE (Secțiunea III, pct. 13); interpretarea noastră la indiciile din căutarea electronică (Anexa nr. 1, secț. III, subsecț. B, pct. 16 spune doar „ori”), aliniată la Comentariul OCDE (pct. 16); ghidul (p. 29, la testul adresei de rezidență) spune „sau” | 29 |
 | `DL-EXPIRED-NEW` | CRS | Expirare, cont nou: rezident și în jurisdicția inițială, și în cea nouă | 35–36 |
 | `DL-EXPIRED-PRE` | CRS | Expirare, cont preexistent: rezident cel puțin în noua jurisdicție | 29 |
-| `RESP-EXPLANATION` | CRS | Explicații rezonabile acceptate: student cu viză, profesor sau stagiar, diplomat, funcționar UE | 37 |
+| `RESP-EXPLANATION` | CRS | Explicații rezonabile acceptate: student cu viză, profesor sau stagiar, diplomat, funcționar UE | 35, 37 |
 
 **Reguli de non-discriminare (testate):** naționalitatea nu e semnal (excepție: cetățenia SUA la FATCA);
 venitul din străinătate nu e indiciu; un telefon străin (non-SUA) alături de unul românesc nu e indiciu.
@@ -1329,7 +1334,7 @@ performanță ANAF 2024, p. 44–45).
 
 ---
 
-## 25. Checklist de predare
+## 25. Checklist de predare (istoric)
 
 **Demo:**
 - [ ] Scenariul (Maria + 3 capcane + scut + tamper + metrici) scris cuvânt cu cuvânt și repetat
@@ -1348,7 +1353,7 @@ performanță ANAF 2024, p. 44–45).
 
 ---
 
-## 26. Decizii deschise
+## 26. Decizii deschise (istoric)
 
 | # | Decizie | Cine | Până când |
 | --- | --- | --- | --- |

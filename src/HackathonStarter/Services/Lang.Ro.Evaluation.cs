@@ -21,7 +21,7 @@ public static partial class Lang
         ro["checked, does not apply"] = "verificat, nu se aplică";
         ro["Clarification"] = "Clarificare";
         ro["Cleared rule missing: {0}"] = "Lipsește regula verificată: {0}";
-        ro["Cluj to Iasi"] = "Cluj → Iași";
+        ro["Cluj to Iași"] = "Cluj → Iași";
         ro["Code"] = "Cod";
         ro["Compliant"] = "Conform";
         ro["Context signals"] = "Semnale contextuale";

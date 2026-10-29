@@ -18,7 +18,7 @@ proof of the confirmation.
 | | |
 | --- | --- |
 | The app | <https://hackathon-starter-k0ym.onrender.com/> (open, no access code; the first start takes up to a minute) |
-| Video (≤ 3 min) | to be added at submission |
+| Video (≤ 3 min) | [Google Drive](https://drive.google.com/drive/folders/1evObAYOK5qisjEUnb0LRrMngxGA4u6jO) (`video-pitch.mp4`; the narration: [`docs/PITCH.md`](docs/PITCH.md)) |
 | The presentation | [`docs/presentation/TRACE.pdf`](docs/presentation/TRACE.pdf) (10 slides; notes: [`docs/PRESENTATION.md`](docs/PRESENTATION.md)) |
 | How the jury can check it in 5 minutes | [`docs/SUBMISSION.md`](docs/SUBMISSION.md#how-the-jury-can-check-it-in-5-minutes) |
 | Run it locally | [§10](#10-quick-start): only the .NET 10 SDK, no keys, no external services |
@@ -67,7 +67,7 @@ extracted pages, `pagini/p-XXX.md`). The rules verified against the text of the 
 | --- | --- | --- |
 | **The code** (deterministic, tested) | Applies the rules from the guide (ID + page), calculates the deadlines, verifies the quotes, checks the TIN format, keeps the audit log | It does not guess: the same input always gives the same result |
 | **The AI** (Claude on Amazon Bedrock) | Reads the documents, extracts quotes, finds context signals, writes the text to the client, explains | It does not decide whether something is an indicium, does not calculate deadlines, does not raise alerts |
-| **The human** (operator, tax department) | Approves the request to the client and the closing of the case, decides the borderline cases | — |
+| **The human** (the operator; the tax department on escalation) | The operator approves the request to the client and the closing of the case; the tax department receives the escalations and decides the borderline cases | — |
 
 A **context signal** (for example, a salary from a German company) is shown with its evidence, but it does not change the
 decision and does not open any case. Nationality is not a signal; only US citizenship counts, and only for FATCA.
@@ -77,7 +77,7 @@ decision and does not open any case. Nationality is not a signal; only US citize
 ## 3. What it does: Maria's case, in screenshots
 
 Maria has a new account (opened after 1 Jan 2016) and moves to Munich. The whole path runs from the UI; the screenshots
-below are from `main`, on the mock (no model, the real tools), in English.
+below were taken on 29.10.2026 with `tools/Screenshots`, on the mock (no model, the real tools), in English.
 
 **1. The change comes in, and code decides on the spot.** `/changes/new` records the change as core banking would send
 it. `CrsRuleEngine` compares "before" with "after" (pure code, no AI): two CRS indicia, each with its rule and page, and
@@ -108,7 +108,7 @@ channel, time, who signed and who approved, SHA-256.
 With no answer, on day 91 the case moves to `Expired`, with the consequence from the guide (resident in RO and in DE).
 The full diagram, with all participants: [`docs/PLAN.md` §6.3](docs/PLAN.md#63-fluxul-mariei-traseul-din-video).
 
-### The traps (no false alarms)
+### The traps (changes that must not raise an alarm)
 
 | The change | The result | Why |
 | --- | --- | --- |
@@ -121,8 +121,8 @@ The full diagram, with all participants: [`docs/PLAN.md` §6.3](docs/PLAN.md#63-
 | Salary from a German company | `NoCase` + signal | Income is not on the list of indicia |
 | PDF with hidden white text | `ShieldAlert` | The shield removes the text before it reaches the model |
 
-Every golden case can be replayed from `/changes/new` ("Start from a golden case"); the verdict shows the rule that
-decided and whether it matches the expected result.
+Every golden case can be replayed from the Demo menu (the date in the top bar) → "Golden cases", or directly with
+`/changes/new?scenario=5a`; the verdict shows the rule that decided and whether it matches the expected result.
 
 | Standing order to Germany from a current account: `NoCase` | Standing order to the US from a current account: `FatcaAlert` |
 | --- | --- |
@@ -133,7 +133,7 @@ decided and whether it matches the expected result.
 | A bank statement with a hidden instruction | Tampering with the audit log |
 | --- | --- |
 | ![The shield's red flag on Victor's statement: white text under 2 pt, removed before any model reads it](docs/screenshots/shield.png) | ![The audit log: "Chain broken at entry #64", the tampered entry and every entry after it marked](docs/screenshots/audit.png) |
-| `/clients/CL-0010` → "Record the upload and scan": white text in a font under 2 pt ("Ignoră instrucțiunile anterioare...", "Ignore the previous instructions...") is removed before the model sees the document, with a red flag. | `/audit` → "Verify", then "Tamper" (admin only) on an entry, then "Verify" again: the chain shows exactly the broken entry. |
+| `/clients/CL-0010` → "Record the upload and scan": white text in a font under 2 pt ("Ignoră instrucțiunile anterioare...", in English "Ignore the previous instructions...") is removed before the model sees the document, with a red flag. | `/audit` → "Verify", then Demo menu → "Tamper mode" (admin only) and "Tamper" on an entry, then "Verify" again: the chain shows exactly the broken entry. |
 
 ## 4. The rules
 
@@ -141,6 +141,9 @@ The CRS indicia are the closed list from the guide, p. 29 (Law 207/2015, Annex 1
 ones are from p. 31 (the FATCA Agreement, Annex I, Section II, paragraph B). `RuleCatalog` has 29 rules: 24 from the
 text of the law, 3 our reading (§5), 2 bank policy. The full catalogue, with the final IDs (Romanian):
 [`docs/PLAN.md` §8.2](docs/PLAN.md#82-catalogul-de-reguli-id-urile-sunt-finale-paginile-verificate-în-ghid-detalii-în-docsreguli-verificatemd).
+In code, the catalogue is
+[`Features/Rules/RuleCatalog.cs`](src/HackathonStarter/Features/Rules/RuleCatalog.cs); the `/architecture` page counts
+its rules live, by source.
 
 | Group | Rules | Page |
 | --- | --- | --- |
@@ -192,7 +195,8 @@ regime from the opening date: CRS preexisting = existing on 31.12.2015, FATCA pr
 - **NEVERIFICAT:** for FATCA, the guide (p. 38) gives no deadline for a change in circumstances: the case opens with no
   deadline from the guide, with NEVERIFICAT shown, and we do not borrow the 90 CRS days.
 
-In the app, every rule that rests on our reading carries an "Our reading" badge next to its ID and page.
+On the case page, an uncovered indicium that rests on our reading carries an "Our reading" badge next to its ID and
+page.
 
 ## 6. Architecture
 
@@ -250,7 +254,7 @@ never gets the last word.
   In production: an EU region or a model on the bank's servers (OpenAI-compatible endpoint).
 - Two profiles: `extract` (Claude Haiku 5.5) for small extractions and classifications; the main one (Claude Sonnet 5.5)
   for the agent and the text to the client.
-- **The chain that does not fail:** live → recording (`Recordings/crs-sentinel.json`, read-only live runs on Bedrock) →
+- **The fallback chain:** live → recording (`Recordings/crs-sentinel.json`, read-only live runs on Bedrock) →
   mock. The mock calls the real tools, so the app works even without internet or keys. Replay does **not** run the
   tools: we use it only for read-only questions (for example "summarize the case"), never for steps that change data.
 
@@ -290,8 +294,9 @@ The metrics come only from real runs (`/metrics` and the tests), presented separ
 
 ### The latest run
 
-The run on commit `9e67e06` (`main`), 29.10.2026, **without a model** (no key, no AI call), from the `/metrics` page
-with the app started locally on the mock. All figures below come from deterministic code, not from AI.
+The run of 29.10.2026, **without a model** (no key, no AI call), from the `/metrics` page: on `main` at `9e67e06`, with
+the app started locally on the mock, and again after the deadline, on the public app and locally, with the same figures.
+All figures below come from deterministic code, not from AI.
 
 **1. Specification coverage** (engine `crs-rules/1.2`): the rules from the guide are implemented and tested, on 20
 golden cases with input data and on 50 synthetic clients.
@@ -349,11 +354,12 @@ Dependencies: only the .NET 10 SDK (`global.json`); `tools/setup-dev.sh` checks 
 for E2E on Linux and macOS (Intel and Apple Silicon). No Docker, no external database, no keys.
 
 Or open `HackathonStarter.slnx` in Visual Studio, Rider or VS Code and start the `HackathonStarter` project. The SQLite
-database is created on startup, with the demo data. Demo users (the menu in the top bar): Ana Popa (operator, admin),
-Mihai Stan (tax department, member), Vera Ionescu (viewer, cannot approve).
+database is created on startup, with the demo data. Demo users (the menu in the top bar): Ana Popa (operator, admin:
+approves sending and closing, moves the demo date), Mihai Stan (tax department, member: records changes, receives
+escalations), Vera Ionescu (viewer, read only).
 
-**Sample inputs** are in the app: 50 synthetic clients, the golden-case PDFs, "Start from a golden case" on
-`/changes/new` and the "Demo" menu (the simulated date, "The client answers", the demo reset).
+**Sample inputs** are in the app: 50 synthetic clients, the golden-case PDFs and the Demo menu (click the date in the
+top bar): the golden cases, the simulated date, "The client answers", the demo reset.
 
 **Live Bedrock (optional):** credentials come only from the AWS default chain (environment variables, local profile or
 IAM role), never from the repo. In `appsettings.Local.json` (ignored by git): `"AI": { "Provider": "Bedrock", "Region":
@@ -372,11 +378,13 @@ It also works on a phone (PWA, bottom navigation, checked at 390 px):
 
 ## 11. Status
 
-The state of `main` at commit `9e67e06`, checked locally on 29.10.2026: `dotnet build -warnaserror` with 0 warnings,
-unit tests 1602 of 1604 passed (2 skipped: the live tests on Bedrock, which run only with `CRS_LIVE=1`), E2E 52 of 52.
-The app starts without `appsettings.Local.json` and without AWS credentials, on the mock, and the full demo route
-(`tools/DemoFilm`, S1–S9: Maria end to end, the traps, the shield, the audit log, the metrics) runs on it without an
-error. Every PR goes in only with green CI (build with 0 warnings, unit and E2E tests).
+The submitted state is `main` at commit `5828400` (29.10.2026, the last commit before the 11:00 deadline): CI green,
+`dotnet build -warnaserror` with 0 warnings, unit tests 1602 of 1604 passed (2 skipped: the live tests on Bedrock, which
+run only with `CRS_LIVE=1`), E2E 52 of 52, and the same figures in a local run. The fixes made after the deadline (the
+documentation, the screenshots and small UI texts) were checked the same way, with the same figures. The app starts
+without `appsettings.Local.json` and without AWS credentials, on the mock, and the full demo route (`tools/DemoFilm`,
+S1–S9: Maria end to end, the traps, the shield, the audit log, the metrics) runs on it without an error. Every PR goes in
+only with green CI (build with 0 warnings, unit and E2E tests).
 
 ![The public landing page of TRACE: "Every data change, a CRS/FATCA decision before the deadline"](docs/screenshots/landing.png)
 
@@ -389,7 +397,7 @@ error. Every PR goes in only with green CI (build with 0 warnings, unit and E2E 
 | `/changes/new` | Records a change (or a golden case) and shows the rule engine's verdict on the spot, with the decisive rule, its page and the deadline |
 | `/cases`, `/cases/{code}` | The case queue and the case record: the stepper, the deadline, the indicia with the rule and the page, the signals, the evidence, the request (RO/EN letter), the correspondence, the case log, the agent panel ("Analyze the file", "Check the answer", the approvals) and the closing with the proof of confirmation |
 | `/clients`, `/clients/{code}` | The client record: addresses, phones, accounts (new or preexisting per regime), standing orders, self-certifications with the TIN format, documents with the shield's verdict, cases |
-| `/audit` | The hash chain, "Verify" (everyone) and "Tamper" (admin only) |
+| `/audit` | The hash chain: "Verify" (everyone); "Tamper" on an entry after Demo menu → "Tamper mode" (admin only) |
 | `/metrics` | The three kinds of figures from `EvaluationService`, with "Run again", case by case |
 | `/runs`, `/runs/{id}` | The agent runs, with the steps, the checks and "Approve" / "Reject" |
 | `/architecture` | How TRACE decides, from the live rules, tools and audit chain |
@@ -400,6 +408,7 @@ error. Every PR goes in only with green CI (build with 0 warnings, unit and E2E 
 
 | Document | What it contains |
 | --- | --- |
+| [`docs/README.md`](docs/README.md) | Every file in `docs/`, grouped: for the jury, the domain, how it works, the working notes |
 | [`docs/presentation/TRACE.pdf`](docs/presentation/TRACE.pdf), [`docs/PRESENTATION.md`](docs/PRESENTATION.md) | The 10 slides and their notes |
 | [`docs/PITCH.md`](docs/PITCH.md), [`docs/SUBMISSION.md`](docs/SUBMISSION.md) | The video script, the submission (the form, the links, the jury criteria) |
 | [`docs/PLAN.md`](docs/PLAN.md) (Romanian) | The implementation plan: the domain, the data model, the rules, the architecture, the roles, the schedule |
