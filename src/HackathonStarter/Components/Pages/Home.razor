@@ -10,21 +10,26 @@
 
     <main>
         <section class="lp-wrap lp-hero">
-            @if (L.Announcement is { } a)
-            {
-                <a class="lp-announce" href="@a.Href"><span>@a.Badge</span>@a.Label<MudIcon Icon="@Icons.Material.Rounded.ChevronRight" Size="Size.Small" /></a>
-            }
+            <p class="lp-eyebrow">@T("CRS/FATCA operations")</p>
             <h1>@L.Headline</h1>
             <p class="lp-hero-sub">@L.Subheadline</p>
             <div class="lp-hero-actions">
                 <a class="lp-btn lp-btn-light" href="@L.CtaHref">@L.CtaLabel</a>
             </div>
+            <p class="lp-demo-note"><MudIcon Icon="@Icons.Material.Outlined.Science" Size="Size.Small" />@T("Demonstration with synthetic customer data.")</p>
         </section>
 
         <div class="lp-wrap"><AppPreview /></div>
 
         <section id="product" class="lp-wrap lp-statement">
-            <p><span>@L.Statement.Lead</span> @L.Statement.Rest</p>
+            <div>
+                <p class="lp-eyebrow">@T("The compliance problem")</p>
+                <h2>@T("From customer changes to a documented review")</h2>
+            </div>
+            <div class="lp-problem-copy">
+                <p>@T("A relevant customer change can make the existing tax-residency declaration unreliable. The bank needs to reassess the file, collect evidence and track the applicable deadline.")</p>
+                <p class="lp-dim">@L.Statement.Rest</p>
+            </div>
         </section>
 
         @foreach (var s in L.Sections)
@@ -58,6 +63,14 @@
                         <li><h3>@step.Title</h3><p>@step.Description</p></li>
                     }
                 </ol>
+                <div class="lp-audit">
+                    <MudIcon Icon="@Icons.Material.Outlined.VerifiedUser" />
+                    <div>
+                        <h3>@T("A verifiable audit trail")</h3>
+                        <p>@T("Case changes and approvals are recorded in a hash-chained log. The chain can be checked for altered entries.")</p>
+                    </div>
+                    <a href="/audit">@T("Audit log")<MudIcon Icon="@Icons.Material.Rounded.ArrowForward" Size="Size.Small" /></a>
+                </div>
             </div>
         </section>
 

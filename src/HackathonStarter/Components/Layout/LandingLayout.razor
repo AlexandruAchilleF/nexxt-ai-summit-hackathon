@@ -1,7 +1,7 @@
 @inherits LayoutComponentBase
 
-@* The landing page is always dark and brings its own footer (Components/Pages/Home.razor). *@
-<MudThemeProvider Theme="AppTheme.Theme" IsDarkMode="true" />
+@* Public product pages use the same light palette as the TRACE workspace. *@
+<MudThemeProvider Theme="AppTheme.Theme" IsDarkMode="false" />
 <MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />

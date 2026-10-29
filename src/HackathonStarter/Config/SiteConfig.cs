@@ -105,7 +105,7 @@ public static class SiteConfig
         Enabled: true,
         Headline: "Every data change, a CRS/FATCA decision before the deadline",
         Subheadline: "When a customer changes their address, phone or a standing order, code assesses the change and, if it matters for tax, opens a case and, for CRS, starts the deadline from the ANAF guide. The agent gathers the evidence and drafts the request to the customer. A person decides.",
-        CtaLabel: "Open the app",
+        CtaLabel: "Open the application",
         CtaHref: "/dashboard",
         Announcement: new("New", "The rules of the ANAF guide, each with its page", "/#product"),
         Preview: new(
