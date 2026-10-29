@@ -219,7 +219,7 @@ else
             {
                 var o = res.Outcome;
                 var tone = CrsUi.Tone(o.Decision);
-                var decisive = o.Uncovered.FirstOrDefault() ?? o.Cleared.FirstOrDefault() ?? o.Indicia.FirstOrDefault();
+                var promoted = ChangeVerdict.Select(o);
                 <div @ref="_verdict" style="scroll-margin-top:72px"></div>
                 <MudPaper Outlined="true" Class="@($"pa-4 crs-verdict{(tone is null ? "" : $" is-{tone}")}")" @key="res.Change.Id">
                     <div class="crs-verdict-stamp">
@@ -230,12 +230,16 @@ else
                         </div>
                     </div>
                     <p class="crs-verdict-description">@CrsUi.Describe(o.Decision)</p>
-                    @if (decisive is not null)
+                    @if (promoted is { Hit: var decisive })
                     {
                         <div class="crs-verdict-decisive">
-                            @if (o.Cleared.Contains(decisive))
+                            @if (promoted.Role == PromotedRuleRole.Cleared)
                             {
                                 <div class="mb-2"><Pill Icon="@Icons.Material.Rounded.Check">@T("Checked · does not apply")</Pill></div>
+                            }
+                            else
+                            {
+                                <div class="mb-2"><Pill Tone="@(promoted.Role == PromotedRuleRole.Covered ? "success" : tone)">@CrsUi.Label(decisive.CoveredBy)</Pill></div>
                             }
                             <b>@CrsUi.RuleTitle(decisive.RuleId)</b>
                             @if (!string.IsNullOrWhiteSpace(decisive.Jurisdiction))
@@ -251,7 +255,11 @@ else
                         <div class="crs-verdict-deadline">
                             @if (recordedCase.DueAt is { } due)
                             {
-                                <b>@T("Deadline") @CrsUi.Date(due)</b><span> · @T("{0} days", CrsUi.DaysBetween(recordedCase.OpenedAt, due))</span>
+                                <b>@T("Deadline") @CrsUi.Date(due)</b>
+                                @if (ChangeVerdict.DeadlineDays(recordedCase, res.Change.Id) is { } days)
+                                {
+                                    <span> · @T("{0} days", days)</span>
+                                }
                                 <span> · <span class="crs-code">@recordedCase.DeadlineRuleId</span> · @CrsUi.Page(recordedCase.DeadlineGuidePage)</span>
                                 @if (recordedCase.RemindAt is { } reminder)
                                 {
