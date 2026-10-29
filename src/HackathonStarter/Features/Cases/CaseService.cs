@@ -110,6 +110,8 @@ public class CaseService(
     CurrentUser currentUser) : ICaseService
 {
     public const string SystemActor = "system";
+    /// <summary>Why a pending reminder draft is withdrawn when the client answers (shown translated on the case page).</summary>
+    public const string ResponseReceivedReason = "response.received";
     public const string DefaultAssignee = "operator";
     /// <summary>The watcher's escalation reason (a code text: the reminder day is our design, 5 days before DueAt, PLAN 9.2).</summary>
     public const string ReminderEscalationReason = "Reminder day (day 85 on a new account, 5 days before the deadline): no answer, escalated automatically";
@@ -568,7 +570,7 @@ public class CaseService(
                 reminder.Status = RequestStatus.Rejected;
                 reminder.RejectedBy = SystemActor;
                 reminder.RejectedAt = now;
-                reminder.RejectionReason = "response.received"; // a code, never the client's free-text answer
+                reminder.RejectionReason = ResponseReceivedReason; // a code, never the client's free-text answer
             }
             item.Responses.Add(saved);
             item.Status = CaseStatus.ResponseReceived;

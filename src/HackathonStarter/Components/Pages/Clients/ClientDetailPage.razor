@@ -156,8 +156,8 @@ else
                     <div class="client-selfcert @(s.Status == SelfCertStatus.Superseded ? "client-former" : "")">
                         <div class="client-row">
                             <div class="client-row-main">
-                                <div>@T("Signed {0}", Format.Date(s.SignedAt))</div>
-                                <div class="app-list-meta">@T("received {0}", Format.Date(s.ReceivedAt)) · @ChannelLabel(s.Channel)@(s.DeclaresUsPerson ? " · " + T("declares a US person") : "")</div>
+                                <div>@T("Signed {0}", CrsUi.Date(s.SignedAt))</div>
+                                <div class="app-list-meta">@T("received {0}", CrsUi.Date(s.ReceivedAt)) · @ChannelLabel(s.Channel)@(s.DeclaresUsPerson ? " · " + T("declares a US person") : "")</div>
                             </div>
                             <div class="client-row-tags">@SelfCertPill(s.Status)</div>
                         </div>
@@ -202,11 +202,16 @@ else
                         <div class="client-row">
                             <div class="client-row-main">
                                 <div class="client-break">@d.FileName</div>
-                                <div class="app-list-meta">@DocumentKindLabel(d.Kind) · @T("{0} page(s)", d.Pages) · @T("uploaded {0}", Format.Date(d.UploadedAt))</div>
+                                <div class="app-list-meta">@DocumentKindLabel(d.Kind) · @T("{0} page(s)", d.Pages) · @T("uploaded {0}", CrsUi.Date(d.UploadedAt))</div>
                             </div>
-                            @if (scan is null)
+                            @if (scan is null && d.ShieldVerdict == ShieldVerdict.HiddenTextRemoved)
                             {
-                                <div class="client-row-tags"><ShieldBadge Verdict="@(d.ShieldVerdict == ShieldVerdict.HiddenTextRemoved ? ShieldVerdict.NotScanned : d.ShieldVerdict)" /></div>
+                                @* Scanned before: the fragments load with "Show the removed text". *@
+                                <div class="client-row-tags"><Pill Tone="danger" Icon="@Icons.Material.Rounded.GppMaybe">@T("Hidden text removed")</Pill></div>
+                            }
+                            else if (scan is null)
+                            {
+                                <div class="client-row-tags"><ShieldBadge Verdict="d.ShieldVerdict" /></div>
                             }
                         </div>
                         @if (scan is not null)
@@ -341,7 +346,7 @@ else
 
     public void Dispose() => Clock.Changed -= OnClockChanged;
 
-    private static string Day(DateOnly d) => d.ToString("d MMM yyyy", Format.Culture);
+    private static string Day(DateOnly d) => CrsUi.Date(d);
 
     private static string HeaderLine(Client c)
     {
@@ -354,12 +359,12 @@ else
     private string CaseDates(Case k)
     {
         if (!k.IsOpen)
-            return k.ClosedAt is { } closed ? T("closed {0}", Format.Date(closed))
-                 : k.ExpiredAt is { } expired ? T("expired {0}", Format.Date(expired))
-                 : T("opened {0}", Format.Date(k.OpenedAt));
-        if (k.DueAt is not { } due) return T("opened {0}", Format.Date(k.OpenedAt)) + " · " + T("no deadline in the guide");
+            return k.ClosedAt is { } closed ? T("closed {0}", CrsUi.Date(closed))
+                 : k.ExpiredAt is { } expired ? T("expired {0}", CrsUi.Date(expired))
+                 : T("opened {0}", CrsUi.Date(k.OpenedAt));
+        if (k.DueAt is not { } due) return T("opened {0}", CrsUi.Date(k.OpenedAt)) + " · " + T("no deadline in the guide");
         var left = due - Clock.UtcNow;
-        return T("opened {0}", Format.Date(k.OpenedAt)) + " · " + T("due {0}", Format.Date(due)) + " · "
+        return T("opened {0}", CrsUi.Date(k.OpenedAt)) + " · " + T("due {0}", CrsUi.Date(due)) + " · "
              + (left >= TimeSpan.Zero ? T("{0} days left", (int)Math.Ceiling(left.TotalDays)) : T("{0} days overdue", (int)Math.Ceiling(-left.TotalDays)));
     }
 

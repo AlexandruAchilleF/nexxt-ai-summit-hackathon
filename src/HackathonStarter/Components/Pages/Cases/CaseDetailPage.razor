@@ -345,7 +345,8 @@ else
             r.Status switch
             {
                 RequestStatus.Sent => T("Approved by {0} · {1} · {2}", r.ApprovedBy, CrsUi.Channel(r.Channel), CrsUi.DateTimeText(r.ApprovedAt!.Value)),
-                RequestStatus.Rejected => T("Rejected by {0}: {1}", r.RejectedBy, r.RejectionReason),
+                RequestStatus.Rejected => T("Rejected by {0}: {1}", CrsUi.Actor(r.RejectedBy),
+                    r.RejectionReason == CaseService.ResponseReceivedReason ? T("the client answered") : r.RejectionReason),
                 _ => T("Drafted by {0} · {1}", CrsUi.Actor(r.DraftedBy), CrsUi.DateTimeText(r.CreatedAt)),
             }, r.DraftedBy == CaseService.SystemActor ? "is-system" : ""))
         .Concat(_case.Responses.Select(r => new Letter(r.ReceivedAt, CrsUi.Label(r.Kind), T("Received"), "accent",

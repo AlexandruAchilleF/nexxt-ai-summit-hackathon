@@ -469,7 +469,7 @@ public static class GoldenCases
             // No-deadline interpretation (Î1, p. 38): FATCA-SC is metadata; DueAt and RemindAt stay null.
             ExpectedDeadline = new("FATCA-SC", Preexisting: false, null, null),
         },
-        new("15", "Cluj to Iasi", "CL-0015", GoldenOwner.R1, Decision.NoCase, [], ["GEN-DOMESTIC"], null, "No case, with an explanation")
+        new("15", "Cluj to Iași", "CL-0015", GoldenOwner.R1, Decision.NoCase, [], ["GEN-DOMESTIC"], null, "No case, with an explanation")
         {
             Layer = GoldenLayer.Engine,
             Status = GoldenStatus.ApprovedR5,

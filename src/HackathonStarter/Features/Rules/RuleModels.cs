@@ -75,7 +75,7 @@ public record RuleOutcome(
 /// </summary>
 public interface ICrsRuleEngine
 {
-    /// <summary>A change: what changed between the two snapshots (Cluj to Iasi = NoCase, GEN-DOMESTIC).</summary>
+    /// <summary>A change: what changed between the two snapshots (Cluj to Iași = NoCase, GEN-DOMESTIC).</summary>
     RuleOutcome Evaluate(ClientSnapshot before, ClientSnapshot after, ChangeKind kind);
 
     /// <summary>The client's current state, with no change: the agent's evaluateRules tool, re-evaluation before closing, metrics.</summary>

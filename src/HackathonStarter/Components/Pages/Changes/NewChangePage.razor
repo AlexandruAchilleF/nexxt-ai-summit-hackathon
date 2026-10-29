@@ -282,6 +282,11 @@ else
                                 @(match ? T("Matches golden case {0}", g.Id) : T("Differs from golden case {0}, which expects {1}", g.Id, CrsUi.Label(g.Expected)))
                             </Pill>
                         </div>
+                        @if (!match)
+                        {
+                            @* The demo data is shared: an earlier visitor may already have recorded this or another change for the client. *@
+                            <div class="crs-hint mt-2">@T("The client's data may already have been changed in this demo. Demo menu, \"Reset demo data\" replays the golden case from the start.")</div>
+                        }
                     }
 
                     @if (res.CaseCode is { } code)

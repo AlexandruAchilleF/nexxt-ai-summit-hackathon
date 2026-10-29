@@ -199,6 +199,7 @@ public static partial class Lang
         ro["Depository"] = "Depozit";
         ro["Differs"] = "Diferă";
         ro["Differs from golden case {0}, which expects {1}"] = "Diferă de cazul-etalon {0}, care așteaptă {1}";
+        ro["The client's data may already have been changed in this demo. Demo menu, \"Reset demo data\" replays the golden case from the start."] = "Este posibil ca datele clientului să fi fost deja modificate în acest demo. Meniul Demo, „Resetează datele demo”, reia cazul-etalon de la început.";
         ro["Diplomat"] = "Diplomat";
         ro["Document"] = "Document";
         ro["Document uploaded"] = "Document încărcat";
@@ -360,6 +361,7 @@ public static partial class Lang
         ro["Register the client's answer"] = "Înregistrează răspunsul clientului";
         ro["Reject and rewrite"] = "Respinge și rescrie";
         ro["Rejected by {0}: {1}"] = "Respinsă de {0}: {1}";
+        ro["the client answered"] = "clientul a răspuns";
         ro["Reminder"] = "Memento";
         ro["Reminder approved by {0}, sent via {1}"] = "Memento aprobat de {0}, trimis prin {1}";
         ro["Reminder day has passed"] = "Ziua mementoului a trecut";
