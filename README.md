@@ -17,7 +17,7 @@ proof of the confirmation.
 
 | | |
 | --- | --- |
-| The app | <https://hackathon-starter-k0ym.onrender.com/> (access code: `crs-nexxt-2026`; the first start takes up to a minute) |
+| The app | <https://hackathon-starter-k0ym.onrender.com/> (open, no access code; the first start takes up to a minute) |
 | Video (≤ 3 min) | to be added at submission |
 | The presentation | [`docs/presentation/TRACE.pdf`](docs/presentation/TRACE.pdf) (10 slides; notes: [`docs/PRESENTATION.md`](docs/PRESENTATION.md)) |
 | How the jury can check it in 5 minutes | [`docs/SUBMISSION.md`](docs/SUBMISSION.md#how-the-jury-can-check-it-in-5-minutes) |
