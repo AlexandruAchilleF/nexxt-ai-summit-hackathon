@@ -172,7 +172,7 @@ internal static class CrsIndicia
                 f.Clear(RuleIds.CrsStandingOrder, country, "StandingOrders",
                     $"Ordin permanent către {Place(country)} dintr-un cont de depozit{ProductNote(account)}: exceptat la CRS " +
                     $"(pct. 12 lit. d; contul curent e cont de depozit, Sec. VIII.C pct. 2){alsoRo}",
-                    $"Standing order to {Place(country, true)} from a depository account ({ProductEn(account)}): excepted under CRS " +
+                    $"Standing order to {Place(country, true)} from a depository account{ProductNote(account)}: excepted under CRS " +
                     $"(12(d); a current account is a depository account, VIII.C(2)){alsoEn}");
             else if (!Jurisdictions.IsCrsReportable(country))
                 NotReportable(f, RuleIds.CrsStandingOrder, country, "StandingOrders",
