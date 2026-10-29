@@ -8,8 +8,8 @@ takes time). What the organizers ask for, from the submission checklist:
 | Team name and team lead's e-mail | yes | the form below | **to fill in** |
 | Project title and description | yes | the form below | ready (EN) |
 | GitHub link | yes | <https://github.com/AlexandruAchilleF/nexxt-ai-summit-hackathon> (public) | ready |
-| The presentation | yes | the slides in [`PRESENTATION.md`](PRESENTATION.md), exported to PDF and uploaded with a public link | **to export** |
-| The 3-minute video | yes | the narration in [`PITCH.md`](PITCH.md) | **to film** |
+| The presentation | yes | [`docs/presentation/TRACE.pdf`](presentation/TRACE.pdf) (10 slides) | ready |
+| The 3-minute video | yes | [`docs/PITCH.md`](PITCH.md) (recorded: 2m 45s) | ready to link |
 | Setup instructions, dependencies, sample inputs | yes ("where needed") | README §10 and "How the jury can check it in 5 minutes" | ready |
 
 The plan: [`PLAN.md`](PLAN.md) (Romanian) and [`PLAYBOOK.md`](PLAYBOOK.md) (Romanian). The golden cases:
