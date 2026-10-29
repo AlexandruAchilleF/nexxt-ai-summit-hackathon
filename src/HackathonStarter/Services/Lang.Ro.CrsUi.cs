@@ -13,6 +13,13 @@ public static partial class Lang
         ro["Add the birth country or the citizenships."] = "Adaugă țara nașterii sau cetățeniile.";
         ro["Add the country and the address."] = "Adaugă țara și adresa.";
         ro["Add the holder's name and country."] = "Adaugă numele și țara împuternicitului.";
+        // The mode chip in the top bar (Components/Crs/ModeChip.razor).
+        ro["Agent: live ({0})"] = "Agent: live ({0})";
+        ro["Agent: live (Bedrock {0})"] = "Agent: live (Bedrock {0})";
+        ro["Agent: replay"] = "Agent: înregistrare";
+        ro["Agent: simulated, real tools"] = "Agent: simulare, unelte reale";
+        ro["All clients and documents are synthetic. Live: the agent's model runs on the configured provider. Simulated: scripted answers, the same tools and checks."] = "Toți clienții și toate documentele sunt sintetice. Live: modelul agentului rulează la furnizorul configurat. Simulare: răspunsuri scriptate, aceleași unelte și verificări.";
+        ro["Synthetic data"] = "Date sintetice";
         ro["Add the phone number and its country."] = "Adaugă numărul de telefon și țara lui.";
         ro["Address"] = "Adresă";
         ro["An indicium is a fact in the bank's data that the law lists as a sign of tax residence abroad (guide p. 29-31). The list is closed: only these start an action."] = "Un indiciu este un fapt din datele băncii pe care legea îl enumeră ca semn de rezidență fiscală în străinătate (ghid, p. 29-31). Lista e închisă: doar acestea pornesc o acțiune.";
