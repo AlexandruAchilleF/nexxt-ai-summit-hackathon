@@ -1,363 +1,378 @@
 # CRS Sentinel
 
-**Fiecare modificare de date a unui client devine o decizie CRS/FATCA, înainte să expire termenul legal.**
+**Every change to a client's data becomes a CRS/FATCA decision, before the legal deadline runs out.**
 
-Când un client își schimbă adresa, telefonul, un ordin permanent sau o împuternicire, banca trebuie să afle din nou unde
-plătește taxe clientul. Altfel îl raportează greșit la ANAF, pe fiecare cont. CRS Sentinel prinde schimbarea, aplică
-regulile din Ghidul ANAF DAC2/CRS/FATCA **în cod** (fiecare regulă cu ID și pagină), pornește termenul, adună dovezile,
-scrie cererea către client și urmărește răspunsul până la închiderea cazului, cu dovada confirmării.
+The app UI is in Romanian by default; switch to English with the RO/EN button in the top bar.
 
-**Codul decide, AI-ul explică, omul aprobă.**
+When a client changes their address, phone number, a standing order or a power of attorney, the bank has to find out
+again where the client pays taxes. Otherwise it reports the client wrongly to ANAF, on every account. CRS Sentinel catches
+the change, applies the rules from the ANAF DAC2/CRS/FATCA Guide **in code** (each rule with an ID and a page), starts the
+deadline, gathers the evidence, writes the request to the client and follows the answer until the case is closed, with
+proof of the confirmation.
 
-Raiffeisen Bank, challenge-ul *AI for Operational Efficiency*, NEXXT AI Hackathon (VibeHack), 28–29 octombrie 2026.
+**Code decides, AI explains, a person approves.**
+
+Raiffeisen Bank, *AI for Operational Efficiency* challenge, NEXXT AI Hackathon (VibeHack), 28–29 October 2026.
 
 | | |
 | --- | --- |
-| Aplicația | <https://hackathon-starter-k0ym.onrender.com/> (cod de acces: `crs-nexxt-2026`; prima pornire durează până la un minut) |
-| Video (≤ 3 min) | de completat la predare |
-| Planul complet | [`docs/PLAN.md`](docs/PLAN.md) |
-| Cum funcționează, cap-coadă | [`docs/CUM-FUNCTIONEAZA.md`](docs/CUM-FUNCTIONEAZA.md) |
+| The app | <https://hackathon-starter-k0ym.onrender.com/> (access code: `crs-nexxt-2026`; the first start takes up to a minute) |
+| Video (≤ 3 min) | to be added at submission |
+| The presentation | [`docs/PRESENTATION.md`](docs/PRESENTATION.md) (PDF: to be added at submission) |
+| How the jury can check it in 5 minutes | [`docs/SUBMISSION.md`](docs/SUBMISSION.md#how-the-jury-can-check-it-in-5-minutes) |
+| The full plan | [`docs/PLAN.md`](docs/PLAN.md) (Romanian) |
+| How it works, end to end | [`docs/CUM-FUNCTIONEAZA.md`](docs/CUM-FUNCTIONEAZA.md) (Romanian) |
 
 ---
 
-## 1. Problema
+## 1. The problem
 
-Clientul declară într-o **autocertificare** în ce state e rezident fiscal și TIN-ul pentru fiecare. Când banca „știe sau
-are motive să știe” că situația s-a schimbat, autocertificarea își pierde valabilitatea. Pe un cont nou, banca are
-**90 de zile** să obțină o autocertificare nouă sau o explicație rezonabilă; altfel clientul e tratat ca rezident fiscal
-**și** în jurisdicția inițială, **și** în cea nouă (Ghid ANAF, p. 35–36).
+In a **self-certification**, the client declares the states where they are tax resident and the TIN for each one. When
+the bank "știe sau are motive să știe" ["knows or has reason to know"] that the situation has changed, the
+self-certification loses its validity. On a new account, the bank has **90 days** to obtain a new self-certification or a
+reasonable explanation; otherwise the client is treated as tax resident **both** in the original jurisdiction **and** in
+the new one (ANAF Guide, p. 35–36).
 
-Azi, verificarea înseamnă un om care compară câmpuri, caută prin documente, scrie clientului și ține minte un termen.
-CRS Sentinel face partea repetitivă; omul aprobă ce pleacă și ce se închide.
+Today, the check means a person who compares fields, searches through documents, writes to the client and keeps a
+deadline in mind. CRS Sentinel does the repetitive part; the person approves what goes out and what gets closed.
 
-**Sursa de adevăr:** Ghidul ANAF DAC2/CRS/FATCA, varianta 29.12.2025, în [`docs/ghid/`](docs/ghid/) (PDF-ul și paginile
-extrase, `pagini/p-XXX.md`). Regulile verificate pe textul ghidului: [`docs/reguli-verificate.md`](docs/reguli-verificate.md).
+**Source of truth:** the ANAF DAC2/CRS/FATCA Guide, version 29.12.2025, in [`docs/ghid/`](docs/ghid/) (the PDF and the
+extracted pages, `pagini/p-XXX.md`). The rules verified against the text of the guide:
+[`docs/reguli-verificate.md`](docs/reguli-verificate.md).
 
-## 2. Cine ce face
+## 2. Who does what
 
-| Cine | Ce face | Ce nu face niciodată |
+| Who | What it does | What it never does |
 | --- | --- | --- |
-| **Codul** (determinist, testat) | Aplică regulile din ghid (ID + pagină), calculează termenele, verifică citatele, verifică formatul TIN, ține jurnalul | Nu ghicește: aceeași intrare dă mereu același rezultat |
-| **AI-ul** (Claude pe Amazon Bedrock) | Citește documentele, extrage citate, găsește semnale de context, scrie textul către client, explică | Nu decide dacă ceva e indiciu, nu calculează termene, nu pornește alerte |
-| **Omul** (operator, departamentul fiscal) | Aprobă cererea către client și închiderea cazului, decide cazurile la limită | — |
+| **The code** (deterministic, tested) | Applies the rules from the guide (ID + page), calculates the deadlines, verifies the quotes, checks the TIN format, keeps the audit log | It does not guess: the same input always gives the same result |
+| **The AI** (Claude on Amazon Bedrock) | Reads the documents, extracts quotes, finds context signals, writes the text to the client, explains | It does not decide whether something is an indicium, does not calculate deadlines, does not raise alerts |
+| **The human** (operator, tax department) | Approves the request to the client and the closing of the case, decides the borderline cases | — |
 
-Un **semnal de context** (de exemplu, un salariu de la o firmă germană) se arată cu dovada lui, dar nu schimbă decizia și
-nu deschide niciun caz. Naționalitatea nu e semnal; doar cetățenia SUA contează, și doar pentru FATCA.
+A **context signal** (for example, a salary from a German company) is shown with its evidence, but it does not change the
+decision and does not open any case. Nationality is not a signal; only US citizenship counts, and only for FATCA.
 
-## 3. Cum funcționează: cazul Mariei
+## 3. How it works: Maria's case
 
-Maria are un cont nou (deschis după 1 ian. 2016) și se mută la München.
+Maria has a new account (opened after 1 Jan 2016) and moves to Munich.
 
 ```text
- [1] Modificarea intră (ChangeEvent): adresă nouă în DE                         jurnal: change.received
- [2] CrsRuleEngine compară „înainte” cu „după” (cod pur, fără AI)
-       CRS-IND-ADDR  (DE)  p. 29 lit. b   indiciu
-       CRS-IND-PHONE (DE)  p. 29 lit. c   indiciu: telefon DE și niciun telefon RO
-       capcanele verificate și respinse, fiecare cu explicație
-       → Clarification                                                         jurnal: rule.applied ×2
- [3] CaseService deschide cazul: termen = data aflării + 90 de zile, memento la ziua 85   jurnal: case.opened
- [4] Agentul pregătește cazul
-       readDocument   → doar textul vizibil, după scut
-       recordEvidence → codul verifică citatul în pagină
-       recordSignal   → „salariu de la Müller GmbH”: semnal, fără alertă
-       draftClientRequest → lista de documente vine din cod, textul îl scrie modelul
- [5] sendClientRequest: cere APROBAREA operatorului                             jurnal: request.approved
- [6] Data simulată +85 de zile → memento și escaladare la departamentul fiscal
- [7] Răspunsul Mariei: autocertificare nouă (PDF)
-       extractSelfCertification → jurisdicții și TIN, fiecare câmp cu citat verificat
-       checkTin(DE)  → „format valid”
-       evaluateRules → Compliant, raportabil pentru DE
- [8] closeCase: cere APROBAREA operatorului → dovada confirmării (canal, moment, hash)   jurnal: case.closed
- [9] /audit → „Verifică” lanțul de hash-uri; „Falsifică” pe o intrare arată exact intrarea ruptă
+ [1] The change comes in (ChangeEvent): new address in DE                       audit log: change.received
+ [2] CrsRuleEngine compares "before" with "after" (pure code, no AI)
+       CRS-IND-ADDR  (DE)  p. 29 (b)   indicium
+       CRS-IND-PHONE (DE)  p. 29 (c)   indicium: DE phone and no RO phone
+       the traps checked and rejected, each with an explanation
+       → Clarification                                                         audit log: rule.applied ×2
+ [3] CaseService opens the case: deadline = date the bank learned + 90 days, reminder on day 85   audit log: case.opened
+ [4] The agent prepares the case
+       readDocument   → only the visible text, after the shield
+       recordEvidence → the code checks the quote on the page
+       recordSignal   → "salary from Müller GmbH": a signal, no alert
+       draftClientRequest → the list of documents comes from code, the model writes the text
+ [5] sendClientRequest: asks for the operator's APPROVAL                        audit log: request.approved
+ [6] Simulated date +85 days → reminder and escalation to the tax department
+ [7] Maria's answer: a new self-certification (PDF)
+       extractSelfCertification → jurisdictions and TIN, each field with a verified quote
+       checkTin(DE)  → "format valid"
+       evaluateRules → Compliant, reportable for DE
+ [8] closeCase: asks for the operator's APPROVAL → proof of confirmation (channel, time, hash)   audit log: case.closed
+ [9] /audit → "Verify" the hash chain; "Tamper" on an entry shows exactly the broken entry
 ```
 
-Fără răspuns, la ziua 91 cazul trece în `Expired`, cu consecința din ghid (rezidentă în RO și în DE). Diagrama completă,
-cu toți participanții: [`docs/PLAN.md` §6.3](docs/PLAN.md#63-fluxul-mariei-traseul-din-video).
+With no answer, on day 91 the case moves to `Expired`, with the consequence from the guide (resident in RO and in DE).
+The full diagram, with all participants: [`docs/PLAN.md` §6.3](docs/PLAN.md#63-fluxul-mariei-traseul-din-video).
 
-Acesta e traseul-țintă. Pe `main`, pașii 1–3 și 6 sunt cod cu teste (`ChangeService`, `CrsRuleEngine`, `CaseService`,
-`DeadlineWatcher`), iar serviciile pentru dovezi, cerere, aprobare și închidere există în `CaseService`. Uneltele agentului
-de la pașii 4, 5, 7 și 8 sunt pe `main` (#44, #47), cu mock-ul care le cheamă; o rulare pornește azi doar prin API, iar
-aprobarea se dă pe `/runs/{id}`. Paginile cazului, ale schimbării noi și dashboard-ul CRS sunt pe `main` din #49, cu fluxul
-manual al cazului (fără agent); starea exactă e în [§11](#11-stare).
+The whole path runs from the UI, on `main`: steps 1–3 and 6 are code with tests (`ChangeService`, `CrsRuleEngine`,
+`CaseService`, `DeadlineWatcher`); steps 4, 5, 7 and 8 start from the case's "CRS Sentinel" panel, with "Analyze the
+file" and "Check the answer", and the approvals are given in the panel (#44, #47, #59). Maria's answer comes in from the
+"Demo" menu → "The client answers"; day 85, from "Demo" → "To the reminder day". The exact status is in
+[§11](#11-status).
 
-### Capcanele (fără alarme false)
+### The traps (no false alarms)
 
-| Modificarea | Rezultatul | De ce |
+| The change | The result | Why |
 | --- | --- | --- |
-| Mutare Cluj → Iași | `NoCase`, explicat | Nicio regulă din p. 29–31 nu se aplică (interpretare de design, `GEN-DOMESTIC`) |
-| Telefon german lângă telefonul românesc | `NoCase` | Regula CRS cere „niciun telefon în România” (p. 29 lit. c) |
-| Ordin permanent către un IBAN german, din contul curent | `NoCase`, explicat | Ordinele din conturile de depozit sunt excluse la CRS (p. 29 lit. d) |
-| Același ordin, din contul de custodie | `Clarification` | Excepția nu se aplică (p. 29 lit. d) |
-| Ordin permanent către SUA, din contul curent | `FatcaAlert` | La FATCA excepția pentru depozite nu există (p. 31) |
-| Telefon SUA, chiar lângă unul românesc | `FatcaAlert` | La FATCA orice telefon SUA e indiciu (p. 31) |
-| Salariu de la o firmă germană | `NoCase` + semnal | Venitul nu e în lista de indicii |
-| PDF cu text alb ascuns | `ShieldAlert` | Scutul scoate textul înainte să ajungă la model |
+| Move Cluj → Iași | `NoCase`, explained | No rule from p. 29–31 applies (design interpretation, `GEN-DOMESTIC`) |
+| German phone next to the Romanian phone | `NoCase` | The CRS rule requires "niciun telefon în România" ["no phone number in Romania"] (p. 29 (c)) |
+| Standing order to a German IBAN, from the current account | `NoCase`, explained | Orders from depository accounts are excluded under CRS (p. 29 (d)) |
+| The same order, from the custody account | `Clarification` | The exception does not apply (p. 29 (d)) |
+| Standing order to the US, from the current account | `FatcaAlert` | Under FATCA the exception for depository accounts does not exist (p. 31) |
+| US phone, even next to a Romanian one | `FatcaAlert` | Under FATCA any US phone is an indicium (p. 31) |
+| Salary from a German company | `NoCase` + signal | Income is not on the list of indicia |
+| PDF with hidden white text | `ShieldAlert` | The shield removes the text before it reaches the model |
 
-## 4. Regulile
+## 4. The rules
 
-Indiciile CRS sunt lista închisă din ghid, p. 29 (Legea 207/2015, Anexa 1, Secțiunea III, subsecțiunea B); cele FATCA
-sunt din p. 31 (Acordul FATCA, Anexa I, Secțiunea II, paragraful B). Catalogul complet, cu ID-urile finale:
+The CRS indicia are the closed list from the guide, p. 29 (Law 207/2015, Annex 1, Section III, subsection B); the FATCA
+ones are from p. 31 (the FATCA Agreement, Annex I, Section II, paragraph B). The full catalogue, with the final IDs
+(Romanian):
 [`docs/PLAN.md` §8.2](docs/PLAN.md#82-catalogul-de-reguli-id-urile-sunt-finale-paginile-verificate-în-ghid-detalii-în-docsreguli-verificatemd).
 
-| Grup | Reguli | Pagina |
+| Group | Rules | Page |
 | --- | --- | --- |
-| Generale | `GEN-CHANGE-CIRC` (schimbarea de circumstanțe), `GEN-NEW-ACCOUNT` (indiciile pe un cont nou); `GEN-DOMESTIC` (mutarea în țară) | 29–30, 33, 35–36; `GEN-DOMESTIC`: NEVERIFICAT (§5) |
-| Indicii CRS | `CRS-IND-RES`, `-ADDR`, `-MAIL`, `-PHONE`, `-SO`, `-POA`, `-CO` | 29 (lit. a–f), 17–18, 31, 48 |
-| Indicii FATCA | `FATCA-IND-CIT`, `-POB`, `-ADDR`, `-PHONE`, `-SO`, `-POA`, `-CO`; `FATCA-SCOPE-ALL` (toate conturile) | 31, 25 |
-| Autocertificarea | `SC-VALID`, `SC-TIN-FORMAT`, `SC-TIN-MISSING`, `SC-CONSISTENT`, `FATCA-SC`, `FATCA-TIN` | 33–34, 36–37, 48, 53, 38 |
-| Termene și expirare | `DL-NEW-90`, `DL-PRE-YEAR`, `DL-EXPIRED-NEW`, `DL-EXPIRED-PRE` | 20–21, 29, 35–36 |
-| Răspunsul clientului | `RESP-EXPLANATION`: student cu viză, profesor sau stagiar, diplomat, funcționar UE | 35, 37 |
+| General | `GEN-CHANGE-CIRC` (change in circumstances), `GEN-NEW-ACCOUNT` (indicia on a new account); `GEN-DOMESTIC` (a move within the country) | 29–30, 33, 35–36; `GEN-DOMESTIC`: NEVERIFICAT (unverified) (§5) |
+| CRS indicia | `CRS-IND-RES`, `-ADDR`, `-MAIL`, `-PHONE`, `-SO`, `-POA`, `-CO` | 29 (a–f), 17–18, 31, 48 |
+| FATCA indicia | `FATCA-IND-CIT`, `-POB`, `-ADDR`, `-PHONE`, `-SO`, `-POA`, `-CO`; `FATCA-SCOPE-ALL` (all accounts) | 31, 25 |
+| Self-certification | `SC-VALID`, `SC-TIN-FORMAT`, `SC-TIN-MISSING`, `SC-CONSISTENT`, `FATCA-SC`, `FATCA-TIN` | 33–34, 36–37, 48, 53, 38 |
+| Deadlines and expiry | `DL-NEW-90`, `DL-PRE-YEAR`, `DL-EXPIRED-NEW`, `DL-EXPIRED-PRE` | 20–21, 29, 35–36 |
+| The client's answer | `RESP-EXPLANATION`: student with a visa, teacher or trainee, diplomat, EU official | 35, 37 |
 
-**Deciziile** (precedența, de la cea mai puternică): `ShieldAlert` > `FatcaAlert` > `Clarification` > `Compliant` >
-`NoCase`. `NoCase` = nicio regulă de indiciu nu s-a aplicat; `Compliant` = există indicii, dar toate sunt acoperite de
-autocertificare sau de o explicație acceptată.
+**The decisions** (precedence, from the strongest): `ShieldAlert` > `FatcaAlert` > `Clarification` > `Compliant` >
+`NoCase`. `NoCase` = no indicium rule applied; `Compliant` = there are indicia, but all of them are covered by the
+self-certification or by an accepted explanation.
 
-**Termenele** depind de contul nou sau preexistent, nu de produs. Statutul se calculează pe regim din data deschiderii:
-CRS preexistent = existent la 31.12.2015, FATCA preexistent = existent la 30.06.2014 (p. 20).
+**The deadlines** depend on whether the account is new or preexisting, not on the product. The status is calculated per
+regime from the opening date: CRS preexisting = existing on 31.12.2015, FATCA preexisting = existing on 30.06.2014
+(p. 20).
 
-| Cont | Termen | La expirare | Pagina |
+| Account | Deadline | On expiry | Page |
 | --- | --- | --- | --- |
-| Nou | 90 de zile calendaristice de la data la care banca știe de schimbare | Rezident și în jurisdicția inițială, și în cea nouă | 20–21, 35–36 |
-| Preexistent | Ultima zi a anului sau 90 de zile; implementăm cea mai târzie dintre ele | Rezident cel puțin în noua jurisdicție | 29 |
+| New | 90 calendar days from the date the bank knows of the change | Resident both in the original jurisdiction and in the new one | 20–21, 35–36 |
+| Preexisting | The last day of the year or 90 days; we implement the later of the two | Resident at least in the new jurisdiction | 29 |
 
-## 5. Interpretările de design (spuse deschis)
+## 5. The design interpretations (stated openly)
 
-- **„Știe sau are motive să știe”.** Considerăm că datele pe care banca le are deja (adrese, telefoane, ordine permanente,
-  împuterniciri) sunt cele pentru care banca știe sau are motive să știe că autocertificarea poate fi nesigură (p. 30, 35).
-- **Indiciile la conturile noi.** În ghid, lista de indicii e procedura pentru conturile preexistente (p. 29, 31). Pentru
-  conturile noi, ghidul cere autocertificarea și testul de rezonabilitate față de informațiile băncii (p. 33). Folosim
-  indiciile drept criterii prin care autocertificarea e contrazisă.
-- **NEVERIFICAT: mutarea în țară** (`GEN-DOMESTIC`) nu are o pagină proprie în ghid (în cod: `RuleCatalog.NotVerified`):
-  nicio regulă din p. 29–31 nu se aplică, deci `NoCase`.
-- **Termenul la contul preexistent.** Ghidul (p. 29) spune „până în ultima zi a anului calendaristic în cauză [...], sau
-  în 90 de zile calendaristice”, în paragraful despre testul adresei de rezidență (nota 57). Aplicăm cea mai târzie
-  dintre cele două date. Pentru contul documentat prin adresa de rezidență așa scrie legea (Codul de procedură fiscală,
-  Anexa nr. 2 pct. 1: „oricare dintre acestea este mai recentă”), care transpune Directiva 2011/16/UE, Anexa II pct. 1 (introdusă prin Directiva 2014/107/UE): „by the later of the last day of the relevant calendar year or other appropriate reporting period, or 90 calendar days following the notice or discovery of such change in circumstances”
-  ([EUR-Lex](https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32014L0107); citatul e verificat pe [copia legislation.gov.uk](https://www.legislation.gov.uk/eudr/2011/16/annex/II), 28.10.2026), și Comentariul OCDE la CRS (Secțiunea III, pct. 13). Directiva are aceeași limită: se aplică
-  atunci când banca „has relied on the residence address test”.
-  La indiciile din căutarea electronică legea spune doar „ori” (Anexa nr. 1, secțiunea III, subsecțiunea B, pct. 16),
-  ghidul (p. 30) nu dă termen, iar Comentariul OCDE (pct. 16) spune „until the later of”. Sistemul nu știe prin ce
-  procedură a fost documentat contul, deci aplică aceeași regulă și tratează toate cazurile ca indicii din căutarea
-  electronică (de exemplu 17b): acolo e interpretarea noastră.
-- **NEVERIFICAT:** la FATCA, ghidul (p. 38) nu dă un termen pentru schimbarea de circumstanțe: cazul se deschide fără
-  termen din ghid, cu NEVERIFICAT afișat, și nu împrumutăm cele 90 de zile CRS.
+- **"Știe sau are motive să știe" ["knows or has reason to know"].** We take the data the bank already holds (addresses,
+  phone numbers, standing orders, powers of attorney) to be the data for which the bank knows or has reason to know that
+  the self-certification may be unreliable (p. 30, 35).
+- **Indicia on new accounts.** In the guide, the list of indicia is the procedure for preexisting accounts (p. 29, 31).
+  For new accounts, the guide requires the self-certification and the reasonableness test against the bank's information
+  (p. 33). We use the indicia as the criteria by which the self-certification is contradicted.
+- **NEVERIFICAT: a move within the country** (`GEN-DOMESTIC`) has no page of its own in the guide (in code:
+  `RuleCatalog.NotVerified`): no rule from p. 29–31 applies, so `NoCase`.
+- **The deadline on a preexisting account.** The guide (p. 29) says "până în ultima zi a anului calendaristic în cauză
+  [...], sau în 90 de zile calendaristice" ["by the last day of the relevant calendar year [...], or within 90 calendar
+  days"], in the paragraph about the residence address test (footnote 57). We apply the later of the two dates. For an
+  account documented through the residence address, this is what the law says (the Fiscal Procedure Code, Annex no. 2,
+  point 1: "oricare dintre acestea este mai recentă" ["whichever of these is later"]), which transposes Directive
+  2011/16/EU, Annex II, point 1 (introduced by Directive 2014/107/EU): "by the later of the last day of the relevant calendar year or other appropriate reporting period, or 90 calendar days following the notice or discovery of such change in circumstances"
+  ([EUR-Lex](https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32014L0107); the quote is verified on the [legislation.gov.uk copy](https://www.legislation.gov.uk/eudr/2011/16/annex/II), 28.10.2026), and the OECD Commentary on the CRS (Section III, para. 13). The Directive has the same limit: it applies
+  when the bank "has relied on the residence address test".
+  For indicia from the electronic search, the law says only "ori" ["or"] (Annex no. 1, Section III, subsection B,
+  point 16), the guide (p. 30) gives no deadline, and the OECD Commentary (para. 16) says "until the later of". The
+  system does not know through which procedure the account was documented, so it applies the same rule and treats all
+  cases as indicia from the electronic search (for example 17b): that part is our interpretation.
+- **NEVERIFICAT:** for FATCA, the guide (p. 38) gives no deadline for a change in circumstances: the case opens with no
+  deadline from the guide, with NEVERIFICAT shown, and we do not borrow the 90 CRS days.
 
-## 6. Arhitectura
+## 6. Architecture
 
 ```mermaid
 flowchart LR
-  CE[Modificare de date] --> RE[CrsRuleEngine<br/>reguli cu ID + pagină]
-  RE -->|NoCase / Compliant| AU[(AuditLog<br/>lanț SHA-256)]
-  RE -->|indicii| CS[CaseService<br/>stări + termen]
+  CE[Data change] --> RE[CrsRuleEngine<br/>rules with ID + page]
+  RE -->|NoCase / Compliant| AU[(AuditLog<br/>SHA-256 chain)]
+  RE -->|indicia| CS[CaseService<br/>states + deadline]
   CLK[SimClock] --> DL[DeadlineCalculator] --> CS
-  CLK --> W[DeadlineWatcher<br/>memento · escaladare · expirare]
-  DOC[PDF-uri] --> SH[HiddenTextShield] --> AG
-  CS --> AG[CrsSentinelAgent<br/>Claude pe Bedrock]
-  AG -->|citate| EV[EvidenceVerifier]
-  AG -->|formatul TIN| TIN[TinFormat + TIN on Europa]
+  CLK --> W[DeadlineWatcher<br/>reminder · escalation · expiry]
+  DOC[PDFs] --> SH[HiddenTextShield] --> AG
+  CS --> AG[CrsSentinelAgent<br/>Claude on Bedrock]
+  AG -->|quotes| EV[EvidenceVerifier]
+  AG -->|TIN format| TIN[TinFormat + TIN on Europa]
   AG -->|evaluateRules| RE
-  AG -->|cerere · închidere| OP[Operatorul aprobă]
+  AG -->|request · closing| OP[The operator approves]
   RE & CS & AG & OP & W --> AU
 ```
 
-Săgețile agentului sunt ținta din [`docs/PLAN.md` §13](docs/PLAN.md#13-agentul-crs-sentinel). Pe `main`,
-`CrsSentinelAgent` are 14 unelte (#44), iar mock-ul RO/EN e o mașină de stări pe starea cazului din baza de date, care
-cheamă uneltele reale (§11).
+The agent's arrows are the target from [`docs/PLAN.md` §13](docs/PLAN.md#13-agentul-crs-sentinel). On `main`,
+`CrsSentinelAgent` has 14 tools (#44), and the RO/EN mock is a state machine on the case state in the database, which
+calls the real tools (§11).
 
-- **Cod pur** (`Rules`, `Deadlines`, `Shield`, `Tin`, hashing-ul din `Audit`): fără EF, fără AI, fără HTTP. Primește un
-  `ClientSnapshot` imutabil și întoarce un rezultat, deci se testează în milisecunde.
-- **Servicii** (`ChangeService`, `CaseService`, `ClientService`, `EvaluationService`): validare, roluri, tranzacții, jurnal.
-  Tranzițiile cazului sunt doar aici, fiecare cu verificare de rol și cu intrare în jurnal.
-- **Agentul** e un agent cu unelte, orchestrat de cod, cu omul la decizie: nu atinge baza de date direct, iar cine
-  deschide cazul, regulile și termenele sunt în cod. Runtime-ul cere aprobarea omului pentru uneltele marcate `needsApproval`
-  și, după aprobare, le rulează fără model; așa sunt marcate `sendClientRequest` și `closeCase` (#44).
-- **Data simulată** (`SimClock`) e un serviciu separat, cu decalaj setabil („+85 de zile”). Codul CRS nu citește ora din
-  altă parte; restul aplicației rămâne pe ceasul real.
-- Entitățile, interfețele și structura folderelor: [`docs/PLAN.md` §6–13](docs/PLAN.md#6-arhitectura).
+- **Pure code** (`Rules`, `Deadlines`, `Shield`, `Tin`, the hashing in `Audit`): no EF, no AI, no HTTP. It takes an
+  immutable `ClientSnapshot` and returns a result, so it is tested in milliseconds.
+- **Services** (`ChangeService`, `CaseService`, `ClientService`, `EvaluationService`): validation, roles, transactions,
+  audit log. The case transitions live only here, each with a role check and an audit log entry.
+- **The agent** is a tool agent, orchestrated by code, with the human making the decision: it does not touch the
+  database directly, and who opens the case, the rules and the deadlines are in code. The runtime asks for the human's
+  approval for the tools marked `needsApproval` and, after approval, runs them without the model; `sendClientRequest`
+  and `closeCase` are marked this way (#44).
+- **The simulated date** (`SimClock`) is a separate service with a settable offset ("+85 days"). The CRS code does not
+  read the time from anywhere else; the rest of the app stays on the real clock.
+- The entities, interfaces and folder structure (Romanian): [`docs/PLAN.md` §6–13](docs/PLAN.md#6-arhitectura).
 
-### Încrederea
+### Trust
 
-| Piesa | Ce garantează |
+| The piece | What it guarantees |
 | --- | --- |
-| `HiddenTextShield` (PdfPig, literă cu literă) | Textul alb, microscopic, din afara paginii sau invizibil e scos **înainte** să ajungă la model; documentul primește semnal roșu |
-| `EvidenceVerifier` | Un citat există în textul vizibil al paginii indicate. Un citat inventat apare „citat negăsit”; unul care există doar în textul ascuns e respins cu semnal roșu („doar în textul ascuns”) |
-| `TinFormat` + TIN on Europa | Formatul TIN pe țară (DE, IT, AT, ES, FR, US, RO); pentru statele UE, verificare la serviciul Comisiei Europene, care confirmă tot doar structura și sintaxa. Spunem „format valid”, niciodată „TIN valid” |
-| `AuditLog` | Fiecare pas e o intrare cu `Hash = SHA-256(hash-ul anterior + conținut)`; „Verifică” găsește exact intrarea modificată |
-| `PiiVault` | CNP, IBAN, card, e-mail și telefoane (românești și internaționale, cu `+` sau `00`) sunt mascate înainte de model; uneltele lucrează cu valorile reale; rulările, prompturile și rezultatele uneltelor se salvează mascate (citatele din documentele clientului se păstrează la caz, ca parte din dosar) |
-| Verificări pe răspuns (`Features/Checks`) | `pii-leak` (fără date personale scăpate); în `CrsChecks`: `evidence-quoted` (citatele sunt printre rezultatele uneltelor), `signals-never-alert`, `rule-cited` (fiecare indiciu are regula și pagina), `no-tin-valid-claim`. Pe `main`, agentul CRS are active `pii-leak` și `evidence-quoted` (#44); celelalte trei sunt oprite, decizia R4 |
+| `HiddenTextShield` (PdfPig, letter by letter) | White, microscopic, off-page or invisible text is removed **before** it reaches the model; the document gets a red flag |
+| `EvidenceVerifier` | A quote exists in the visible text of the indicated page. An invented quote shows up as "Quote not found"; one that exists only in the hidden text is rejected with a red flag ("Only in hidden text") |
+| `TinFormat` + TIN on Europa | The TIN format per country (DE, IT, AT, ES, FR, US, RO); for EU states, a check with the European Commission's service, which also confirms only the structure and syntax. We say "format valid", never "TIN valid" |
+| `AuditLog` | Every step is an entry with `Hash = SHA-256(previous hash + content)`; "Verify" finds exactly the modified entry |
+| `PiiVault` | CNP, IBAN, card, e-mail and phone numbers (Romanian and international, with `+` or `00`) are masked before the model; the tools work with the real values; runs, prompts and tool results are saved masked (the quotes from the client's documents are kept with the case, as part of the case file) |
+| Checks on the answer (`Features/Checks`) | `pii-leak` (no personal data leaked); in `CrsChecks`: `evidence-quoted` (the quotes are among the tool results), `signals-never-alert`, `rule-cited` (every indicium has its rule and page), `no-tin-valid-claim`. On `main`, the CRS agent has `pii-leak` and `evidence-quoted` active (#44); the other three are off, an R4 decision |
 
-### Modelele și fallback-ul
+### The models and the fallback
 
-- Amazon Bedrock, regiunea **us-west-2** (contul de workshop blochează Bedrock în `eu-central-1`), doar cu date sintetice.
-  În producție: o regiune UE sau un model pe serverele băncii (endpoint compatibil OpenAI).
-- Două profiluri: `extract` (Claude Haiku 5.5) pentru extrageri și clasificări mici; principal (Claude Sonnet 5.5) pentru
-  agent și textul către client.
-- **Lanțul care nu pică:** live → înregistrare (`Recordings/crs-sentinel.json`, încă neînregistrată) → mock. Mock-ul
-  cheamă uneltele reale, deci aplicația merge și fără internet sau chei. Replay-ul **nu** rulează uneltele: îl folosim doar
-  pentru întrebări care citesc (de exemplu „rezumă cazul”), niciodată pentru pași care schimbă date.
+- Amazon Bedrock, region **us-west-2** (the workshop account blocks Bedrock in `eu-central-1`), with synthetic data only.
+  In production: an EU region or a model on the bank's servers (OpenAI-compatible endpoint).
+- Two profiles: `extract` (Claude Haiku 5.5) for small extractions and classifications; the main one (Claude Sonnet 5.5)
+  for the agent and the text to the client.
+- **The chain that does not fail:** live → recording (`Recordings/crs-sentinel.json`, read-only live runs on Bedrock, #69) → mock. The mock
+  calls the real tools, so the app works even without internet or keys. Replay does **not** run the tools: we use it only
+  for read-only questions (for example "summarize the case"), never for steps that change data.
 
-## 7. Domeniul MVP
+## 7. MVP scope
 
-**În MVP:** persoane fizice; schimbările de situație după onboarding (nucleul); validarea unei autocertificări noi (caz
-secundar).
+**In the MVP:** individuals; changes in circumstances after onboarding (the core); validation of a new self-certification
+(secondary case).
 
-**Ce nu prindem încă:**
+**What we do not catch yet:**
 
-- conturile firmelor și persoanele care le controlează;
-- fișierul F3000 și formularele W-8BEN;
-- textul acoperit de o formă desenată peste el, în PDF; OCR pe scanări proaste;
-- existența unui TIN (verificăm doar formatul);
-- conturile preexistente cu valoare mare (peste 1.000.000 USD): acolo Comentariul OCDE (Secțiunea III, pct. 49, p. 125)
-  vorbește doar de cele 90 de zile de la identificarea indiciului;
-- integrarea reală cu sistemele băncii, ONRC sau ANAF.
+- company accounts and the persons who control them;
+- the F3000 file and the W-8BEN forms;
+- text covered by a shape drawn over it, in a PDF; OCR on poor scans;
+- whether a TIN exists (we check only the format);
+- high-value preexisting accounts (over USD 1,000,000): there the OECD Commentary (Section III, para. 49, p. 125) speaks
+  only of the 90 days from the identification of the indicium;
+- real integration with the bank's systems, ONRC or ANAF.
 
-## 8. Cazurile-etalon și metricile
+## 8. The golden cases and the metrics
 
-Rezultatul corect e scris **înainte** de cod: 18 scenarii (cu variantele 5a–5c și 17a–17b), fiecare cu intrarea exactă,
-decizia, regulile așteptate și pagina din ghid, în [`docs/GOLDEN-CASES.md`](docs/GOLDEN-CASES.md). Pe lângă ele, 50 de
-clienți sintetici (același seed → aceleași date), etichetați după scenariul ales la generare, nu după rezultatul motorului.
+The correct result is written **before** the code: 18 scenarios (with variants 5a–5c and 17a–17b), each with the exact
+input, the decision, the expected rules and the page from the guide, in [`docs/GOLDEN-CASES.md`](docs/GOLDEN-CASES.md)
+(Romanian). Besides them, 50 synthetic clients (same seed → same data), labelled by the scenario chosen at generation,
+not by the engine's result.
 
-Metricile vin doar din rulări reale (`/metrics` și testele), prezentate separat:
+The metrics come only from real runs (`/metrics` and the tests), presented separately:
 
-1. **Acoperirea specificației:** cazurile trec sau nu. Motorul e determinist, deci, când toate cazurile trec,
-   spunem „regulile din ghid sunt implementate și testate”, nu „acuratețe 100%”.
-2. **Unde există incertitudine:** extragerea din PDF câmp cu câmp, procentul de citate verificate și respinse, scutul pe
-   PDF-uri variate, semnalele care ar fi schimbat decizia (0 prin construcție, verificat la fiecare rulare).
-3. **Eficiența operațională:** timpul pe caz cu agentul, doar când se poate măsura dintr-o rulare. Azi `EvaluationService`
-   îl raportează „indisponibil”: rulările agentului nu sunt legate de cazuri. Nu îl comparăm cu un timp manual: nu avem o
-   estimare de la mentor.
+1. **Specification coverage:** the cases pass or they do not. The engine is deterministic, so, when all cases pass, we
+   say "the rules from the guide are implemented and tested", not "100% accuracy".
+2. **Where there is uncertainty:** field-by-field extraction from PDFs, the percentage of quotes verified and rejected,
+   the shield on varied PDFs, the signals that would have changed the decision (0 by construction, checked on every run).
+3. **Operational efficiency:** the time per case with the agent, only when it can be measured from a run. Today
+   `EvaluationService` reports it as "unavailable": the agent's runs are not linked to cases. We do not compare it with a
+   manual time: we have no estimate from the mentor.
 
-### Ultima rulare
+### The latest run
 
-Rularea pe commit-ul `e0bc47c`, 28.10.2026, 22:08, **fără model** (nicio cheie, niciun apel AI): pagina `/metrics`, cu
-aplicația pornită local, și `IEvaluationService.RunAsync()` chemat direct dau aceleași cifre. Pe `eaea3f3` (după #44, la
-22:14), `IEvaluationService` dă din nou aceleași cifre. Pe `0a467f1` (după #55, la 23:32), pagina `/metrics`, cu aplicația
-pornită fără `appsettings.Local.json` și fără credențiale AWS, dă aceleași cifre. Toate cifrele de mai jos vin din cod
-determinist, nu din AI.
+The run on commit `e0bc47c`, 28.10.2026, 22:08, **without a model** (no key, no AI call): the `/metrics` page, with the
+app started locally, and `IEvaluationService.RunAsync()` called directly give the same figures. On `eaea3f3` (after #44,
+at 22:14), `IEvaluationService` again gives the same figures. On `0a467f1` (after #55, at 23:32), the `/metrics` page,
+with the app started without `appsettings.Local.json` and without AWS credentials, gives the same figures. All figures
+below come from deterministic code, not from AI.
 
-**1. Acoperirea specificației** (motorul `crs-rules/1.2`): regulile din ghid sunt implementate și testate, pe 20 de
-cazuri-etalon cu date de intrare și pe 50 de clienți sintetici.
+**1. Specification coverage** (engine `crs-rules/1.2`): the rules from the guide are implemented and tested, on 20
+golden cases with input data and on 50 synthetic clients.
 
-| Set | Evaluate | Trec | Acțiuni așteptate | Prinse | Ratate | Alarme false |
+| Set | Evaluated | Pass | Expected actions | Caught | Missed | False alarms |
 | --- | --- | --- | --- | --- | --- | --- |
-| Cazurile-etalon | 20 (cazul 10 e la scut) | 20 | 13 | 13 | 0 | 0 |
-| Clienții sintetici | 50 | 50 | 10 | 10 | 0 | 0 |
+| The golden cases | 20 (case 10 is at the shield) | 20 | 13 | 13 | 0 | 0 |
+| The synthetic clients | 50 | 50 | 10 | 10 | 0 | 0 |
 
-**2. Unde există incertitudine**
+**2. Where there is uncertainty**
 
-| Ce | Rezultat |
+| What | Result |
 | --- | --- |
-| Scutul, pe 12 PDF-uri generate | 4 cu text ascuns (5 texte: alb 1, microscopic 2, în afara paginii 1, invizibil 1): toate 5 detectate, 0 ratate; 8 curate, 0 alarme false |
-| Citatele, pe banca de test a `EvidenceVerifier` (citate fixe, nu ale modelului) | 10 din 10 citate adevărate verificate; 4 din 4 citate doar din textul ascuns respinse; 38 din 38 de citate inventate respinse |
-| Extragerea autocertificării de către AI | nemăsurată: nu există încă o rulare live |
-| Semnalele care ar fi schimbat decizia | 0, prin construcție (motorul nu primește semnale), verificat la rulare |
+| The shield, on 12 generated PDFs | 4 with hidden text (5 texts: white 1, microscopic 2, off-page 1, invisible 1): all 5 detected, 0 missed; 8 clean, 0 false alarms |
+| The quotes, on the `EvidenceVerifier` test bench (fixed quotes, not the model's) | 10 of 10 true quotes verified; 4 of 4 quotes only from the hidden text rejected; 38 of 38 invented quotes rejected |
+| Extraction of the self-certification by the AI | not measured: there is no live run yet |
+| The signals that would have changed the decision | 0, by construction (the engine does not receive signals), checked at run time |
 
-**3. Eficiența operațională:** nemăsurată. Timpul agentului pe caz nu se poate măsura încă, iar timpul manual nu are sursă.
+**3. Operational efficiency:** not measured. The agent's time per case cannot be measured yet, and the manual time has
+no source.
 
-Nicio cifră fără rulare: la fiecare rulare nouă, tabelul se refă cu commit-ul, data și modul.
+No figure without a run: on every new run, the table is redone with the commit, the date and the mode.
 
-## 9. Confidențialitate
+## 9. Privacy
 
-- **Doar date sintetice.** Clienții, documentele și TIN-urile sunt generate; actele de identitate poartă „SPECIMEN”.
-- **Temeiul legal** este obligația legală (art. 6 alin. (1) lit. (c) GDPR). Codul de procedură fiscală (Legea 207/2015)
-  cere băncii să aplice procedurile de diligență fiscală din anexele nr. 1 și 2 (art. 291 alin. (4)) și să raporteze
-  anual conturile la ANAF (art. 62 alin. (1)); pentru FATCA, procedurile din Acordul FATCA (art. 62 alin. (3), Legea
-  233/2015). Citatele sunt în [`docs/PRIVACY-TEXT.md`](docs/PRIVACY-TEXT.md#7-surse).
-- **Păstrarea:** rulările agentului se șterg automat după `Privacy:RetentionDays` (implicit 30 de zile). Nicio regulă
-  de retenție nu șterge clienții, cazurile sau jurnalul. Legea cere băncii să păstreze înregistrările de diligență
-  fiscală și de raportare, și probele pe care s-a bazat, 10 ani de la termenul de raportare de 15 mai
-  (art. 62 alin. (11)).
-- **Art. 22 GDPR nu se aplică:** nicio decizie nu se ia exclusiv automat. Codul aplică regulile, omul aprobă cererea și
-  închiderea.
-- **Mascarea** CNP-urilor, IBAN-urilor, numerelor de card, e-mailurilor și telefoanelor (românești și internaționale, cu `+` sau `00`) înainte de model ține
-  de reducerea la minimum a datelor (art. 5 alin. (1) lit. (c) GDPR) și de securitatea prelucrării, prin pseudonimizare
-  și criptare (art. 32 alin. (1) lit. (a) GDPR).
-- Numele, adresele, datele de naștere și TIN-urile străine nu sunt mascate înainte de model (datele
-  sunt sintetice). Pagina `/privacy` arată, din configurația live, ce ajunge la care model, ce se salvează și cât timp.
+- **Synthetic data only.** The clients, documents and TINs are generated; identity documents carry "SPECIMEN".
+- **The legal basis** is the legal obligation (Art. 6(1)(c) GDPR). The Fiscal Procedure Code (Law 207/2015) requires the
+  bank to apply the tax due diligence procedures from annexes no. 1 and 2 (Art. 291(4)) and to report the accounts to
+  ANAF every year (Art. 62(1)); for FATCA, the procedures from the FATCA Agreement (Art. 62(3), Law 233/2015). The
+  quotes are in [`docs/PRIVACY-TEXT.md`](docs/PRIVACY-TEXT.md#7-surse) (Romanian).
+- **Retention:** the agent's runs are deleted automatically after `Privacy:RetentionDays` (default 30 days). No
+  retention rule deletes the clients, the cases or the audit log. The law requires the bank to keep the tax due diligence
+  and reporting records, and the evidence they relied on, for 10 years from the 15 May reporting deadline
+  (Art. 62(11)).
+- **Art. 22 GDPR does not apply:** no decision is taken solely by automated means. The code applies the rules, the human
+  approves the request and the closing.
+- **Masking** of CNPs, IBANs, card numbers, e-mails and phone numbers (Romanian and international, with `+` or `00`) before the model serves
+  data minimisation (Art. 5(1)(c) GDPR) and the security of processing, through pseudonymisation and encryption
+  (Art. 32(1)(a) GDPR).
+- Names, addresses, dates of birth and foreign TINs are not masked before the model (the data is synthetic). The
+  `/privacy` page shows, from the live configuration, what reaches which model, what is saved and for how long.
 
-## 10. Pornire rapidă
+## 10. Quick start
 
 ```bash
-tools/setup-dev.sh                              # o singură dată: .NET 10, build, Chromium pentru testele E2E
-dotnet run --project src/HackathonStarter       # http://localhost:5000, merge pe mock fără nicio cheie
-dotnet test tests/HackathonStarter.Tests        # teste unitare, fără rețea
-dotnet test tests/HackathonStarter.E2E          # teste în browser; pornesc singure aplicația
+tools/setup-dev.sh                              # once: .NET 10, build, Chromium for the E2E tests
+dotnet run --project src/HackathonStarter       # http://localhost:5000, runs on the mock with no key
+dotnet test tests/HackathonStarter.Tests        # unit tests, no network
+dotnet test tests/HackathonStarter.E2E          # browser tests; they start the app themselves
 ```
 
-Pe macOS, pasul Chromium din `tools/setup-dev.sh` pică (scriptul cheamă driverul `linux-x64`). După build, rulează:
-`tests/HackathonStarter.E2E/bin/Debug/net10.0/.playwright/node/darwin-arm64/node tests/HackathonStarter.E2E/bin/Debug/net10.0/.playwright/package/cli.js install chromium` (pe Mac cu Intel: `darwin-x64`).
+Dependencies: only the .NET 10 SDK (`global.json`); `tools/setup-dev.sh` checks it, runs the build and installs Chromium
+for E2E on Linux and macOS (Intel and Apple Silicon, #72). No Docker, no external database, no keys.
 
-Sau deschide `HackathonStarter.slnx` în Visual Studio, Rider sau VS Code și pornește proiectul `HackathonStarter`.
-Baza de date SQLite se creează la pornire, cu datele demo. Utilizatori demo (meniul din bara de sus): Ana (operator,
-admin), Mihai (departamentul fiscal, member), Vera (viewer, nu poate aproba).
+Or open `HackathonStarter.slnx` in Visual Studio, Rider or VS Code and start the `HackathonStarter` project. The SQLite
+database is created on startup, with the demo data. Demo users (the menu in the top bar): Ana (operator, admin), Mihai
+(tax department, member), Vera (viewer, cannot approve).
 
-**Bedrock live (opțional):** credențialele vin doar din lanțul implicit AWS (variabile de mediu, profil local sau rol
-IAM), niciodată din repo. În `appsettings.Local.json` (ignorat de git): `"AI": { "Provider": "Bedrock", "Region":
-"us-west-2", ... }`, după exemplul din `appsettings.Local.example.json`.
+**Live Bedrock (optional):** credentials come only from the AWS default chain (environment variables, local profile or
+IAM role), never from the repo. In `appsettings.Local.json` (ignored by git): `"AI": { "Provider": "Bedrock", "Region":
+"us-west-2", ... }`, following the example in `appsettings.Local.example.json`.
 
-**Deploy:** Render, din `render.yaml` și `Dockerfile`; `main` se publică doar după ce CI-ul e verde
+**Deploy:** Render, from `render.yaml` and `Dockerfile`; `main` is published only after CI is green
 ([`docs/DEPLOY.md`](docs/DEPLOY.md)).
 
-## 11. Stare
+## 11. Status
 
-Lucrăm în paralel, pe module; fiecare PR intră doar cu CI verde (build cu 0 warnings, teste unitare și E2E).
+We work in parallel, by module; each PR goes in only with green CI (build with 0 warnings, unit and E2E tests).
 
-Starea de pe `main` la commit-ul `0a467f1`, verificată local pe 28.10.2026, la 23:30: `dotnet build -warnaserror` fără
-warnings, testele unitare 1315 din 1315, E2E 30 din 30. Aplicația pornește fără `appsettings.Local.json` și fără
-credențiale AWS, pe mock.
+The state of `main` at commit `ed0d4eb`, checked locally on 29.10.2026, at 01:30: `dotnet build -warnaserror` with no
+warnings, unit tests 1414 of 1415 (1 skipped: Maria on Bedrock, runs only with `CRS_LIVE`), E2E 39 of 39. The app starts without `appsettings.Local.json` and without
+AWS credentials, on the mock.
 
-| Modul | Rol | Pe `main` | În lucru | Lipsește |
+| Module | Role | On `main` | In progress | Missing |
 | --- | --- | --- | --- | --- |
-| Documentația: planul, regulile verificate, paginile ghidului, cazurile-etalon, sursele, scenariul video, textul `/privacy` | toți | da (#1–#4, #6, #7, #10, #12, #14, #15, #19, #30, #33, #34) | | |
-| Contractele și entitățile (Faza 0), `SimClock` | integrator | da (#13, #18) | | |
-| `CrsRuleEngine`, `RuleCatalog`, `GoldenEngineTests` | R1 | da (#16, #37, #41) | | |
-| `ChangeService`, `CaseService` (stările cazului), `DeadlineCalculator`, `DeadlineWatcher`, `SimClockControl`, cazurile de flux cap-coadă, resetarea demo-ului | R2 | da (#28, #40, #43, #55; meniul „Demo” cu data simulată în #49) | | |
-| `HiddenTextShield`, `EvidenceVerifier`, `TinFormat` + TIN on Europa, `AuditLog`; scanarea unui document nescanat din pagina clientului | R3 | da (#23, #48) | | |
-| Pagina `/privacy` (jurnal, TIN on Europa, Bedrock, retenție, temeiul legal) | R3 | da (#26) | | |
-| Provider Bedrock | R4 | da (#5) | | |
-| Runtime-ul agentului (aprobarea oprește rularea, o aprobare rulează o singură dată), verificările CRS pe răspuns, mascarea telefoanelor străine | R4 | da (#20, #35, #51, #52) | | |
-| `CrsSentinelAgent`: cele 14 unelte, system prompt-ul, mock RO/EN (Maria cap-coadă), verificările active; mock-ul scrie doar la cele două acțiuni ale cazului (mesajele fixe din `SentinelActions`) | R4 | da (#44, #47) | #53 (ecranele cazului cu panoul agentului), #54 (Maria live pe Bedrock) | butoanele „Analizează dosarul” și „Verifică răspunsul” pe pagina cazului (nu sunt pe `main`); pasul din UI care pune autocertificarea Mariei în dosar |
-| Datele: 50 de clienți sintetici, PDF-urile cazurilor-etalon, cazurile-etalon transcrise, seed-ul | R5 | da (#8, #9, #11, #17, #21, #22, #25, #27, #31, #36, #39) | | |
-| `EvaluationService` (cele trei feluri de cifre) și pagina `/metrics` | R5 | da (#29, #38, #42) | | |
-| Pagina clientului `/clients`, `/clients/{code}` (adrese, conturi, ordine permanente, autocertificări, documente, cazuri) | R5 | da (#45) | | |
-| Paginile CRS: `/dashboard`, `/cases`, `/cases/{code}` (ceasul termenului, cererea, răspunsul, închiderea cu aprobare), `/changes/new`, meniul „Demo” | UI | da (#49) | | |
-| README-ul și pitch-ul la zi cu `main` | R5 | da (#46) | | |
-| Landing-ul și subsolurile | R5 | da (#24, #32) | | |
+| The documentation: the plan, the verified rules, the guide pages, the golden cases, the sources, the video script, the `/privacy` text | all | yes (#1–#4, #6, #7, #10, #12, #14, #15, #19, #30, #33, #34) | | |
+| The contracts and entities (Phase 0), `SimClock` | integrator | yes (#13, #18) | | |
+| `CrsRuleEngine`, `RuleCatalog`, `GoldenEngineTests` | R1 | yes (#16, #37, #41) | | |
+| `ChangeService`, `CaseService` (the case states), `DeadlineCalculator`, `DeadlineWatcher`, `SimClockControl`, the end-to-end flow cases, the demo reset | R2 | yes (#28, #40, #43, #55; the "Demo" menu with the simulated date in #49) | | |
+| `HiddenTextShield`, `EvidenceVerifier`, `TinFormat` + TIN on Europa, `AuditLog`; scanning an unscanned document from the client page | R3 | yes (#23, #48) | | |
+| The `/privacy` page (audit log, TIN on Europa, Bedrock, retention, the legal basis) | R3 | yes (#26) | | |
+| Bedrock provider | R4 | yes (#5) | | |
+| The agent runtime (an approval stops the run, an approval runs only once), the CRS checks on the answer, the masking of foreign phone numbers | R4 | yes (#20, #35, #51, #52) | | |
+| `CrsSentinelAgent`: the 14 tools, the system prompt, RO/EN mock (Maria end to end), the active checks; the mock writes only on the two case actions (the fixed messages from `SentinelActions`) | R4 | yes (#44, #47, #54; the agent panel on the case page and "The client answers" in #59; the read-only recordings in #69) | | |
+| The data: 50 synthetic clients, the golden-case PDFs, the transcribed golden cases, the seed | R5 | yes (#8, #9, #11, #17, #21, #22, #25, #27, #31, #36, #39) | | |
+| `EvaluationService` (the three kinds of figures) and the `/metrics` page | R5 | yes (#29, #38, #42) | | |
+| The client page `/clients`, `/clients/{code}` (addresses, accounts, standing orders, self-certifications, documents, cases) | R5 | yes (#45) | | |
+| The CRS pages: `/dashboard`, `/cases`, `/cases/{code}` (the deadline clock, the request, the answer, the closing with approval), `/changes/new`, the "Demo" menu | UI | yes (#49) | | |
+| The README and the pitch up to date with `main` | R5 | yes (#46) | | |
+| The landing page and the footers | R5 | yes (#24, #32) | | |
 
-**Paginile CRS, așa cum sunt acum pe `main`:**
+**The CRS pages, as they are now on `main`:**
 
-| Pagina | Ce arată |
+| The page | What it shows |
 | --- | --- |
-| `/audit` | Lanțul de hash-uri, „Verifică” (toți) și „Falsifică” („Tamper” în EN, doar admin). La pornire are intrările istoricului din seed (#39) |
-| `/metrics` | Cele trei feluri de cifre din `EvaluationService`, cu „Rulează din nou”, caz cu caz (§8) |
-| `/privacy` | Textul actualizat (#26) |
-| `/clients`, `/clients/{code}` | Lista clienților și fișa clientului (#45). Documentele nescanate au „Înregistrează încărcarea și scanează” (admin, member): extrasul lui Victor ridică semnalul roșu al scutului, cu fragmentul scos (#48) |
-| `/changes/new` | Înregistrează o schimbare (sau un caz-etalon din meniul „Demo”) și arată pe loc verdictul motorului de reguli (#49) |
-| `/cases`, `/cases/{code}` | Coada cazurilor și fișa cazului: indiciile cu regula și pagina, semnalele, dovezile, corespondența, jurnalul cazului și pasul următor, manual: ciorna cererii, „Aprobă și trimite”, „Înregistrează răspunsul”, „Aprobă închiderea”. Meniul „Demo” are „La ziua mementoului” și „Completează răspunsul-exemplu” (#49) |
-| `/runs`, `/runs/{id}` | Rulările agenților, cu pașii și „Aprobă” / „Respinge”; aici se aprobă azi rulările `crs-sentinel` pornite prin API |
-| `/settings` | „Resetează datele demo” (admin) readuce datele CRS, jurnalul și data simulată la starea de la pornire (#43) |
-| `/dashboard` | Cazurile CRS: deschise, cu termen în 7 zile, în așteptarea aprobării, escaladate; următoarele termene (#49) |
+| `/audit` | The hash chain, "Verify" (everyone) and "Tamper" (admin only). On startup it has the history entries from the seed (#39) |
+| `/metrics` | The three kinds of figures from `EvaluationService`, with "Run again", case by case (§8) |
+| `/privacy` | The updated text (#26) |
+| `/clients`, `/clients/{code}` | The list of clients and the client record (#45). Unscanned documents have "Record the upload and scan" (admin, member): Victor's statement raises the shield's red flag, with the removed fragment (#48) |
+| `/changes/new` | Records a change (or a golden case from the "Demo" menu) and shows the rule engine's verdict on the spot (#49) |
+| `/cases`, `/cases/{code}` | The case queue and the case record: the indicia with the rule and the page, the signals, the evidence, the correspondence, the case audit log, the "CRS Sentinel" panel ("Analyze the file", "Check the answer", the approvals, #59) and the next step, and manually: the draft request, "Approve and send", "Register the answer", "Approve the closing". The "Demo" menu has "To the reminder day", "Past the deadline", "Fill in the sample answer" (#49) and "The client answers" (#59) |
+| `/runs`, `/runs/{id}` | The agent runs, with the steps and "Approve" / "Reject"; the `crs-sentinel` runs started from the case panel are opened from here with "Open the run" |
+| `/settings` | "Reset demo data" (admin) brings the CRS data, the audit log and the simulated date back to their state at startup (#43) |
+| `/dashboard` | The CRS cases: open, with a deadline within 7 days, awaiting approval, escalated; the upcoming deadlines (#49) |
 
-## 12. Documentația
+## 12. Documentation
 
-| Document | Ce conține |
+| Document | What it contains |
 | --- | --- |
-| [`docs/PLAN.md`](docs/PLAN.md) | Planul de implementare: domeniul, modelul de date, regulile, arhitectura, rolurile, programul |
-| [`docs/CUM-FUNCTIONEAZA.md`](docs/CUM-FUNCTIONEAZA.md) | Sistemul cap-coadă, pe înțelesul oricui din echipă |
-| [`docs/reguli-verificate.md`](docs/reguli-verificate.md) | Fiecare regulă, verificată pe textul ghidului, cu pagina |
-| [`docs/GOLDEN-CASES.md`](docs/GOLDEN-CASES.md) | Datele exacte ale cazurilor-etalon |
-| [`docs/RESEARCH-CRS.md`](docs/RESEARCH-CRS.md) | Faptele din ghid și întrebările pentru mentor |
-| [`docs/PITCH.md`](docs/PITCH.md), [`docs/SUBMISSION.md`](docs/SUBMISSION.md) | Scenariul video și checklist-ul de predare |
-| [`docs/ui/macheta-caz.html`](docs/ui/macheta-caz.html) | Macheta paginii cazului |
-| [`AGENTS.md`](AGENTS.md) | Convențiile de cod, pentru oameni și pentru asistenții AI |
-| [`docs/TEMPLATE.md`](docs/TEMPLATE.md) | Referința template-ului: runtime-ul de agenți, configurarea, API-ul HTTP, comenzile |
+| [`docs/PLAN.md`](docs/PLAN.md) (Romanian) | The implementation plan: the domain, the data model, the rules, the architecture, the roles, the schedule |
+| [`docs/CUM-FUNCTIONEAZA.md`](docs/CUM-FUNCTIONEAZA.md) (Romanian) | The system end to end, understandable by anyone on the team |
+| [`docs/reguli-verificate.md`](docs/reguli-verificate.md) (Romanian) | Every rule, verified against the text of the guide, with its page |
+| [`docs/GOLDEN-CASES.md`](docs/GOLDEN-CASES.md) (Romanian) | The exact data of the golden cases |
+| [`docs/RESEARCH-CRS.md`](docs/RESEARCH-CRS.md) (Romanian) | The facts from the guide and the questions for the mentor |
+| [`docs/PITCH.md`](docs/PITCH.md), [`docs/SUBMISSION.md`](docs/SUBMISSION.md), [`docs/PRESENTATION.md`](docs/PRESENTATION.md) | The video script, the submission (the form, the links, the jury criteria) and the slides |
+| [`docs/ui/macheta-caz.html`](docs/ui/macheta-caz.html) | The mock-up of the case page |
+| [`AGENTS.md`](AGENTS.md) | The code conventions, for people and for AI assistants |
+| [`docs/TEMPLATE.md`](docs/TEMPLATE.md) | The template reference: the agent runtime, configuration, the HTTP API, the commands |
 
-## 13. Template-ul
+## 13. The template
 
-Am pornit de la template-ul .NET al echipei, scris înainte de hackathon (commit-ul `381d8c2` din istoricul repo-ului):
-.NET 10, Blazor Server, MudBlazor, EF Core, Microsoft.Extensions.AI. De acolo vin runtime-ul de agenți (unelte, aprobări,
-rulări în fundal, înregistrări, mock), mascarea datelor personale, verificările deterministe, `TargetClient`, datele
-sintetice, PWA-ul și pipeline-ul de deploy. Tot ce ține de CRS e scris în timpul hackathonului, începând cu 28 octombrie
-2026. [Rulebook-ul](https://nexxtsummit.com/rulebook) nu interzice codul scris înainte și cere doar ca lucrul pe temă să
-înceapă la startul oficial (28 oct., 09:00); organizatorii au confirmat pe 28 oct. Documentația template-ului:
-[`docs/TEMPLATE.md`](docs/TEMPLATE.md).
+We started from the team's .NET template, written before the hackathon (commit `381d8c2` in the repo history): .NET 10,
+Blazor Server, MudBlazor, EF Core, Microsoft.Extensions.AI. From there come the agent runtime (tools, approvals,
+background runs, recordings, mock), the masking of personal data, the deterministic checks, `TargetClient`, the
+synthetic data, the PWA and the deploy pipeline. Everything related to CRS was written during the hackathon, starting
+on 28 October 2026. The [rulebook](https://nexxtsummit.com/rulebook) does not forbid code written beforehand and only
+requires that work on the challenge start at the official start (28 Oct, 09:00); the organisers confirmed this on
+28 Oct. The template documentation: [`docs/TEMPLATE.md`](docs/TEMPLATE.md).
