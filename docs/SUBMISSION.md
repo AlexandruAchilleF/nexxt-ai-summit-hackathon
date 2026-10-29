@@ -1,4 +1,4 @@
-# Submission: CRS Sentinel (Raiffeisen, AI for Operational Efficiency)
+# Submission: TRACE (Raiffeisen, AI for Operational Efficiency)
 
 The organizers' deadline: **Thursday, 29 Oct 2026, 11:00**. We submit by **10:30** (uploading and processing the video
 takes time). What the organizers ask for, from the submission checklist:
@@ -20,9 +20,9 @@ The plan: [`PLAN.md`](PLAN.md) (Romanian) and [`PLAYBOOK.md`](PLAYBOOK.md) (Roma
 
 **Team name:** `[to fill in]` · **Team lead, e-mail:** `[to fill in]`
 
-**Project title:** CRS Sentinel
+**Project title:** TRACE (Tax Residency Anomaly Correlation Engine)
 
-**Short description:** CRS Sentinel turns every change to a customer's data (address, phone, standing order, power of
+**Short description:** TRACE turns every change to a customer's data (address, phone, standing order, power of
 attorney) into an explained CRS/FATCA decision before the legal deadline runs out. The rules of the ANAF guide are code,
 each with its ID and page; the AI agent reads the documents, quotes the evidence and drafts the letter to the customer; the
 operator approves sending it and closing the case.
@@ -33,7 +33,7 @@ operator approves sending it and closing the case.
 > every account wrongly to ANAF. For a new account it has 90 days to obtain a new self-certification (ANAF guide, p. 35-36).
 > Today a person compares fields against the guide, writes to the customer and remembers the deadline.
 >
-> CRS Sentinel automates the repetitive part with one tool-using agent orchestrated by code, with a person deciding.
+> TRACE automates the repetitive part with one tool-using agent orchestrated by code, with a person deciding.
 > Deterministic, tested C# applies the closed list of CRS and FATCA indicia (each rule with its guide page), computes the
 > deadline, checks every quote the model returns against the document, checks the TIN format and keeps a SHA-256
 > hash-chained audit log. The model (Claude on Amazon Bedrock) only reads documents, records quoted evidence and context
@@ -72,7 +72,7 @@ The sample inputs are in the app: 50 synthetic clients, the golden-case PDFs and
 | Originality | 15% | The core is after onboarding (changes of circumstances); the guide's rules as code with a page; the hidden-text shield; the audit log that shows where it was tampered with | Video S2, S6, S7; slide 4 |
 | Problem and domain research | 15% | The ANAF guide of 29.12.2025, page by page; the verified rules; the traps (depository account, RO phone, move within the country); the design interpretations stated openly; the preexisting-account deadline with the law and the Directive | README §4–5, `docs/reguli-verificate.md` (Romanian), video S5; slide 3 |
 | Agent design and orchestration | 25% | 14 tools, two approval stops, quotes checked by code, signals with no effect, fallback live → recording → mock; unexpected situations: hidden text, invented quote, model unavailable | Video S3, S4, S6, S7; README §6; slide 5 |
-| Functional completeness and testability | 20% | One end-to-end scenario from the UI; 1414 unit tests (1 live test skipped) and 39 E2E tests green; `/metrics` with the result written beforehand | "How the jury can check it"; video S8; slide 6 |
+| Functional completeness and testability | 20% | One end-to-end scenario from the UI; 1602 unit tests (2 live tests skipped) and 52 E2E tests green; `/metrics` with the result written beforehand | "How the jury can check it"; video S8; slide 6 |
 | Architecture and reproducibility | 15% | Pure modules (`Rules`, `Deadlines`, `Shield`, `Tin`) separate from the services and the agent; starts with no configuration; Docker + Render | README §6 and §10; `/architecture`; slide 7 |
 | Business mentoring | 10% | The user, the benefit, the adoption barriers, the next step | `PITCH.md` §5b; slide 8 |
 
@@ -134,9 +134,9 @@ Tips:
 
 ## Code checklist
 
-- [x] `dotnet build -warnaserror` with no warnings, unit tests 1414 of 1415 (1 live test skipped, it needs Bedrock), E2E
-      39 of 39, on `ed0d4eb` (29 Oct 2026, 01:30)
-- [ ] The app starts **without** `appsettings.Local.json` and without AWS, on the final version
+- [x] `dotnet build -warnaserror` with no warnings, unit tests 1602 of 1604 (2 live tests skipped, they need Bedrock), E2E
+      52 of 52, on `9e67e06` (29 Oct 2026)
+- [x] The app starts **without** `appsettings.Local.json` and without AWS, on `9e67e06`; the DemoFilm route S1-S9 runs on it
 - [ ] README: what it does, how to start it, the architecture, what is AI and what is code, the MVP scope, the design
       interpretations, the video link
 - [x] **No secret in the repo (it is public):** `git log -p` on `main` finds no real AWS (`AKIA...`) or Anthropic keys
