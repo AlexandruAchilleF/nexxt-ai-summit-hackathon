@@ -118,7 +118,7 @@ public class AppTests(AppFixture app)
         await AskAsync(page, "Arhivează elementul „Write demo script”");
         await Assertions.Expect(page.GetByText("Approval needed")).ToBeVisibleAsync();
         await page.GetByRole(AriaRole.Button, new() { Name = "Approve" }).ClickAsync();
-        await Assertions.Expect(page.GetByText("Approved by Ana Admin").First).ToBeVisibleAsync();
+        await Assertions.Expect(page.GetByText("Approved by Ana Popa").First).ToBeVisibleAsync();
     }
 
     [Fact]

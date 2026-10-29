@@ -1,14 +1,24 @@
+::deep .client-grid-cell {
+    display: flex;
+    min-width: 0;
+}
+
 .client-card {
     display: block;
+    flex: 1;
+    min-width: 0;
     padding: 20px;
 }
 
 .client-card h2 {
-    margin: 0 0 4px;
+    margin: 0 0 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--app-separator);
 }
 
 .client-card .app-card-sub {
     margin: 0 0 8px;
+    line-height: 1.5;
 }
 
 .client-none {
@@ -44,6 +54,7 @@
     flex: 1;
     min-width: 0;
     font-size: 14px;
+    overflow-wrap: anywhere;
 }
 
 .client-row-tags {

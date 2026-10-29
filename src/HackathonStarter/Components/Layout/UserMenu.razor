@@ -1,16 +1,20 @@
 @inject CurrentUser CurrentUser
 @inject NavigationManager Nav
 
-@* Demo users instead of login: one click switches user (real cookie auth with roles). *@
-<MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" Class="ml-1">
+@* Staff demo profiles use the same role checks as services and agent approvals. *@
+<MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" Class="ml-1 staff-menu">
     <ActivatorContent>
-        <MudChip T="string" Variant="Variant.Text" Class="px-1" OnClick="@(e => context.ToggleAsync(e))">
+        <MudButton Variant="Variant.Text" Color="Color.Inherit" Class="staff-profile" OnClick="@(e => context.ToggleAsync(e))"
+                   aria-label="@T("Switch staff profile")" EndIcon="@Icons.Material.Rounded.ExpandMore">
             <MudAvatar Size="Size.Small" Style="@($"background:{_user?.Color};color:white;font-size:12px")">@_user?.Initials</MudAvatar>
-            <span class="ml-2 d-none d-sm-inline">@_user?.Name</span>
-        </MudChip>
+            <span class="staff-profile-text d-none d-sm-flex">
+                <span>@_user?.Name</span>
+                <span class="staff-profile-role">@RoleLabel(_user?.Role)</span>
+            </span>
+        </MudButton>
     </ActivatorContent>
     <ChildContent>
-        <MudText Typo="Typo.caption" Class="px-4 pt-2 mud-text-secondary">@T("Switch demo user")</MudText>
+        <MudText Typo="Typo.caption" Class="px-4 pt-2 mud-text-secondary">@T("Staff demo profiles")</MudText>
         @foreach (var u in SiteConfig.Users)
         {
             <MudMenuItem OnClick="() => Switch(u)">
@@ -18,7 +22,7 @@
                     <MudAvatar Size="Size.Small" Style="@($"background:{u.Color};color:white;font-size:12px")">@u.Initials</MudAvatar>
                     <div>
                         <MudText Typo="Typo.body2">@u.Name</MudText>
-                        <MudText Typo="Typo.caption" Class="mud-text-secondary">@T(u.Role)</MudText>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">@RoleLabel(u.Role)</MudText>
                     </div>
                     @if (u.Id == _user?.Id)
                     {
@@ -34,6 +38,14 @@
     private DemoUser? _user;
 
     protected override async Task OnInitializedAsync() => _user = await CurrentUser.GetAsync();
+
+    private static string RoleLabel(string? role) => role switch
+    {
+        Roles.Operator => T("Operator"),
+        Roles.TaxDepartment => T("Tax department"),
+        Roles.Viewer => T("Read-only access"),
+        _ => "",
+    };
 
     private void Switch(DemoUser user)
     {

@@ -1,4 +1,4 @@
-<a href="/" class="brand-logo@(Compact ? " brand-logo-compact" : "")">
+<a href="/" class="brand-logo@(Compact ? " brand-logo-compact" : "")" aria-label="@($"{SiteConfig.Name} — {SiteConfig.FullName}")">
     <span class="brand-logo-mark">
         @if (SiteConfig.Logo.StartsWith('/'))
         {
@@ -9,7 +9,10 @@
             @SiteConfig.Logo
         }
     </span>
-    <span class="brand-logo-name">@SiteConfig.Name</span>
+    <span class="brand-logo-wordmark">
+        <span class="brand-logo-name">@SiteConfig.Name</span>
+        <span class="brand-logo-description">@SiteConfig.FullName</span>
+    </span>
 </a>
 
 @code {

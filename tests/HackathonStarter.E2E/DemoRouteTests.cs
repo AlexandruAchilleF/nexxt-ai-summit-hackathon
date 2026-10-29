@@ -147,7 +147,7 @@ public class DemoRouteTests(AppFixture app)
             await Assertions.Expect(next).ToContainTextAsync("Proof of confirmation");
             await Assertions.Expect(Fact(next, "Channel")).ToHaveTextAsync("Online · Electronic acceptance");
             await Assertions.Expect(Fact(next, "Signed by")).ToHaveTextAsync(clientName);
-            await Assertions.Expect(Fact(next, "Approved by")).ToHaveTextAsync("Ana Admin");
+            await Assertions.Expect(Fact(next, "Approved by")).ToHaveTextAsync("Ana Popa");
             await Assertions.Expect(Fact(next, "SHA-256")).ToHaveTextAsync(new Regex("^[0-9a-f]{16}…$"));
 
             // 6. The audit log: the case's steps in order (newest first) and the hash chain intact.

@@ -169,7 +169,7 @@ public class SentinelGuardsTests
         var result = decided.Steps.Last(s => s.Kind == StepKind.ToolResult);
         Assert.Contains("role", result.Error);
         Assert.DoesNotContain(decided.Steps, s => s.Kind == StepKind.Text && s.Text.Contains("Done:", StringComparison.Ordinal));
-        Assert.StartsWith("Approved by Mihai Member, but the action failed:", decided.Steps.Last(s => s.Kind == StepKind.Text).Text);
+        Assert.StartsWith("Approved by Mihai Stan, but the action failed:", decided.Steps.Last(s => s.Kind == StepKind.Text).Text);
         Assert.Equal(RunStatus.Error, decided.Status);
         var item = (await host.CaseAsync(code))!;
         Assert.Equal(CaseStatus.Open, item.Status);

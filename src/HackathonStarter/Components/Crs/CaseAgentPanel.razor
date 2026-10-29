@@ -16,7 +16,7 @@
 <MudPaper Outlined="true" Class="pa-4 case-agent" Style="min-width:0">
     <div class="crs-head">
         <div>
-            <div class="app-card-title d-flex align-center gap-1"><MudIcon Icon="@Icons.Material.Rounded.SmartToy" Style="font-size:18px" /> CRS Sentinel</div>
+            <div class="app-card-title d-flex align-center gap-1"><MudIcon Icon="@Icons.Material.Rounded.SmartToy" Style="font-size:18px" /> @SiteConfig.Name</div>
             <div class="crs-hint">@T("The agent reads the documents, records the quotes and the signals and drafts the letter. Code decides; nothing is sent or closed without your approval.")</div>
         </div>
         @if (IsEditor && Case.IsOpen)

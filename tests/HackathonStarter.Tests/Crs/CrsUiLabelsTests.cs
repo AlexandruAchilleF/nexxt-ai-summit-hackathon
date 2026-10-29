@@ -8,13 +8,13 @@ namespace HackathonStarter.Tests.Crs;
 public class CrsUiLabelsTests
 {
     [Theory]
-    [InlineData("en-US", "agent:crs-sentinel for user:admin", "CRS Sentinel for Ana Admin")]
-    [InlineData("ro-RO", "agent:crs-sentinel for user:admin", "CRS Sentinel pentru Ana Admin")]
-    [InlineData("en-US", "agent:crs-sentinel", "CRS Sentinel")]
+    [InlineData("en-US", "agent:crs-sentinel for user:admin", "TRACE for Ana Popa")]
+    [InlineData("ro-RO", "agent:crs-sentinel for user:admin", "TRACE pentru Ana Popa")]
+    [InlineData("en-US", "agent:crs-sentinel", "TRACE")]
     [InlineData("en-US", "system:seed", "Seed history")]
     [InlineData("en-US", "system:watcher", "System")]
-    [InlineData("en-US", "user:admin", "Ana Admin")]
-    [InlineData("en-US", "admin", "Ana Admin")]
+    [InlineData("en-US", "user:admin", "Ana Popa")]
+    [InlineData("en-US", "admin", "Ana Popa")]
     public void Actors_read_as_people_and_systems(string culture, string actor, string expected)
     {
         using var _ = new UiLanguage(culture);

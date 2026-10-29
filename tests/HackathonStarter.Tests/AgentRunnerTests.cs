@@ -123,7 +123,7 @@ public class AgentRunnerTests
         Assert.Equal("Item 999 not found", decided.Steps.Single(s => s.Kind == StepKind.ToolResult).Error);
         var card = decided.Steps.Single(s => s.Kind == StepKind.Approval);
         Assert.Equal((ApprovalState.Approved, "Item 999 not found"), (card.State!.Value, card.Error));
-        Assert.Equal("Approved by Ana Admin, but the action failed: Item 999 not found.", decided.Steps.Last(s => s.Kind == StepKind.Text).Text);
+        Assert.Equal("Approved by Ana Popa, but the action failed: Item 999 not found.", decided.Steps.Last(s => s.Kind == StepKind.Text).Text);
         Assert.DoesNotContain(decided.Steps, s => s.Text.Contains("Done:"));
         Assert.Equal(RunStatus.Error, (await host.Get<RunStore>().GetAsync(run.Id))!.Status);
     }

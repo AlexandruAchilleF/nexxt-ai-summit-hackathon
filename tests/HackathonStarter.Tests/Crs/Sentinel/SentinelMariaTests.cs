@@ -68,7 +68,7 @@ public class SentinelMariaTests
         var signal = Assert.Single(prepared.Signals);
         Assert.Equal("Angajator: Müller Logistik GmbH", prepared.Evidence.Single(e => e.Id == signal.EvidenceId).Quote);
         Assert.Equal(RequestStatus.Draft, Assert.Single(prepared.Requests).Status);
-        Assert.Equal("agent:crs-sentinel for user:admin", Assert.Single(prepared.Requests).DraftedBy); // not "Drafted by Ana Admin"
+        Assert.Equal("agent:crs-sentinel for user:admin", Assert.Single(prepared.Requests).DraftedBy); // not "Drafted by Ana Popa"
 
         // Ana approves: the tool runs now, without the model.
         var approved = await host.DecideAsync(run1, SentinelTools.SendClientRequest);
@@ -112,7 +112,7 @@ public class SentinelMariaTests
         Assert.Equal(GoldenCases.Get("4").Response!.RuleId, closed.OutcomeRuleId);
         Assert.Equal(ConfirmationChannel.Online, closed.Proof!.Channel);
         Assert.Equal($"DOC-{documentId}", closed.Proof.TransactionOrDocumentId);
-        Assert.Equal("Ana Admin", closed.Proof.ApprovedBy);
+        Assert.Equal("Ana Popa", closed.Proof.ApprovedBy);
 
         // The audit log has every step, in order, and its hash chain is intact.
         var kinds = await host.AuditKindsAsync();
@@ -210,8 +210,8 @@ public class SentinelMariaTests
 
         Assert.Contains("Documente cerute: O autocertificare nouă sau o explicație rezonabilă și documentele aferente (dacă este cazul); Dovada noii adrese.", run1.Answer());
         Assert.Contains("- Dovada noii adrese", letter);
-        Assert.StartsWith($"Aprobată de Ana Admin. Executată: Trimite cererea pentru cazul {code} prin email:", run1.Steps.Last(st => st.Kind == StepKind.Text).Text);
-        Assert.Equal($"Aprobată de Ana Admin. Executată: Închide cazul {code} (canal: Online); codul reevaluează mai întâi regulile.", run2.Steps.Last(st => st.Kind == StepKind.Text).Text);
+        Assert.StartsWith($"Aprobată de Ana Popa. Executată: Trimite cererea pentru cazul {code} prin email:", run1.Steps.Last(st => st.Kind == StepKind.Text).Text);
+        Assert.Equal($"Aprobată de Ana Popa. Executată: Închide cazul {code} (canal: Online); codul reevaluează mai întâi regulile.", run2.Steps.Last(st => st.Kind == StepKind.Text).Text);
         Assert.Contains("Citatele sunt dovezi verificate", shown);
         Assert.Contains("Toate citatele (1) sunt dovezi verificate.", shown);
         Assert.Contains("Reevaluare în cod (evaluateRules): Conform (Compliant).", run2.Answer());

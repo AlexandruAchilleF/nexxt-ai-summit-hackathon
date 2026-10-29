@@ -389,7 +389,7 @@ public static class CrsUi
         {
             var cut = actor.IndexOf(onBehalf, StringComparison.Ordinal);
             var agent = cut < 0 ? actor[agentPrefix.Length..] : actor[agentPrefix.Length..cut];
-            var agentName = agent == "crs-sentinel" ? "CRS Sentinel" : agent;
+            var agentName = agent == "crs-sentinel" ? Config.SiteConfig.Name : agent;
             return cut < 0 ? agentName : T("{0} for {1}", agentName, UserName(actor[(cut + onBehalf.Length)..]));
         }
         return UserName(actor.StartsWith("user:", StringComparison.Ordinal) ? actor[5..] : actor);
