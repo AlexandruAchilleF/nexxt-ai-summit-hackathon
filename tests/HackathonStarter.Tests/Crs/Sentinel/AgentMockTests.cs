@@ -134,6 +134,38 @@ public class AgentMockTests
         AssertSafe(proof);
     }
 
+    [Theory]
+    [InlineData("ro-RO", "Clientul a răspuns. Verifică autocertificarea.")]
+    [InlineData("en-GB", "The client replied. Check the self-certification.")]
+    public async Task A_missing_saved_id_stops_the_mock_before_registering_a_response_or_requesting_close_approval(string culture, string message)
+    {
+        using var _ = new UiLanguage(culture);
+        var world = new MariaWorld();
+        world.DeliverAnswer();
+        world.Changes.AfterRecord = recorded => recorded with { SelfCertificationId = null };
+        await using var host = await world.HostAsync();
+
+        var run = await host.RunAsync("crs-sentinel", Prefix + message);
+
+        Assert.Equal(RunSource.Mock, run.Source);
+        Assert.Equal(RunStatus.Completed, run.Status);
+        Assert.Equal(["getCase", "listDocuments", "extractSelfCertification"], run.ToolCalls());
+        Assert.DoesNotContain(run.Steps, s => s.Kind == StepKind.Approval);
+        Assert.Single(world.Changes.Requests);
+        Assert.Equal(2, world.Clients.Maria.SelfCertifications.Count);
+        Assert.Empty(world.Case.Responses);
+        Assert.Equal(CaseStatus.Escalated, world.Case.Status);
+        Assert.Null(world.Case.Proof);
+        var extraction = Assert.Single(run.Steps, s => s is { Kind: StepKind.ToolResult, Tool: "extractSelfCertification" });
+        Assert.Null(extraction.Error);
+        var result = Json(extraction.Output) ?? throw new InvalidOperationException("Missing extraction tool result.");
+        var error = result.GetProperty("error").GetString();
+        Assert.Contains("no selfCertificationId", error);
+        Assert.Contains("Do not call registerResponse or closeCase", error);
+        Assert.Contains(error!, run.Answer());
+        AssertSafe(run);
+    }
+
     [Fact]
     public async Task ResponseReceived_proposes_the_closing()
     {

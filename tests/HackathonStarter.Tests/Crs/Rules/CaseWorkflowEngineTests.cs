@@ -1,5 +1,7 @@
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using HackathonStarter.Features.Audit;
 using HackathonStarter.Features.Cases;
 using HackathonStarter.Features.Changes;
 using HackathonStarter.Features.Clients;
@@ -16,8 +18,8 @@ namespace HackathonStarter.Tests.Crs.RuleEngine;
 /// </summary>
 public class CaseWorkflowEngineTests
 {
-    private static Task<R2WorkflowHost> WithRealEngine(Func<IServiceProvider, ICrsRuleEngine>? engine = null) =>
-        CreateAsync(s => s.AddSingleton(sp => engine?.Invoke(sp) ?? sp.GetRequiredService<CrsRuleEngine>()));
+    private static Task<R2WorkflowHost> WithRealEngine() =>
+        CreateAsync(s => s.AddSingleton<ICrsRuleEngine>(sp => sp.GetRequiredService<CrsRuleEngine>()));
 
     private static NewResponse Answer(int selfCertId) =>
         new(ResponseKind.NewSelfCertification, ExplanationCategory.None, "online", "New self-certification", SelfCertificationId: selfCertId);
@@ -61,12 +63,10 @@ public class CaseWorkflowEngineTests
     }
 
     [Fact]
-    public async Task A_fatca_case_closes_on_a_not_us_person_form_once_close_passes_when_the_indicia_were_added()
+    public async Task A_fatca_case_closes_on_a_post_change_not_us_person_form_with_confirmation_proof()
     {
-        // CaseService.CloseAsync with the one-line change proposed to R2: EvaluateCurrent(snapshot, latest Indicium.AddedAt).
-        DateTime? addedAt = null;
-        await using var host = await WithRealEngine(sp => new ClosesWithDate(sp.GetRequiredService<CrsRuleEngine>(), () => addedAt));
-        await host.SeedClientAsync("CL-0014", new DateOnly(2019, 3, 14));
+        await using var host = await WithRealEngine();
+        var client = await host.SeedClientAsync("CL-0014", new DateOnly(2019, 3, 14));
 
         var change = await host.As(Member).Changes.RecordAsync(new ChangeRequest("CL-0014", ChangeKind.PhoneAdded, "online",
             Phone: new PhoneSnapshot("+13125550147", "US")));
@@ -74,14 +74,28 @@ public class CaseWorkflowEngineTests
         var code = await RequestSentAsync(host, change);
         host.AdvanceDays(3);
         var selfCertId = await host.SubmitSelfCertificationAsync("CL-0014", code, host.Clock.UtcNow, null, "RO");
-        await host.As(Member).Cases.RegisterResponseAsync(code, Answer(selfCertId));
+        var response = await host.As(Member).Cases.RegisterResponseAsync(code, Answer(selfCertId));
+        var waiting = Assert.IsType<Case>(await host.As(Member).Cases.GetAsync(code));
+        Assert.Equal(CaseStatus.ResponseReceived, waiting.Status);
+        Assert.Null(waiting.Proof);
 
-        await using (var db = await host.DbAsync())
-            addedAt = (await db.Cases.Include(c => c.Indicia).SingleAsync(c => c.Code == code)).Indicia.Max(i => i.AddedAt);
         var closed = await host.As(Admin).Cases.CloseAsync(code, ConfirmationChannel.Online);
 
         Assert.Equal((CaseStatus.Closed, "FATCA-SC"), (closed.Status, closed.OutcomeRuleId));
         Assert.DoesNotContain("US", closed.ReportableFor);
+        await using var db = await host.DbAsync();
+        var saved = await db.Cases.Include(c => c.Proof).SingleAsync(c => c.Code == code);
+        var form = await db.SelfCertifications.SingleAsync(s => s.Id == selfCertId);
+        Assert.True(form.SignedAt > change.Change.ReceivedAt);
+        Assert.False(form.DeclaresUsPerson);
+        Assert.Equal((CaseStatus.Closed, "FATCA-SC"), (saved.Status, saved.OutcomeRuleId));
+        Assert.Empty(saved.ReportableFor);
+        var proof = Assert.IsType<ConfirmationProof>(saved.Proof);
+        Assert.Equal((ConfirmationChannel.Online, response.ReceivedAt, form.SignedAt, form.ReceivedAt),
+            (proof.Channel, proof.ConfirmedAt, proof.DeclarationDatedAt, proof.DeclarationReceivedAt));
+        Assert.Equal((client.FullName, Admin.Name, $"SC-{selfCertId}"),
+            (proof.SignedBy, proof.ApprovedBy, proof.TransactionOrDocumentId));
+        Assert.Equal(CaseService.Sha256(Encoding.UTF8.GetBytes(CaseService.CanonicalJson(form))), proof.EvidenceSha256);
     }
 
     [Fact]
@@ -105,7 +119,7 @@ public class CaseWorkflowEngineTests
     [Theory]
     [InlineData(null, false)]
     [InlineData("521374829", true)]
-    public async Task A_fatca_tin_case_closes_only_on_a_form_with_the_us_tin(string? usTin, bool closes)
+    public async Task A_fatca_tin_case_accepts_a_response_and_closes_only_on_a_form_with_the_us_tin(string? usTin, bool closes)
     {
         await using var host = await WithRealEngine();
         var client = await host.SeedClientAsync("CL-0001", new DateOnly(2019, 3, 14));
@@ -115,27 +129,42 @@ public class CaseWorkflowEngineTests
         var code = await RequestSentAsync(host, await Form(null));
         host.AdvanceDays(3);
         await Form(usTin);
+        int answer;
         await using (var db = await host.DbAsync())
-        {
-            var answer = await db.SelfCertifications.Where(x => x.ClientId == client.Id && x.Status == SelfCertStatus.Valid).Select(x => x.Id).SingleAsync();
-            await host.As(Member).Cases.RegisterResponseAsync(code, Answer(answer));
-        }
+            answer = await db.SelfCertifications.Where(x => x.ClientId == client.Id && x.Status == SelfCertStatus.Valid).Select(x => x.Id).SingleAsync();
 
         if (closes)
-            Assert.Equal(["US"], (await host.As(Admin).Cases.CloseAsync(code, ConfirmationChannel.Online)).ReportableFor);
+        {
+            await host.As(Member).Cases.RegisterResponseAsync(code, Answer(answer));
+            var closed = await host.As(Admin).Cases.CloseAsync(code, ConfirmationChannel.Online);
+            Assert.Equal((CaseStatus.Closed, "FATCA-SC"), (closed.Status, closed.OutcomeRuleId));
+            Assert.Equal(["US"], closed.ReportableFor);
+            Assert.NotNull(closed.Proof);
+            Assert.Equal($"SC-{answer}", closed.Proof.TransactionOrDocumentId);
+        }
         else
+        {
+            var before = Assert.IsType<Case>(await host.As(Member).Cases.GetAsync(code));
+            var entries = host.Audit.Entries.ToArray();
             Assert.Contains("FATCA-TIN:US", (await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                host.As(Admin).Cases.CloseAsync(code, ConfirmationChannel.Online))).Message);
-    }
+                host.As(Member).Cases.RegisterResponseAsync(code, Answer(answer)))).Message);
 
-    /// <summary>The real engine, with the closing re-evaluation dated (what R2's CloseAsync would pass).</summary>
-    private sealed class ClosesWithDate(CrsRuleEngine real, Func<DateTime?> changeKnownAt) : ICrsRuleEngine
-    {
-        public IReadOnlyList<RuleDefinition> Catalog => real.Catalog;
-        public RuleOutcome Evaluate(ClientSnapshot before, ClientSnapshot after, ChangeKind kind) => real.Evaluate(before, after, kind);
-        public RuleOutcome EvaluateCurrent(ClientSnapshot client) =>
-            changeKnownAt() is { } at ? real.EvaluateCurrent(client, at) : real.EvaluateCurrent(client);
-        public RuleOutcome EvaluateSelfCertification(ClientSnapshot client, SelfCertificationSnapshot selfCertification) =>
-            real.EvaluateSelfCertification(client, selfCertification);
+            var after = Assert.IsType<Case>(await host.As(Member).Cases.GetAsync(code));
+            Assert.Equal(CaseStatus.AwaitingClient, after.Status);
+            Assert.Empty(after.Responses);
+            Assert.Null(after.Proof);
+            Assert.Null(after.ClosedAt);
+            Assert.Equal(JsonSerializer.Serialize(before), JsonSerializer.Serialize(after));
+            Assert.Equal(entries, host.Audit.Entries);
+            Assert.Empty(host.Audit.OfKind(AuditKinds.ResponseRegistered));
+            Assert.Empty(host.Audit.OfKind(AuditKinds.CaseClosed));
+
+            // Refusal leaves the case waiting; FATCA still has no reminder or expiry deadline (p. 38).
+            Assert.Null(after.DueAt);
+            Assert.Null(after.RemindAt);
+            host.AdvanceDays(90);
+            Assert.Equal(new DeadlineTick(0, 0, 0), await host.As(Member).Cases.TickAsync(host.Clock.UtcNow));
+            Assert.Equal(JsonSerializer.Serialize(before), JsonSerializer.Serialize(await host.As(Member).Cases.GetAsync(code)));
+        }
     }
 }

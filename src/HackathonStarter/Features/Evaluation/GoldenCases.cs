@@ -78,7 +78,7 @@ public sealed record GoldenHit(string RuleId, string? Jurisdiction, string? Sour
     public string Key => Jurisdiction is null ? RuleId : $"{RuleId}:{Jurisdiction}";
 }
 
-/// <param name="RuleId">The DL-* rule; null when the guide gives none (FATCA and case 2, GOLDEN-CASES.md Î1).</param>
+/// <param name="RuleId">The DL-* rule or FATCA-SC metadata with no deadline (p. 38); null for case 2 (GOLDEN-CASES.md Î1).</param>
 /// <param name="Preexisting">Of the account that sets the deadline, per regime (<see cref="Clients.Preexisting.For"/>).</param>
 /// <param name="DueAt">UTC; null = no deadline in the guide: the case opens without one (DeadlineResult.DueAt is null too).</param>
 public sealed record GoldenDeadline(string? RuleId, bool Preexisting, DateTime? DueAt, DateTime? RemindAt);
@@ -279,7 +279,7 @@ public static class GoldenCases
             ExpectedReportableFor = [], // derived, not on the card
             ExpectedDeadline = new("DL-NEW-90", Preexisting: false, NewAccountDueAt, NewAccountRemindAt),
         },
-        new("5c", "Standing order to the US from a current account", "CL-0005", GoldenOwner.R1, Decision.FatcaAlert, ["FATCA-IND-SO:US"], ["CRS-IND-SO"], null, "FATCA alert, no deadline in the guide")
+        new("5c", "Standing order to the US from a current account", "CL-0005", GoldenOwner.R1, Decision.FatcaAlert, ["FATCA-IND-SO:US"], ["CRS-IND-SO"], "FATCA-SC", "FATCA alert, no deadline in the guide")
         {
             Layer = GoldenLayer.Engine,
             Status = GoldenStatus.ApprovedR5,
@@ -298,10 +298,10 @@ public static class GoldenCases
                 // The guide's reason first (Î12, p. 29 lit. d); "SUA nu e jurisdicție CRS raportabilă" is not in the guide, so it comes after.
                 new("CRS-IND-SO", "US", GuidePage: "29 d", Reason: "ordin dintr-un cont de depozit, exceptat la CRS; în plus, SUA nu e jurisdicție CRS raportabilă"),
             ],
-            // No deadline in the guide (Î1): the case opens without one; DeadlineCalculator answers FATCA-SC, p. 38, DueAt null.
-            ExpectedDeadline = new(null, Preexisting: false, null, null),
+            // No-deadline interpretation (Î1, p. 38): FATCA-SC is metadata; DueAt and RemindAt stay null.
+            ExpectedDeadline = new("FATCA-SC", Preexisting: false, null, null),
         },
-        new("6", "Passport with place of birth in the US", "CL-0006", GoldenOwner.R1, Decision.FatcaAlert, ["FATCA-IND-POB:US"], [], null, "FATCA alert")
+        new("6", "Passport with place of birth in the US", "CL-0006", GoldenOwner.R1, Decision.FatcaAlert, ["FATCA-IND-POB:US"], [], "FATCA-SC", "FATCA alert")
         {
             Layer = GoldenLayer.Engine,
             Status = GoldenStatus.Validated,
@@ -320,10 +320,10 @@ public static class GoldenCases
             ],
             ExpectedRegime = Regime.Fatca,
             ExpectedIndicia = [new("FATCA-IND-POB", "US")],
-            // No deadline in the guide (Î1), as 5c.
-            ExpectedDeadline = new(null, Preexisting: false, null, null),
+            // No-deadline interpretation (Î1, p. 38): FATCA-SC is metadata; DueAt and RemindAt stay null.
+            ExpectedDeadline = new("FATCA-SC", Preexisting: false, null, null),
         },
-        new("7", "US citizenship (second passport)", "CL-0007", GoldenOwner.R1, Decision.FatcaAlert, ["FATCA-IND-CIT:US"], ["FATCA-IND-POB"], null, "FATCA alert")
+        new("7", "US citizenship (second passport)", "CL-0007", GoldenOwner.R1, Decision.FatcaAlert, ["FATCA-IND-CIT:US"], ["FATCA-IND-POB"], "FATCA-SC", "FATCA alert")
         {
             Layer = GoldenLayer.Engine,
             Status = GoldenStatus.Validated,
@@ -342,7 +342,8 @@ public static class GoldenCases
             ExpectedRegime = Regime.Fatca,
             ExpectedIndicia = [new("FATCA-IND-CIT", "US")],
             ExpectedClearedRules = [new("FATCA-IND-POB", null, Reason: "născut în România", GuidePage: "31")],
-            ExpectedDeadline = new(null, Preexisting: false, null, null),
+            // No-deadline interpretation (Î1, p. 38): FATCA-SC is metadata; DueAt and RemindAt stay null.
+            ExpectedDeadline = new("FATCA-SC", Preexisting: false, null, null),
         },
         new("8", "Andrei: salary from a German company", "CL-0013", GoldenOwner.R1, Decision.NoCase, [], ["GEN-DOMESTIC"], null, "No case; one weak signal, explained")
         {
@@ -446,7 +447,7 @@ public static class GoldenCases
             ExpectedClearedRules = [new("CRS-IND-PHONE", "DE", Reason: "există și un telefon în România", GuidePage: "29 c")],
             ExpectedReportableFor = [], // derived, not on the card
         },
-        new("14", "US phone next to the RO phone", "CL-0014", GoldenOwner.R1, Decision.FatcaAlert, ["FATCA-IND-PHONE:US"], ["CRS-IND-PHONE"], null, "FATCA alert")
+        new("14", "US phone next to the RO phone", "CL-0014", GoldenOwner.R1, Decision.FatcaAlert, ["FATCA-IND-PHONE:US"], ["CRS-IND-PHONE"], "FATCA-SC", "FATCA alert")
         {
             Layer = GoldenLayer.Engine,
             Status = GoldenStatus.Validated,
@@ -465,7 +466,8 @@ public static class GoldenCases
             [
                 new("CRS-IND-PHONE", "US", GuidePage: "29 c", Reason: "există și un telefon în România; în plus, SUA nu e jurisdicție CRS raportabilă"),
             ],
-            ExpectedDeadline = new(null, Preexisting: false, null, null),
+            // No-deadline interpretation (Î1, p. 38): FATCA-SC is metadata; DueAt and RemindAt stay null.
+            ExpectedDeadline = new("FATCA-SC", Preexisting: false, null, null),
         },
         new("15", "Cluj to Iasi", "CL-0015", GoldenOwner.R1, Decision.NoCase, [], ["GEN-DOMESTIC"], null, "No case, with an explanation")
         {

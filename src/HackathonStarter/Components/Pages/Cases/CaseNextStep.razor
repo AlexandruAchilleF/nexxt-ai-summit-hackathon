@@ -6,7 +6,6 @@
 @using HackathonStarter.Features.Tin
 @inject ICaseService Cases
 @inject IChangeService Changes
-@inject IClientService Clients
 @inject ITinFormat TinFormat
 @inject ISnackbar Snackbar
 
@@ -47,6 +46,7 @@
     [Parameter, EditorRequired] public Case Case { get; set; } = default!;
     [Parameter, EditorRequired] public DateTime Now { get; set; }
     [Parameter] public IReadOnlyList<string> RequiredDocs { get; set; } = [];
+    [Parameter] public IReadOnlyCollection<DocumentInfo> Documents { get; set; } = [];
     /// <summary>Code's re-evaluation of the client today (shown before closing on a self-certification).</summary>
     [Parameter] public RuleOutcome? Current { get; set; }
     [Parameter] public bool IsOperator { get; set; }
@@ -282,10 +282,22 @@
     private string _answerChannel = "online";
     private string _summary = "";
     private DateTime? _signedOn;
+    private int? _documentId;
     private bool _declaresUs, _documentary;
     private readonly List<ResidenceRow> _residences = [new()];
     private bool _escalating;
     private string _escalation = "";
+
+    private bool RequiresDocumentaryEvidence => Case.IsPreexisting && Case.Regime is Regime.Crs or Regime.Both;
+    private IEnumerable<DocumentInfo> ClientDocuments => Documents.Where(d => d.ClientId == Case.ClientId);
+    private DateTime ReceiptDay => CrsUi.Local(Now).Date;
+
+    private void SetAnswerKind(ResponseKind kind)
+    {
+        _kind = kind;
+        _documentary = false;
+        _documentId = null;
+    }
 
     private sealed class ResidenceRow
     {
@@ -302,7 +314,7 @@
     public void FillSample()
     {
         if (Sample is not { } s) return;
-        _kind = s.Kind;
+        SetAnswerKind(s.Kind);
         _category = s.Category == ExplanationCategory.None ? ExplanationCategory.Student : s.Category;
         _answerChannel = string.IsNullOrWhiteSpace(s.Channel) ? "online" : s.Channel;
         _residences.Clear();
@@ -312,38 +324,56 @@
             _residences.AddRange(sc.Residences.Select(r => new ResidenceRow { Country = r.Country, Tin = r.Tin ?? "", Reason = r.NoTinReason }));
         }
         if (_residences.Count == 0) _residences.Add(new());
-        _documentary = Case.IsPreexisting;
+        _documentary = _kind == ResponseKind.NewSelfCertification && RequiresDocumentaryEvidence;
         _summary = s.Kind == ResponseKind.ReasonableExplanation ? T("The client explains the stay abroad: {0}.", CrsUi.Label(_category).ToLowerInvariant()) : T("New self-certification received.");
         StateHasChanged();
     }
 
-    private bool AnswerReady => _kind switch
+    private string? AnswerProblem
+    {
+        get
+        {
+            if (_kind == ResponseKind.NewSelfCertification && _signedOn is { } day && day.Date > ReceiptDay)
+                return T("The signing date cannot be after the receipt date (guide p. 34).");
+            if (_kind == ResponseKind.NewSelfCertification && RequiresDocumentaryEvidence && !_documentary)
+                return T("A preexisting CRS account needs a new self-certification and documentary evidence (guide p. 29).");
+            if (_documentary && !ClientDocuments.Any(d => d.Id == _documentId))
+                return T("Select a document belonging to this client before registering documentary evidence.");
+            return null;
+        }
+    }
+
+    private bool AnswerReady => AnswerProblem is null && (_kind switch
     {
         ResponseKind.NewSelfCertification => _residences.Any(r => r.Country.Trim().Length == 2),
         ResponseKind.ReasonableExplanation => _category != ExplanationCategory.None,
         _ => !string.IsNullOrWhiteSpace(_summary),
-    };
+    });
 
     private async Task RegisterAsync()
     {
-        int? selfCertId = null;
-        if (_kind == ResponseKind.NewSelfCertification)
+        if (AnswerProblem is { } problem) throw new InvalidOperationException(problem);
+
+        var caseCode = Case.Code;
+        var response = new NewResponse(_kind,
+            _kind == ResponseKind.ReasonableExplanation ? _category : ExplanationCategory.None, _answerChannel,
+            string.IsNullOrWhiteSpace(_summary) ? CrsUi.Label(_kind) : _summary,
+            DocumentId: _documentary ? _documentId : null, HasDocumentaryEvidence: _documentary);
+        if (response.Kind == ResponseKind.NewSelfCertification)
         {
-            // Signed on the chosen day, but never after the bank received it (guide p. 34).
+            // Preserve the chosen calendar date; receipt days use the app's Bucharest convention (guide p. 34).
             var signed = _signedOn is { } day ? DateTime.SpecifyKind(day.Date, DateTimeKind.Utc) : Now;
-            if (signed > Now) signed = Now;
             var snapshot = new SelfCertificationSnapshot(signed,
                 [.. _residences.Where(r => r.Country.Trim().Length == 2).Select(r => new TaxResidenceSnapshot(r.Country.Trim().ToUpperInvariant(),
                     string.IsNullOrWhiteSpace(r.Tin) ? null : r.Tin.Trim(), string.IsNullOrWhiteSpace(r.Tin) ? r.Reason : NoTinReason.None))],
                 _declaresUs);
             // ChangeService owns client data: it saves the self-certification and lets code evaluate it against the case.
-            await Changes.RecordAsync(new ChangeRequest(Case.ClientCode, ChangeKind.SelfCertSubmitted, _answerChannel, SelfCertification: snapshot, CaseCode: Case.Code));
-            var client = await Clients.GetAsync(Case.ClientCode);
-            selfCertId = client?.SelfCertifications.Where(s => s.Status == SelfCertStatus.Valid).OrderByDescending(s => s.Id).Select(s => (int?)s.Id).FirstOrDefault();
+            var result = await Changes.RecordAsync(new ChangeRequest(Case.ClientCode, ChangeKind.SelfCertSubmitted, response.Channel, SelfCertification: snapshot, CaseCode: caseCode));
+            var selfCertId = result.SelfCertificationId
+                ?? throw new InvalidOperationException(T("The self-certification ID was not returned. The answer was not registered."));
+            response = response with { SelfCertificationId = selfCertId };
         }
-        await Cases.RegisterResponseAsync(Case.Code, new NewResponse(_kind,
-            _kind == ResponseKind.ReasonableExplanation ? _category : ExplanationCategory.None, _answerChannel,
-            string.IsNullOrWhiteSpace(_summary) ? CrsUi.Label(_kind) : _summary, HasDocumentaryEvidence: _documentary, SelfCertificationId: selfCertId));
+        await Cases.RegisterResponseAsync(caseCode, response);
     }
 
     private RenderFragment Answer => __builder =>
@@ -355,7 +385,7 @@
                       : T("Waiting since the request was sent. Record what the client sent; code then checks whether it is enough to close."),
                   Icons.Material.Rounded.MarkEmailUnread)
             <div class="crs-form cols-2">
-                <MudSelect T="ResponseKind" @bind-Value="_kind" Label="@T("Answer")" Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense" Disabled="@(!IsEditor)">
+                <MudSelect T="ResponseKind" Value="_kind" ValueChanged="SetAnswerKind" Label="@T("Answer")" Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense" Disabled="@(_busy || !IsEditor)">
                     @foreach (var k in Enum.GetValues<ResponseKind>())
                     {
                         <MudSelectItem Value="k">@CrsUi.Label(k)</MudSelectItem>
@@ -400,14 +430,30 @@
                         }
                         <MudButton Variant="Variant.Text" Size="Size.Small" StartIcon="@Icons.Material.Rounded.Add" OnClick="() => _residences.Add(new())" Disabled="@(!IsEditor)">@T("Add a residence")</MudButton>
                     </div>
-                    <MudDatePicker @bind-Date="_signedOn" Label="@T("Signed on")" Variant="Variant.Outlined" Margin="Margin.Dense" MaxDate="CrsUi.Local(Now).Date" Placeholder="@CrsUi.Date(Now)" Disabled="@(!IsEditor)" />
+                    <MudDatePicker @bind-Date="_signedOn" Label="@T("Signed on")" Variant="Variant.Outlined" Margin="Margin.Dense" MaxDate="ReceiptDay" Placeholder="@CrsUi.Date(Now)" Disabled="@(!IsEditor)" />
                     <div class="d-flex flex-column">
                         <MudCheckBox T="bool" @bind-Value="_declaresUs" Label="@T("Declares to be a US person")" Dense="true" Disabled="@(!IsEditor)" />
-                        @if (Case.IsPreexisting)
+                        @if (RequiresDocumentaryEvidence)
                         {
-                            <MudCheckBox T="bool" @bind-Value="_documentary" Label="@T("New documentary evidence attached (preexisting account, p. 29)")" Dense="true" Disabled="@(!IsEditor)" />
+                            <MudCheckBox T="bool" @bind-Value="_documentary" Label="@T("New documentary evidence attached (preexisting account, p. 29)")" Dense="true" Disabled="@(_busy || !IsEditor)" />
                         }
                     </div>
+                    @if (RequiresDocumentaryEvidence || _documentary)
+                    {
+                        <div class="span-2 crs-response-document">
+                            <MudSelect T="int?" @bind-Value="_documentId" Label="@T("Document")" Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense"
+                                       Clearable="true" Disabled="@(_busy || !IsEditor || !ClientDocuments.Any())">
+                                @foreach (var d in ClientDocuments)
+                                {
+                                    <MudSelectItem T="int?" Value="d.Id"><span class="crs-response-document-label">@d.FileName · @CrsUi.Label(d.Kind) · @CrsUi.Label(d.ShieldVerdict)</span></MudSelectItem>
+                                }
+                            </MudSelect>
+                        </div>
+                        @if (!ClientDocuments.Any())
+                        {
+                            <MudAlert Severity="Severity.Warning" Dense="true" Class="span-2">@T("No documents are available for this client. Documentary evidence is required before registering this answer.")</MudAlert>
+                        }
+                    }
                 }
                 else if (_kind == ResponseKind.ReasonableExplanation)
                 {
@@ -425,7 +471,7 @@
                            OnClick="@(() => RunAsync(RegisterAsync, T("Answer registered: code checks it before closing")))">@T("Register the answer")</MudButton>
                 @if (IsEditor && !AnswerReady)
                 {
-                    <span class="crs-hint" style="margin:0">@(_kind == ResponseKind.NewSelfCertification ? T("Add at least one country of residence.") : T("Add a note on the answer."))</span>
+                    <span class="crs-hint" style="margin:0">@(AnswerProblem ?? (_kind == ResponseKind.NewSelfCertification ? T("Add at least one country of residence.") : T("Add a note on the answer.")))</span>
                 }
                 @if (Case.Status is CaseStatus.AwaitingClient or CaseStatus.Reminded)
                 {

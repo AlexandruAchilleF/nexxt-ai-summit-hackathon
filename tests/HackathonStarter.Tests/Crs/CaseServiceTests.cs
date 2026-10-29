@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Text;
 using HackathonStarter.Features.Audit;
 using HackathonStarter.Features.Cases;
 using HackathonStarter.Features.Changes;
@@ -151,6 +150,7 @@ public class CaseServiceTests
 
         var draft = await host.As(Member).Cases.DraftRequestAsync(item.Code, "ro", "Buna ziua");
         await host.As(Admin).Cases.ApproveRequestAsync(item.Code, draft.Id, "email");
+        host.AdvanceDays(400);
         Assert.Equal(new DeadlineTick(0, 0, 0), await host.As(Viewer).Cases.TickAsync(Base.AddDays(400)));
         Assert.Equal(CaseStatus.AwaitingClient, (await host.As(Viewer).Cases.GetAsync(item.Code))!.Status);
     }
@@ -181,9 +181,11 @@ public class CaseServiceTests
 
         var draft = await host.As(Member).Cases.DraftRequestAsync(item.Code, "ro", "Buna ziua");
         await host.As(Admin).Cases.ApproveRequestAsync(item.Code, draft.Id, "email");
+        host.AdvanceDays(85);
         Assert.Equal(new DeadlineTick(0, 0, 0), await cases.TickAsync(Base.AddDays(85))); // the reminder day and expiry of 90 days
+        host.AdvanceDays(6);
         Assert.Equal(new DeadlineTick(0, 0, 0), await cases.TickAsync(Base.AddDays(91)));
-        host.AdvanceDays(100);
+        host.AdvanceDays(9);
         Assert.Equal(new DeadlineTick(0, 0, 0), await cases.TickAsync(host.Clock.UtcNow));
         Assert.Equal(CaseStatus.AwaitingClient, (await cases.GetAsync(item.Code))!.Status);
 
@@ -197,6 +199,7 @@ public class CaseServiceTests
         Assert.Equal((Base.AddDays(190), Base.AddDays(185)), (item.DueAt, item.RemindAt));
         Assert.Equal(("DL-NEW-90", "20-21, 35-36", false), (item.DeadlineRuleId, item.DeadlineGuidePage, item.IsPreexisting));
         Assert.Contains("\"deadlineStarted\":true", Assert.Single(host.Audit.OfKind(AuditKinds.CaseIndiciumAdded)).PayloadJson);
+        host.SetNow(Base.AddDays(185));
         Assert.Equal(new DeadlineTick(0, 0, 0), await cases.TickAsync(Base.AddDays(185).AddSeconds(-1)));
         Assert.Equal(new DeadlineTick(1, 1, 0), await cases.TickAsync(Base.AddDays(185)));
     }
@@ -234,6 +237,7 @@ public class CaseServiceTests
             Assert.Null(item.RemindAt);
         }
         Assert.Contains("\"deadlineStarted\":false", Assert.Single(host.Audit.OfKind(AuditKinds.CaseIndiciumAdded)).PayloadJson);
+        host.AdvanceDays(400);
         Assert.Equal(new DeadlineTick(0, 0, 0), await cases.TickAsync(Base.AddDays(400)));
         Assert.Equal(3, (await cases.QueueAsync()).Count);
     }
@@ -316,6 +320,7 @@ public class CaseServiceTests
             await host.As(Viewer).Cases.RequiredDocumentsAsync(code));
 
         var after = Utc("2027-01-01T00:00:00");
+        host.SetNow(after);
         Assert.Equal(new DeadlineTick(0, 0, 1), await host.As(Viewer).Cases.TickAsync(after));
 
         item = (await host.As(Viewer).Cases.GetAsync(code))!;
@@ -338,9 +343,11 @@ public class CaseServiceTests
         var code = await host.AwaitingClientAsync("CL-0016", "ES");
         var cases = host.As(Viewer).Cases; // the tick is the system's: no role
 
+        host.SetNow(Utc("2027-01-21T06:59:59"));
         Assert.Equal(new DeadlineTick(0, 0, 0), await cases.TickAsync(Utc("2027-01-21T06:59:59")));
 
         var remind = Utc("2027-01-21T07:00:00");
+        host.SetNow(remind);
         Assert.Equal(new DeadlineTick(1, 1, 0), await cases.TickAsync(remind));
         var item = (await cases.GetAsync(code))!;
         Assert.Equal(CaseStatus.Escalated, item.Status);
@@ -355,6 +362,7 @@ public class CaseServiceTests
         Assert.Equal([RequiredDocuments.SelfCertificationOrExplanation, RequiredDocuments.ProofOfAddress], reminder.RequestedDocuments);
 
         Assert.Equal(new DeadlineTick(0, 0, 0), await cases.TickAsync(remind));
+        host.AdvanceDays(2);
         Assert.Equal(new DeadlineTick(0, 0, 0), await cases.TickAsync(remind.AddDays(2)));
         item = (await cases.GetAsync(code))!;
         Assert.Single(item.Requests, r => r.Kind == RequestKind.Reminder);
@@ -362,6 +370,7 @@ public class CaseServiceTests
         Assert.Equal("system", Assert.Single(host.Audit.OfKind(AuditKinds.CaseEscalated)).Actor);
 
         var expiry = Utc("2027-01-26T07:00:01");
+        host.SetNow(expiry);
         Assert.Equal(new DeadlineTick(0, 0, 1), await cases.TickAsync(expiry));
         item = (await cases.GetAsync(code))!;
         Assert.Equal(CaseStatus.Expired, item.Status);
@@ -371,6 +380,7 @@ public class CaseServiceTests
         Assert.Contains("original self-certification (RO) and in ES", item.Outcome);
         Assert.Contains("inițială (RO) și în ES", item.OutcomeRo);
 
+        host.AdvanceDays(30);
         Assert.Equal(new DeadlineTick(0, 0, 0), await cases.TickAsync(expiry.AddDays(30)));
         Assert.Single(host.Audit.OfKind(AuditKinds.CaseExpired));
         var late = await Assert.ThrowsAsync<InvalidOperationException>(() =>
@@ -384,6 +394,7 @@ public class CaseServiceTests
         await using var host = await CreateAsync();
         await host.SeedClientAsync("CL-0016", NewAccount);
         var code = await host.AwaitingClientAsync("CL-0016", "ES");
+        host.AdvanceDays(85);
         await host.As(Viewer).Cases.TickAsync(Utc("2027-01-21T07:00:00"));
         var reminder = (await host.As(Viewer).Cases.GetAsync(code))!.Requests.Single(r => r.Kind == RequestKind.Reminder);
 
@@ -407,14 +418,18 @@ public class CaseServiceTests
         var code = await host.AwaitingClientAsync("CL-0016", "ES");
         var cases = host.As(Viewer).Cases;
         var remind = Utc("2027-01-21T07:00:00");
+        host.SetNow(remind);
         Assert.Equal(new DeadlineTick(1, 1, 0), await cases.TickAsync(remind));
 
         host.SetNow(remind.AddHours(2));
-        await host.As(Member).Cases.RegisterResponseAsync(code, Explanation(ExplanationCategory.Other)); // not enough
+        await Assert.ThrowsAsync<InvalidOperationException>(() => host.As(Member).Cases.RegisterResponseAsync(code, Explanation(ExplanationCategory.Other)));
+        // A legacy insufficient stored response can still be sent back for a follow-up; new submissions are refused above.
+        await SeedStoredResponseAsync(host, code, Explanation(ExplanationCategory.Other));
         var followUp = await host.As(Member).Cases.DraftRequestAsync(code, "ro", "Mai avem nevoie de autocertificare.", RequestKind.FollowUp);
         await host.As(Admin).Cases.ApproveRequestAsync(code, followUp.Id, "email");
         Assert.Equal(CaseStatus.AwaitingClient, (await cases.GetAsync(code))!.Status);
 
+        host.SetNow(remind.AddDays(1));
         Assert.Equal(new DeadlineTick(0, 0, 0), await cases.TickAsync(remind.AddDays(1)));
 
         var item = (await cases.GetAsync(code))!;
@@ -423,6 +438,7 @@ public class CaseServiceTests
         Assert.Equal((remind, remind), (item.RemindedAt, item.EscalatedAt));
         Assert.Single(host.Audit.OfKind(AuditKinds.CaseReminded));
         Assert.Single(host.Audit.OfKind(AuditKinds.CaseEscalated));
+        host.SetNow(Utc("2027-01-26T07:00:00"));
         Assert.Equal(new DeadlineTick(0, 0, 1), await cases.TickAsync(Utc("2027-01-26T07:00:00"))); // the deadline still holds
     }
 
@@ -439,6 +455,7 @@ public class CaseServiceTests
         Assert.Equal(["CRS-IND-ADDR:ES", "FATCA-IND-CIT:US"], both.Indicia.Select(i => $"{i.RuleId}:{i.Jurisdiction}"));
 
         var expiry = Utc("2027-01-26T07:00:00");
+        host.SetNow(expiry);
         Assert.Equal(new DeadlineTick(0, 0, 1), await cases.TickAsync(expiry));
 
         var expired = (await cases.GetAsync(code))!;
@@ -460,6 +477,7 @@ public class CaseServiceTests
         Assert.Contains($"fatca follow-up of {code}", opened.PayloadJson);
         Assert.Contains($"\"fatcaFollowUp\":\"{followUp.Code}\"", Assert.Single(host.Audit.OfKind(AuditKinds.CaseExpired)).PayloadJson);
 
+        host.AdvanceDays(400);
         Assert.Equal(new DeadlineTick(0, 0, 0), await cases.TickAsync(expiry.AddDays(400)));
         Assert.Equal(CaseStatus.Open, (await cases.GetAsync(followUp.Code))!.Status);
     }
@@ -488,6 +506,7 @@ public class CaseServiceTests
         var cases = host.As(Viewer).Cases;
         var due = (await cases.GetAsync(code))!.DueAt!.Value;
 
+        host.SetNow(due.AddSeconds(1));
         Assert.Equal(new DeadlineTick(0, 0, 1), await cases.TickAsync(due.AddSeconds(1)));
 
         var item = (await cases.GetAsync(code))!;
@@ -513,6 +532,7 @@ public class CaseServiceTests
             SelfCertification: new SelfCertificationSnapshot(host.Clock.UtcNow, [new("RO", client.Cnp), new("US", "521374829")], DeclaresUsPerson: true)));
         var cases = host.As(Viewer).Cases;
 
+        host.SetNow(Utc("2027-01-26T07:00:00"));
         Assert.Equal(new DeadlineTick(0, 0, 1), await cases.TickAsync(Utc("2027-01-26T07:00:00")));
 
         var expired = (await cases.GetAsync(code))!;
@@ -536,6 +556,7 @@ public class CaseServiceTests
         host.Engine.OnEvaluateCurrent = _ => Outcome([Hit("CRS-IND-ADDR", "ES"), Hit("FATCA-IND-CIT", "US"), Hit("FATCA-IND-PHONE", "US", Coverage.SelfCertification)]);
         var cases = host.As(Viewer).Cases;
 
+        host.SetNow(Utc("2027-01-26T07:00:00"));
         Assert.Equal(new DeadlineTick(0, 0, 1), await cases.TickAsync(Utc("2027-01-26T07:00:00")));
 
         var followUp = Assert.Single(await cases.QueueAsync());
@@ -564,6 +585,7 @@ public class CaseServiceTests
         var cases = host.As(Viewer).Cases;
         var expiry = Utc("2027-01-26T07:00:00");
 
+        host.SetNow(expiry);
         Assert.Equal(new DeadlineTick(0, 0, 2), await cases.TickAsync(expiry));
 
         var followUps = await cases.QueueAsync();
@@ -577,6 +599,7 @@ public class CaseServiceTests
         var entries = host.Audit.Entries.Count;
 
         Assert.Equal(new DeadlineTick(0, 0, 0), await cases.TickAsync(expiry));
+        host.AdvanceDays(400);
         Assert.Equal(new DeadlineTick(0, 0, 0), await cases.TickAsync(expiry.AddDays(400)));
 
         Assert.Equal(entries, host.Audit.Entries.Count);
@@ -608,6 +631,7 @@ public class CaseServiceTests
         }
         var due = (await cases.GetAsync(code))!.DueAt!.Value;
 
+        host.SetNow(due.AddSeconds(1));
         Assert.Equal(new DeadlineTick(0, 0, 1), await cases.TickAsync(due.AddSeconds(1)));
 
         var expired = (await cases.GetAsync(code))!;
@@ -639,6 +663,7 @@ public class CaseServiceTests
         await using var other = await CreateAsync();
         await other.SeedClientAsync("CL-0016", NewAccount);
         var jumped = await other.AwaitingClientAsync("CL-0016", "ES");
+        other.AdvanceDays(91);
         Assert.Equal(new DeadlineTick(0, 0, 1), await other.As(Viewer).Cases.TickAsync(Base.AddDays(91)));
         var item = (await other.As(Viewer).Cases.GetAsync(jumped))!;
         Assert.Equal(CaseStatus.Expired, item.Status);
@@ -647,14 +672,15 @@ public class CaseServiceTests
     }
 
     [Fact]
-    public async Task A_case_with_a_response_is_never_expired_by_the_tick()
+    public async Task A_case_with_a_sufficient_response_is_never_expired_by_the_tick()
     {
         await using var host = await CreateAsync();
         await host.SeedClientAsync("CL-0018", NewAccount);
         var code = await host.AwaitingClientAsync("CL-0018", "DE");
         host.AdvanceDays(20);
-        await host.As(Member).Cases.RegisterResponseAsync(code, Explanation(ExplanationCategory.Other));
+        await host.As(Member).Cases.RegisterResponseAsync(code, Explanation(ExplanationCategory.Student));
 
+        host.SetNow(Base.AddDays(120));
         Assert.Equal(new DeadlineTick(0, 0, 0), await host.As(Viewer).Cases.TickAsync(Base.AddDays(120)));
         Assert.Equal(CaseStatus.ResponseReceived, (await host.As(Viewer).Cases.GetAsync(code))!.Status);
     }
@@ -739,9 +765,11 @@ public class CaseServiceTests
         Assert.Equal(answeredAt, proof.ConfirmedAt);
         Assert.Equal($"DOC-{documentId}", proof.TransactionOrDocumentId);
 
-        // Re-evaluated with the candidate explanation before saving it (the engine reached Compliant).
-        var evaluated = Assert.Single(host.Engine.CurrentCalls);
-        Assert.Equal(("DE", ExplanationCategory.Student, code), evaluated.AcceptedExplanations.Select(e => (e.Jurisdiction, e.Category, e.CaseCode)).Single());
+        // Both registration and closing re-evaluate a temporary explanation; only closing persists it.
+        Assert.Equal(2, host.Engine.CurrentCalls.Count);
+        Assert.All(host.Engine.CurrentCalls, evaluated =>
+            Assert.Equal(("DE", ExplanationCategory.Student, code), evaluated.AcceptedExplanations.Select(e => (e.Jurisdiction, e.Category, e.CaseCode)).Single()));
+        Assert.Equal([answeredAt, answeredAt.AddHours(3)], host.Engine.CurrentCalls.Select(c => Assert.Single(c.AcceptedExplanations).AcceptedAt));
         await using var db = await host.DbAsync();
         var accepted = await db.AcceptedExplanations.SingleAsync();
         Assert.Equal((client.Id, "DE", ExplanationCategory.Student, code, answeredAt.AddHours(3)), (accepted.ClientId, accepted.Jurisdiction, accepted.Category, accepted.CaseCode, accepted.AcceptedAt));
@@ -756,12 +784,16 @@ public class CaseServiceTests
     [InlineData(ResponseKind.ReasonableExplanation, ExplanationCategory.Other)]
     [InlineData(ResponseKind.ReasonableExplanation, ExplanationCategory.None)]
     [InlineData(ResponseKind.Other, ExplanationCategory.None)]
-    public async Task Close_refuses_an_answer_that_is_not_on_the_guide_list(ResponseKind kind, ExplanationCategory category)
+    public async Task Registration_and_closing_refuse_an_answer_that_is_not_on_the_guide_list(ResponseKind kind, ExplanationCategory category)
     {
         await using var host = await CreateAsync();
         await host.SeedClientAsync("CL-0018", NewAccount);
         var code = await host.AwaitingClientAsync("CL-0018", "DE");
-        await host.As(Member).Cases.RegisterResponseAsync(code, new NewResponse(kind, category, "online", "Something else"));
+        var response = new NewResponse(kind, category, "online", "Something else");
+        await Assert.ThrowsAsync<InvalidOperationException>(() => host.As(Member).Cases.RegisterResponseAsync(code, response));
+        Assert.Equal(CaseStatus.AwaitingClient, (await host.As(Viewer).Cases.GetAsync(code))!.Status);
+        Assert.Empty(host.Audit.OfKind(AuditKinds.ResponseRegistered));
+        await SeedStoredResponseAsync(host, code, response); // legacy/tampered rows must also fail at close
 
         var refused = await Assert.ThrowsAsync<InvalidOperationException>(() => host.As(Admin).Cases.CloseAsync(code, ConfirmationChannel.Online));
 
@@ -792,10 +824,16 @@ public class CaseServiceTests
         Assert.Contains("Superseded", superseded.Message);
         Assert.Equal(CaseStatus.AwaitingClient, (await member.GetAsync(code))!.Status);
 
-        // Accepted when registered, then superseded by a later submission before closing: the close checks again.
+        // A later submission is refused while approval is pending; close still checks tampered/stale rows independently.
         await member.RegisterResponseAsync(code, SelfCertResponse(first));
         host.AdvanceDays(1);
-        await host.SubmitSelfCertificationAsync("CL-0001", code, host.Clock.UtcNow.AddHours(-1), null, "DE");
+        Assert.Contains("ResponseReceived", (await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            host.SubmitSelfCertificationAsync("CL-0001", code, host.Clock.UtcNow.AddHours(-1), null, "DE"))).Message);
+        await using (var db = await host.DbAsync())
+        {
+            (await db.SelfCertifications.SingleAsync(s => s.Id == first)).Status = SelfCertStatus.Superseded;
+            await db.SaveChangesAsync();
+        }
         var atClose = await Assert.ThrowsAsync<InvalidOperationException>(() => host.As(Admin).Cases.CloseAsync(code, ConfirmationChannel.Online));
 
         Assert.Contains("Superseded", atClose.Message);
@@ -843,6 +881,7 @@ public class CaseServiceTests
         Assert.Equal(escalated.EscalationReason, (await host.As(Viewer).Cases.GetAsync(code))!.EscalationReason);
         Assert.DoesNotContain("does not answer", Assert.Single(host.Audit.OfKind(AuditKinds.CaseEscalated)).PayloadJson);
 
+        host.AdvanceDays(85);
         await host.As(Viewer).Cases.TickAsync(Utc("2027-01-21T07:00:00"));
         Assert.Equal(CaseService.ReminderEscalationReason, (await host.As(Viewer).Cases.GetAsync(automatic))!.EscalationReason);
     }
@@ -896,8 +935,13 @@ public class CaseServiceTests
         await host.SeedClientAsync("CL-0016", NewAccount);
         var code = await host.AwaitingClientAsync("CL-0016", "ES");
         host.AdvanceDays(5);
-        var selfCertId = await host.SubmitSelfCertificationAsync("CL-0016", code, host.Clock.UtcNow.AddHours(-1), null, "RO");
+        var selfCertId = await host.SubmitSelfCertificationAsync("CL-0016", code, host.Clock.UtcNow.AddHours(-1), null, "ES");
         await host.As(Member).Cases.RegisterResponseAsync(code, SelfCertResponse(selfCertId));
+        await using (var db = await host.DbAsync())
+        {
+            (await db.SelfCertifications.SingleAsync(s => s.Id == selfCertId)).Residences = [new TaxResidence { Country = "RO" }];
+            await db.SaveChangesAsync();
+        }
 
         var refused = await Assert.ThrowsAsync<InvalidOperationException>(() => host.As(Admin).Cases.CloseAsync(code, ConfirmationChannel.Online));
 
@@ -914,33 +958,30 @@ public class CaseServiceTests
     {
         await using var host = await CreateAsync();
         host.SetNow(Utc("2026-03-10T08:00:00"));
-        await host.SeedClientAsync("CL-0017", PreexistingAccount);
+        var client = await host.SeedClientAsync("CL-0017", PreexistingAccount);
         var code = await host.AwaitingClientAsync("CL-0017", "ES");
         var admin = host.As(Admin).Cases;
         var member = host.As(Member).Cases;
 
         host.AdvanceDays(10);
-        await member.RegisterResponseAsync(code, Explanation(ExplanationCategory.Student));
-        Assert.Contains("p. 29", (await Assert.ThrowsAsync<InvalidOperationException>(() => admin.CloseAsync(code, ConfirmationChannel.InPerson))).Message);
+        Assert.Contains("p. 29", (await Assert.ThrowsAsync<InvalidOperationException>(() => member.RegisterResponseAsync(code, Explanation(ExplanationCategory.Student)))).Message);
 
-        await admin.ApproveRequestAsync(code, (await member.DraftRequestAsync(code, "ro", "Follow-up", RequestKind.FollowUp)).Id, "branch");
         var selfCertId = await host.SubmitSelfCertificationAsync("CL-0017", code, host.Clock.UtcNow.AddHours(-2), null, "ES");
-        await member.RegisterResponseAsync(code, SelfCertResponse(selfCertId, documentary: false));
-        Assert.Contains("p. 29", (await Assert.ThrowsAsync<InvalidOperationException>(() => admin.CloseAsync(code, ConfirmationChannel.InPerson))).Message);
+        Assert.Contains("p. 29", (await Assert.ThrowsAsync<InvalidOperationException>(() => member.RegisterResponseAsync(code, SelfCertResponse(selfCertId, documentary: false)))).Message);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => member.RegisterResponseAsync(code, SelfCertResponse(selfCertId, documentary: true)));
 
-        await admin.ApproveRequestAsync(code, (await member.DraftRequestAsync(code, "ro", "Follow-up 2", RequestKind.FollowUp)).Id, "branch");
-        await member.RegisterResponseAsync(code, SelfCertResponse(selfCertId, documentary: true));
+        var documentId = await host.AddDocumentAsync(client.Id, "Synthetic documentary evidence", DocumentKind.Letter);
+        await member.RegisterResponseAsync(code, SelfCertResponse(selfCertId, documentId, documentary: true));
         var closed = await admin.CloseAsync(code, ConfirmationChannel.InPerson, ConfirmationEvidenceKind.SignedDocument, "Signed at the branch, checked by the clerk.");
 
         Assert.Equal(CaseStatus.Closed, closed.Status);
         Assert.Equal("SC-VALID", closed.OutcomeRuleId);
         Assert.Equal(["ES"], closed.ReportableFor);
         Assert.Equal("Signed at the branch, checked by the clerk.", closed.Proof!.CollectionSteps);
-        // No document: the hash is over the canonical JSON of the self-certification.
         await using var db = await host.DbAsync();
-        var selfCert = await db.SelfCertifications.SingleAsync(s => s.Id == selfCertId);
-        Assert.Equal($"SC-{selfCertId}", closed.Proof.TransactionOrDocumentId);
-        Assert.Equal(CaseService.Sha256(Encoding.UTF8.GetBytes(CaseService.CanonicalJson(selfCert))), closed.Proof.EvidenceSha256);
+        var document = await db.ClientDocuments.SingleAsync(d => d.Id == documentId);
+        Assert.Equal($"DOC-{documentId}", closed.Proof.TransactionOrDocumentId);
+        Assert.Equal(CaseService.Sha256(document.Content), closed.Proof.EvidenceSha256);
     }
 
     [Fact]
@@ -954,10 +995,8 @@ public class CaseServiceTests
         await admin.ApproveRequestAsync(code, (await member.DraftRequestAsync(code, "ro", "Buna ziua")).Id, "email");
         host.AdvanceDays(7);
 
-        await member.RegisterResponseAsync(code, Explanation(ExplanationCategory.Student));
-        Assert.Contains("p. 38", (await Assert.ThrowsAsync<InvalidOperationException>(() => admin.CloseAsync(code, ConfirmationChannel.Online))).Message);
+        Assert.Contains("p. 38", (await Assert.ThrowsAsync<InvalidOperationException>(() => member.RegisterResponseAsync(code, Explanation(ExplanationCategory.Student)))).Message);
 
-        await admin.ApproveRequestAsync(code, (await member.DraftRequestAsync(code, "en", "Follow-up", RequestKind.FollowUp)).Id, "email");
         await host.As(Member).Changes.RecordAsync(new ChangeRequest("CL-0007", ChangeKind.SelfCertSubmitted, "online",
             SelfCertification: new SelfCertificationSnapshot(host.Clock.UtcNow.AddHours(-1), [new("RO", client.Cnp), new("US", "900-00-0001")], DeclaresUsPerson: true),
             CaseCode: code));
@@ -1324,6 +1363,20 @@ public class CaseServiceTests
         string[] personal = [client.FirstName, client.LastName, client.Cnp!, "40723655190", "Sintetica", "Madrid", accountIban, beneficiary, "86095174223"];
         Assert.All(personal, p => Assert.DoesNotContain(p, all));
         Assert.Contains(AuditKinds.CaseClosed, host.Audit.Entries.Select(e => e.Kind));
+    }
+
+    private static async Task SeedStoredResponseAsync(R2WorkflowHost host, string code, NewResponse response)
+    {
+        await using var db = await host.DbAsync();
+        var item = await db.Cases.SingleAsync(c => c.Code == code);
+        item.Responses.Add(new ClientResponse
+        {
+            Kind = response.Kind, Category = response.Category, Channel = response.Channel, Summary = response.Summary,
+            ReceivedAt = host.Clock.UtcNow, DocumentId = response.DocumentId, SelfCertificationId = response.SelfCertificationId,
+            HasDocumentaryEvidence = response.HasDocumentaryEvidence,
+        });
+        item.Status = CaseStatus.ResponseReceived;
+        await db.SaveChangesAsync();
     }
 
     private sealed class HiddenOnlyVerifier : IEvidenceVerifier

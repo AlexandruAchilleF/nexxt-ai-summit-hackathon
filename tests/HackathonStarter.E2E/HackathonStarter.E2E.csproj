@@ -20,8 +20,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Build the app before the E2E tests (they start it as a real process). -->
-    <ProjectReference Include="..\..\src\HackathonStarter\HackathonStarter.csproj" ReferenceOutputAssembly="false" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <!-- Build the real app; isolated browser fixtures also use its EF model to seed disposable test rows. -->
+    <ProjectReference Include="..\..\src\HackathonStarter\HackathonStarter.csproj" />
     <None Include="Fixtures\**" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

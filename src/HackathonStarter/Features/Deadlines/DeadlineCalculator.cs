@@ -52,8 +52,8 @@ public sealed class DeadlineCalculator : IDeadlineCalculator
         var yearEnd = TimeZoneInfo.ConvertTimeToUtc(yearEndLocal, Bucharest);
         var due = yearEnd > plus90 ? yearEnd : plus90;
         return new(due, due.AddDays(-ReminderDaysBefore), true, "DL-PRE-YEAR", "29",
-            "Preexisting account: the end of the year or 90 days, whichever is later (our reading; the guide says \"or\").",
-            "Cont preexistent: sfârșitul anului sau 90 de zile, data mai târzie (interpretarea noastră; ghidul spune „sau”).", DesignChoice: true);
+            "Preexisting account, electronic record search: year end or 90 days, whichever is later, is our interpretation (Fiscal Procedure Code, Annex 1, Section III, subsection B, point 16 says \"or\"), aligned with OECD Commentary on Section III, paragraph 16. For the residence address test, the later date is required by law (Annex 2, point 1; Directive 2011/16/EU, Annex II, point 1; OECD Commentary on Section III, paragraph 13).",
+            "Cont preexistent, indicii din căutarea electronică: sfârșitul anului sau 90 de zile, data mai târzie, este interpretarea noastră (Codul de procedură fiscală, Anexa nr. 1, secțiunea III, subsecțiunea B, pct. 16 spune „ori”), aliniată cu Comentariul OCDE la Secțiunea III, pct. 16. Pentru testul adresei de rezidență, data mai târzie este prevăzută de lege (Anexa nr. 2, pct. 1; Directiva 2011/16/UE, Anexa II, pct. 1; Comentariul OCDE la Secțiunea III, pct. 13).", DesignChoice: true);
     }
 }
 

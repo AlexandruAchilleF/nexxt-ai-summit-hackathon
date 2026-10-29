@@ -288,8 +288,8 @@ public class ChangeServiceTests
         await using var host = await CreateAsync();
         await host.SeedClientAsync("CL-0016", NewAccount);
         var code = (await host.MoveAsync("CL-0016", "ES")).CaseCode!;
-        Assert.Equal(new DeadlineTick(0, 0, 1), await host.As(Viewer).Cases.TickAsync(Base.AddDays(91)));
         host.AdvanceDays(91);
+        Assert.Equal(new DeadlineTick(0, 0, 1), await host.As(Viewer).Cases.TickAsync(Base.AddDays(91)));
         var entries = host.Audit.Entries.Count;
 
         var refused = await Assert.ThrowsAsync<InvalidOperationException>(() => host.As(Member).Changes.RecordAsync(new ChangeRequest("CL-0016",

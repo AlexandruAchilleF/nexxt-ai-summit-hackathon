@@ -3,7 +3,8 @@ using HackathonStarter.Features.Rules;
 
 namespace HackathonStarter.Features.Cases;
 
-/// <summary>Case lifecycle (docs/PLAN.md 9.3). Transitions happen only in <see cref="ICaseService"/>.</summary>
+/// <summary>Case lifecycle (docs/PLAN.md 9.3). ResponseReceived means a sufficient answer awaits human approval.
+/// Transitions happen only in <see cref="ICaseService"/>.</summary>
 public enum CaseStatus { Open, AwaitingClient, Reminded, Escalated, ResponseReceived, Closed, Expired }
 
 public class Case
@@ -137,7 +138,8 @@ public class ClientResponse
     public int? DocumentId { get; set; }
     /// <summary>The self-certification sent as the answer (saved through IChangeService); CloseAsync reads its dates.</summary>
     public int? SelfCertificationId { get; set; }
-    /// <summary>Preexisting CRS accounts need new documentary evidence besides the self-certification (guide p. 29).</summary>
+    /// <summary>Preexisting CRS accounts need new documentary evidence besides the self-certification (guide p. 29).
+    /// When true, DocumentId must identify an existing document belonging to this client, regardless of account age.</summary>
     public bool HasDocumentaryEvidence { get; set; }
     public string Summary { get; set; } = "";
 }
@@ -160,7 +162,8 @@ public class ConfirmationProof
     public int CaseId { get; set; }
     public ConfirmationChannel Channel { get; set; }
     public DateTime ConfirmedAt { get; set; }
-    /// <summary>Must not be later than <see cref="DeclarationReceivedAt"/> (guide p. 34: dated at the latest on the date of receipt).</summary>
+    /// <summary>The calendar date must not be later than that of <see cref="DeclarationReceivedAt"/> (guide p. 34).
+    /// Europe/Bucharest is the application's calendar convention, not a rule in the guide; timestamps stay in UTC.</summary>
     public DateTime DeclarationDatedAt { get; set; }
     public DateTime DeclarationReceivedAt { get; set; }
     public string CollectionSteps { get; set; } = "";
