@@ -83,3 +83,8 @@
     font-size: 13px;
     color: var(--mud-palette-text-secondary);
 }
+
+::deep .metrics-source:empty,
+.metrics-source:empty {
+    display: none;
+}
