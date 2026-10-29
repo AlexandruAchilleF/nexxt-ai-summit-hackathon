@@ -33,7 +33,7 @@ else if (!_loaded)
 }
 else if (_case is null)
 {
-    <EmptyState Icon="@Icons.Material.Rounded.SearchOff" Title="@T("No case {0}", Code)" Description="@T("The code may be mistyped, or the demo data was recreated on restart.")">
+    <EmptyState Icon="@Icons.Material.Rounded.SearchOff" Title="@T("No case {0}", Code)">
         <MudButton Variant="Variant.Outlined" Color="Color.Primary" Href="/cases">@T("All cases")</MudButton>
     </EmptyState>
 }
@@ -71,13 +71,10 @@ else
         <div class="crs-grid two">
             <MudPaper Outlined="true" Class="pa-4">
                 <div class="crs-head">
-                    <div>
-                        <div class="app-card-title d-flex align-center gap-1">@T("Indicia from the law")
-                            <MudTooltip Text="@T("An indicium is a fact in the bank's data that the law lists as a sign of tax residence abroad (guide p. 29-31). The list is closed: only these start an action.")">
-                                <MudIcon Icon="@Icons.Material.Rounded.HelpOutline" Class="crs-help" />
-                            </MudTooltip>
-                        </div>
-                        <div class="crs-hint">@T("Found by code, each with its rule and guide page. Only these can start a deadline.")</div>
+                    <div class="app-card-title d-flex align-center gap-1">@T("Indicia from the law")
+                        <MudTooltip Text="@T("An indicium is a fact in the bank's data that the law lists as a sign of tax residence abroad (guide p. 29-31). The list is closed: only these start an action.")">
+                            <MudIcon Icon="@Icons.Material.Rounded.HelpOutline" Class="crs-help" />
+                        </MudTooltip>
                     </div>
                     <Pill Tone="@(Uncovered > 0 ? "warning" : "success")">@T("{0} of {1} covered", c.Indicia.Count - Uncovered, c.Indicia.Count)</Pill>
                 </div>
@@ -112,8 +109,7 @@ else
                 @if (_cleared.Count > 0)
                 {
                     <MudDivider Class="my-4" />
-                    <div class="crs-title">@T("Checked, does not apply")</div>
-                    <div class="crs-hint mb-2">@T("Rules code checked on the client's data today, with the reason they do not apply.")</div>
+                    <div class="crs-title mb-2">@T("Checked, does not apply")</div>
                     @foreach (var rule in _cleared.Take(_allCleared ? 50 : 4))
                     {
                         <div class="crs-cleared">
@@ -132,12 +128,11 @@ else
 
             <div class="crs-stack">
                 <MudPaper Outlined="true" Class="pa-4">
-                    <div class="app-card-title d-flex align-center gap-1">@T("Context signals")
+                    <div class="app-card-title d-flex align-center gap-1 mb-3">@T("Context signals")
                         <MudTooltip Text="@T("Something found in a document that is not on the law's list, such as a salary from a foreign employer. It is shown with its quote and never opens a case.")">
                             <MudIcon Icon="@Icons.Material.Rounded.HelpOutline" Class="crs-help" />
                         </MudTooltip>
                     </div>
-                    <div class="crs-hint mb-4">@T("Found in the documents, with a quote. A signal is shown; it never starts an alert or changes the decision.")</div>
                     @if (c.Signals.Count == 0)
                     {
                         <div class="crs-hint">@T("No signal recorded on this case.")</div>
@@ -165,8 +160,7 @@ else
                 @if (c.Evidence.Any(e => e.LinkedRuleId is null && !c.Signals.Any(sg => sg.EvidenceId == e.Id)))
                 {
                     <MudPaper Outlined="true" Class="pa-4">
-                        <div class="app-card-title">@T("Other evidence")</div>
-                        <div class="crs-hint mb-2">@T("Quotes checked by code against the visible text of the document.")</div>
+                        <div class="app-card-title mb-2">@T("Other evidence")</div>
                         @foreach (var ev in c.Evidence.Where(e => e.LinkedRuleId is null && !c.Signals.Any(sg => sg.EvidenceId == e.Id)))
                         {
                             @EvidenceQuote(ev)
@@ -199,10 +193,7 @@ else
 
         <MudPaper Outlined="true" Class="pa-4">
             <div class="crs-head">
-                <div>
-                    <div class="app-card-title">@T("Case log")</div>
-                    <div class="crs-hint">@T("Every step of this case in the hash-chained audit log, newest first.")</div>
-                </div>
+                <div class="app-card-title">@T("Case log")</div>
                 <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Primary" Href="/audit" EndIcon="@Icons.Material.Rounded.ChevronRight">@T("Audit log")</MudButton>
             </div>
             @if (_audit.Count == 0)
@@ -306,9 +297,9 @@ else
         if (_isOperator && c.DueAt is { } due && due > _now)
             actions.Add(new(T("Past the deadline"), Icons.Material.Rounded.EventBusy, () => MoveAsync(Days(due) + 1), T("the case expires"), Destructive: true));
         if (_agent?.CanDeliverAnswer(c) == true)
-            actions.Add(new(T("The client answers"), Icons.Material.Rounded.MarkEmailRead, _agent.DeliverAnswerAsync, T("the new self-certification arrives")));
+            actions.Add(new(T("The client answers"), Icons.Material.Rounded.MarkEmailRead, _agent.DeliverAnswerAsync));
         if (_next?.CanFillSample == true)
-            actions.Add(new(T("Fill in the sample answer"), Icons.Material.Rounded.AutoFixHigh, () => { _next.FillSample(); return Task.CompletedTask; }, T("from the golden case")));
+            actions.Add(new(T("Fill in the sample answer"), Icons.Material.Rounded.AutoFixHigh, () => { _next.FillSample(); return Task.CompletedTask; }));
         if (actions.Count == 0) Demo.Withdraw(this);
         else Demo.Offer(this, T("Case {0}", c.Code), actions);
     }

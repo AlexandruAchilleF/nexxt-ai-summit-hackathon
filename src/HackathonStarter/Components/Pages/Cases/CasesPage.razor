@@ -9,7 +9,7 @@
 
 <PageTitle>@T("Cases") · @SiteConfig.Name</PageTitle>
 
-<PageHeader Title="@T("Cases")" Description="@T("The queue of CRS/FATCA cases, ordered by deadline on the demo date. Cases without a deadline in the guide (FATCA) come last.")">
+<PageHeader Title="@T("Cases")">
     <Actions>
         <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.EditNote" Href="/changes/new">@T("New change")</MudButton>
     </Actions>
@@ -39,14 +39,13 @@ else
     var shown = Shown().ToList();
     @if (_cases.Count == 0)
     {
-        <EmptyState Icon="@Icons.Material.Rounded.AssignmentTurnedIn" Title="@T("No cases yet")"
-                    Description="@T("A case opens only when a change touches an uncovered indicium from the guide. Record a change, or start from a golden case such as Maria's move to Munich.")">
+        <EmptyState Icon="@Icons.Material.Rounded.AssignmentTurnedIn" Title="@T("No cases yet")">
             <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/changes/new" StartIcon="@Icons.Material.Rounded.EditNote">@T("Record a change")</MudButton>
         </EmptyState>
     }
     else if (shown.Count == 0)
     {
-        <EmptyState Icon="@Icons.Material.Rounded.FilterAltOff" Title="@T("Nothing matches")" Description="@T("Try another filter or clear the search.")" />
+        <EmptyState Icon="@Icons.Material.Rounded.FilterAltOff" Title="@T("Nothing matches")" />
     }
     else
     {

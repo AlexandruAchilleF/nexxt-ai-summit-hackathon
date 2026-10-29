@@ -16,11 +16,6 @@
     border-bottom: 1px solid var(--app-separator);
 }
 
-.client-card .app-card-sub {
-    margin: 0 0 8px;
-    line-height: 1.5;
-}
-
 .client-none {
     margin: 8px 0 0;
     font-size: 14px;

@@ -4,7 +4,7 @@
    so a country missing from the list still works; ChangeService validates the code again. *@
 <MudAutocomplete T="string" Value="@Value" ValueChanged="OnChanged" SearchFunc="SearchAsync" ToStringFunc="Display" Label="@(Label ?? T("Country"))"
                  Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" CoerceValue="true" MaxItems="10" ResetValueOnEmptyText="true"
-                 Placeholder="DE" Disabled="Disabled" Class="@Class" HelperText="@Helper" />
+                 Placeholder="DE" Disabled="Disabled" Class="@Class" />
 
 @code {
     [Parameter] public string? Value { get; set; }
@@ -15,8 +15,6 @@
 
     private static readonly string[] Codes = [.. Jurisdictions.EuMemberStates.Concat(TinFormat.Countries)
         .Concat(["US", "GB", "CH", "NO", "MD", "AE", "CA", "AU", "TR", "UA", "RS"]).Select(Jurisdictions.Normalize).Distinct().Order()];
-
-    private string? Helper => Value is { Length: 2 } ? null : T("Code or name, e.g. DE or Germany");
 
     private static string Display(string? code) => string.IsNullOrWhiteSpace(code) ? "" : CrsUi.Country(code);
 

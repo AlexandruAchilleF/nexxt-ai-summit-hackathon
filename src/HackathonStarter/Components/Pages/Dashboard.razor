@@ -15,7 +15,7 @@
 
 <PageTitle>@T("Dashboard") · @SiteConfig.Name</PageTitle>
 
-<PageHeader Title="@T("Welcome back, {0}", _user?.Name.Split(' ')[0])" Description="@SiteConfig.Description">
+<PageHeader Title="@T("Welcome back, {0}", _user?.Name.Split(' ')[0])">
     <Actions>
         <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Rounded.AssignmentLate" Href="/cases">@T("Cases")</MudButton>
         <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.EditNote" Href="/changes/new">@T("New change")</MudButton>
@@ -40,21 +40,10 @@ else if (_cases is null)
 else if (_cases.Count == 0 && _changes.Count == 0)
 {
     <MudPaper Outlined="true" Class="pa-4 app-enter crs-start">
-        <div class="crs-grid two" style="align-items:center">
-            <div>
-                <div class="crs-verdict-title" style="font-size:1.75rem">@T("Nothing to decide yet")</div>
-                <p class="crs-hint mt-2 mb-5" style="font-size:15px;max-width:52ch">@T("Cases appear here when a change to a client's data touches an indicium from the ANAF guide. Record one to see the rules, the deadline and the approvals at work.")</p>
-                <div class="d-flex flex-wrap gap-2">
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" Href="/changes/new?scenario=4" EndIcon="@Icons.Material.Rounded.ArrowForward">@T("Start with Maria's move to Munich")</MudButton>
-                    <MudButton Variant="Variant.Text" Href="/changes/new">@T("Record another change")</MudButton>
-                </div>
-            </div>
-            <ol class="crs-steps">
-                @foreach (var step in SiteConfig.Landing.Steps)
-                {
-                    <li><b>@step.Title</b><span>@step.Description</span></li>
-                }
-            </ol>
+        <div class="crs-verdict-title mb-4" style="font-size:1.75rem">@T("Nothing to decide yet")</div>
+        <div class="d-flex flex-wrap gap-2">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" Href="/changes/new?scenario=4" EndIcon="@Icons.Material.Rounded.ArrowForward">@T("Start with Maria's move to Munich")</MudButton>
+            <MudButton Variant="Variant.Text" Href="/changes/new">@T("Record another change")</MudButton>
         </div>
     </MudPaper>
 }
@@ -67,19 +56,15 @@ else
         <MudItem xs="6" md="3"><StatCard Label="@T("Open cases")" Value="@Format.Number(open.Count)" Icon="@Icons.Material.Rounded.AssignmentLate" Href="/cases"
                                          Hint="@T("{0} closed or expired", _cases.Count - open.Count)" /></MudItem>
         <MudItem xs="6" md="3"><StatCard Label="@T("Due in 7 days")" Value="@Format.Number(urgent)" Icon="@Icons.Material.Rounded.Timer" Delay="70" Href="/cases?view=urgent"
-                                         Hint="@(urgent > 0 ? T("Reminder day has passed") : T("Nothing close to its deadline"))" Tone="@(urgent > 0 ? "warning" : null)" /></MudItem>
+                                         Hint="@(urgent > 0 ? T("Reminder day has passed") : null)" Tone="@(urgent > 0 ? "warning" : null)" /></MudItem>
         <MudItem xs="6" md="3"><StatCard Label="@T("Waiting for approval")" Value="@Format.Number(_drafts.Count)" Icon="@Icons.Material.Rounded.HowToReg" Delay="140"
-                                         Href="@(_drafts.Count == 1 ? $"/cases/{_drafts[0]}" : "/cases?view=approval")" Hint="@T("Drafts only the operator can send")" /></MudItem>
-        <MudItem xs="6" md="3"><StatCard Label="@T("Escalated")" Value="@Format.Number(escalated)" Icon="@Icons.Material.Rounded.PriorityHigh" Delay="210" Href="/cases?view=urgent"
-                                         Hint="@T("With the tax department")" Tone="@(escalated > 0 ? "warning" : null)" /></MudItem>
+                                         Href="@(_drafts.Count == 1 ? $"/cases/{_drafts[0]}" : "/cases?view=approval")" /></MudItem>
+        <MudItem xs="6" md="3"><StatCard Label="@T("Escalated")" Value="@Format.Number(escalated)" Icon="@Icons.Material.Rounded.PriorityHigh" Delay="210" Href="/cases?view=urgent" /></MudItem>
 
         <MudItem xs="12" md="8">
             <MudPaper Outlined="true" Class="pa-4 app-enter" Style="height:100%;animation-delay:280ms">
                 <div class="crs-head">
-                    <div>
-                        <div class="app-card-title">@T("Next deadlines")</div>
-                        <div class="app-card-sub">@T("Open cases on the demo date, the closest first")</div>
-                    </div>
+                    <div class="app-card-title">@T("Next deadlines")</div>
                     <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" Href="/cases">@T("See all")</MudButton>
                 </div>
                 @if (open.Count == 0)
@@ -105,16 +90,14 @@ else
         </MudItem>
         <MudItem xs="12" md="4">
             <MudPaper Outlined="true" Class="pa-4 app-enter" Style="height:100%;animation-delay:340ms">
-                <div class="app-card-title">@T("Who the cases wait for")</div>
-                <div class="app-card-sub mb-6">@T("All cases")</div>
+                <div class="app-card-title mb-6">@T("Who the cases wait for")</div>
                 <ActivityRings Segments="_byWaiting" Unit="@T("cases")" />
             </MudPaper>
         </MudItem>
 
         <MudItem xs="12" md="4">
             <MudPaper Outlined="true" Class="pa-4 app-enter" Style="height:100%;animation-delay:400ms">
-                <div class="app-card-title">@T("Decisions of the code")</div>
-                <div class="app-card-sub mb-4">@T("On the last {0} changes", _changes.Count)</div>
+                <div class="app-card-title mb-4">@T("Decisions of the code")</div>
                 @{ var k = 0; var max = Math.Max(1, _decisions.Values.DefaultIfEmpty(0).Max()); }
                 @foreach (var d in Enum.GetValues<Decision>())
                 {

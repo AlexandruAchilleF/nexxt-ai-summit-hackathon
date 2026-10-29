@@ -3,7 +3,7 @@
 
 <PageTitle>@T("Agent runs") · @SiteConfig.Name</PageTitle>
 
-<PageHeader Title="@T("Agent runs")" Description="@T("Every run with its steps: what the agent did, with which data, who approved it, and which checks it passed.")" />
+<PageHeader Title="@T("Agent runs")" />
 
 @if (_error is not null)
 {
@@ -15,7 +15,7 @@ else if (_runs is null)
 }
 else if (_runs.Count == 0)
 {
-    <EmptyState Icon="@Icons.Material.Outlined.SmartToy" Title="@T("No agent runs yet")" Description="@T("Talk to the Assistant or start a scenario: every run shows up here.")" />
+    <EmptyState Icon="@Icons.Material.Outlined.SmartToy" Title="@T("No agent runs yet")" />
 }
 else
 {

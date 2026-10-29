@@ -9,7 +9,7 @@
 
 <PageTitle>@T("Data and privacy") · @SiteConfig.Name</PageTitle>
 
-<PageHeader Title="@T("Data and privacy")" Description="@T("What happens to personal data in this app, read from the live configuration: what reaches a model, what is stored, and for how long.")" />
+<PageHeader Title="@T("Data and privacy")" />
 
 <div class="d-flex flex-column gap-4">
     <MudPaper Outlined="true" Class="pa-5">
@@ -118,12 +118,8 @@
     </MudPaper>
 
     <MudPaper Outlined="true" Class="pa-5">
-        <MudText Typo="Typo.subtitle1" Style="font-weight:600">@T("Signals and test data")</MudText>
-        <MudSimpleTable Dense="true" Elevation="0" Class="mt-2">
-            <tbody>
-                <tr><td>@T("Test data")</td><td>@T("Synthetic data only: clients, documents and TINs are generated from a fixed seed. Generated identity documents show SPECIMEN.")</td></tr>
-            </tbody>
-        </MudSimpleTable>
+        <MudText Typo="Typo.subtitle1" Style="font-weight:600">@T("Test data")</MudText>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary mt-1">@T("Synthetic data only: clients, documents and TINs are generated from a fixed seed. Generated identity documents show SPECIMEN.")</MudText>
     </MudPaper>
 
     @if (_targets.Count > 0)

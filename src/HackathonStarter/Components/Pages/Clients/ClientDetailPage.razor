@@ -29,7 +29,7 @@ else if (_loading)
 else if (_client is not { } c)
 {
     <PageHeader Title="@T("Client {0}", Code)" />
-    <EmptyState Icon="@Icons.Material.Rounded.PersonSearch" Title="@T("No client with this code")" Description="@T("Check the code or pick the client from the list.")">
+    <EmptyState Icon="@Icons.Material.Rounded.PersonSearch" Title="@T("No client with this code")">
         <MudButton Href="/clients" Variant="Variant.Filled" Color="Color.Primary">@T("All clients")</MudButton>
     </EmptyState>
 }
@@ -108,7 +108,6 @@ else
         <MudItem xs="12" Class="client-grid-cell">
             <section class="app-card client-card" aria-labelledby="client-accounts">
                 <h2 id="client-accounts" class="app-card-title">@T("Accounts and standing orders")</h2>
-                <p class="app-card-sub">@T("New or preexisting is computed per regime from the opening date (guide p. 20): CRS preexisting = held on 31 Dec 2015, FATCA preexisting = held on 30 Jun 2014.")</p>
                 @if (c.Accounts.Count == 0)
                 {
                     <p class="client-none">@T("No account.")</p>
@@ -132,7 +131,7 @@ else
                                 <MudIcon Icon="@Icons.Material.Rounded.SubdirectoryArrowRight" Size="Size.Small" Class="client-order-icon" />
                                 <div class="client-row-main">
                                     <div>@T("Standing order to") <span class="mono client-break">@o.BeneficiaryAccount</span></div>
-                                    <div class="app-list-meta"><span class="tabular">@Format.Number(o.Amount, 2) @a.Currency</span> · @FrequencyLabel(o.Frequency) · @T("from the account above")</div>
+                                    <div class="app-list-meta"><span class="tabular">@Format.Number(o.Amount, 2) @a.Currency</span> · @FrequencyLabel(o.Frequency)</div>
                                 </div>
                                 <div class="client-row-tags">
                                     <span class="client-country mono">@o.BeneficiaryCountry</span>
@@ -148,7 +147,6 @@ else
         <MudItem xs="12" md="6" Class="client-grid-cell">
             <section class="app-card client-card" aria-labelledby="client-selfcerts">
                 <h2 id="client-selfcerts" class="app-card-title">@T("Self-certifications")</h2>
-                <p class="app-card-sub">@T("TIN checks say \"format valid\": they check the format, not that the number exists.")</p>
                 @if (c.SelfCertifications.Count == 0)
                 {
                     <p class="client-none">@T("No self-certification on file.")</p>
@@ -180,7 +178,6 @@ else
                                     {
                                         var check = TinFormat.Check(r.Country, r.Tin);
                                         <div class="mono client-break">@r.Tin</div>
-                                        <div class="app-list-meta">@T("Tax residence")</div>
                                         <div class="client-tin"><TinBadge Check="check" /></div>
                                     }
                                 </div>
@@ -194,7 +191,6 @@ else
         <MudItem xs="12" md="6" Class="client-grid-cell">
             <section class="app-card client-card" aria-labelledby="client-documents">
                 <h2 id="client-documents" class="app-card-title">@T("Documents")</h2>
-                <p class="app-card-sub">@T("The shield removes hidden text before any model reads a document.")</p>
                 @if (_documents.Count == 0)
                 {
                     <p class="client-none">@T("No document on file.")</p>
@@ -216,10 +212,6 @@ else
                         @if (scan is not null)
                         {
                             <ShieldBadge Verdict="scan.Verdict" Hidden="scan.Hidden" />
-                            @if (d.ShieldVerdict == ShieldVerdict.NotScanned)
-                            {
-                                <p class="app-list-meta mt-1">@T("Scanned now for this view; the saved verdict changes only when the document goes through a change.")</p>
-                            }
                         }
                         else if (d.ShieldVerdict != ShieldVerdict.Clean)
                         {

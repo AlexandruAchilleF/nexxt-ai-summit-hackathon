@@ -11,13 +11,12 @@
 
 <PageTitle>@T("Settings") · @SiteConfig.Name</PageTitle>
 
-<PageHeader Title="@T("Settings")" Description="@T("Demo user and what is connected right now. Everything works without configuration.")" />
+<PageHeader Title="@T("Settings")" />
 
 <MudGrid Spacing="3">
     <MudItem xs="12" md="6">
         <MudPaper Outlined="true" Class="pa-5">
             <MudText Typo="Typo.subtitle1" Style="font-weight:600">@T("Demo user")</MudText>
-            <MudText Typo="Typo.caption" Class="mud-text-secondary">@T("Roles control what each user can do.")</MudText>
             <MudList T="string" Class="mt-2">
                 @foreach (var u in SiteConfig.Users)
                 {
@@ -42,7 +41,6 @@
     <MudItem xs="12" md="6">
         <MudPaper Outlined="true" Class="pa-5">
             <MudText Typo="Typo.subtitle1" Style="font-weight:600">@T("System")</MudText>
-            <MudText Typo="Typo.caption" Class="mud-text-secondary">@T("From appsettings.json / appsettings.Local.json / environment variables.")</MudText>
             <MudSimpleTable Dense="true" Class="mt-2" Elevation="0">
                 <tbody>
                     <tr><td>@T("Database")</td><td class="mono">@(Config["Database:Provider"] ?? "Sqlite")</td></tr>
@@ -67,10 +65,7 @@
         <MudItem xs="12">
             <MudPaper Outlined="true" Class="pa-5">
                 <div class="d-flex flex-wrap align-center gap-4">
-                    <div style="flex:1;min-width:240px">
-                        <MudText Typo="Typo.subtitle1" Style="font-weight:600">@T("Connections")</MudText>
-                        <MudText Typo="Typo.caption" Class="mud-text-secondary">@T("Sends a one-line request to the main model, every model profile and every target. Run it on the venue's network before going on stage.")</MudText>
-                    </div>
+                    <MudText Typo="Typo.subtitle1" Style="font-weight:600;flex:1;min-width:240px">@T("Connections")</MudText>
                     <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Outlined.NetworkCheck" Disabled="_checking" OnClick="CheckConnections">
                         @T(_checking ? "Checking…" : "Test connections")
                     </MudButton>
@@ -101,10 +96,7 @@
     {
         <MudItem xs="12">
             <MudPaper Outlined="true" Class="pa-5 d-flex flex-wrap align-center gap-4">
-                <div style="flex:1;min-width:240px">
-                    <MudText Typo="Typo.subtitle1" Style="font-weight:600">@T("Reset demo data")</MudText>
-                    <MudText Typo="Typo.caption" Class="mud-text-secondary">@T("Deletes all agent runs and restores the seed data. Do it right before the demo.")</MudText>
-                </div>
+                <MudText Typo="Typo.subtitle1" Style="font-weight:600;flex:1;min-width:240px">@T("Reset demo data")</MudText>
                 <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Outlined.RestartAlt" Disabled="_resetting" OnClick="Reset">@T("Reset")</MudButton>
             </MudPaper>
         </MudItem>

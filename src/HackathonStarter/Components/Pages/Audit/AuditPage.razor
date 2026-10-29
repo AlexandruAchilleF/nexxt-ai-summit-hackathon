@@ -10,7 +10,7 @@
 
 <PageTitle>@T("Audit log") · @SiteConfig.Name</PageTitle>
 
-<PageHeader Title="@T("Audit log")" Description="@T("The bank keeps a record that can credibly prove each confirmation, for audit purposes, and its electronic system must ensure that the information received is the information sent (ANAF guide, p. 34-35). Each entry is chained to the previous one with SHA-256: a change breaks the chain exactly there.")">
+<PageHeader Title="@T("Audit log")">
     <Actions>
         <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.Verified" OnClick="VerifyAsync"
                    Disabled="@(_entries is null || _verifying)">@T("Verify")</MudButton>
@@ -35,17 +35,16 @@ else if (_entries is null)
 }
 else if (_entries.Count == 0)
 {
-    <EmptyState Title="@T("No entries yet")" Description="@T("Every change, rule, case step, evidence check and approval is written here.")" Icon="@Icons.Material.Rounded.Verified">
+    <EmptyState Title="@T("No entries yet")" Icon="@Icons.Material.Rounded.Verified">
         <MudButton Variant="Variant.Outlined" Color="Color.Primary" Href="/changes/new">@T("Record a change")</MudButton>
     </EmptyState>
 }
 else
 {
-    <div class="d-flex flex-wrap align-center gap-3 mb-4">
+    <div class="mb-4">
         <Segmented Label="@T("Audit log")" @bind-Value="_view" Options="@([
             new("steps", T("Steps and decisions"), _entries.Count(e => e.Kind != AuditKinds.RuleApplied)),
             new("all", T("Everything"), _entries.Count)])" />
-        <span class="crs-hint" style="margin:0">@(_view == "steps" ? T("The rule checks of each change are hidden; they stay in the chain.") : T("Including every rule checked on every change."))</span>
     </div>
     <div class="@($"audit-table{(_verification is null ? "" : _verification.Ok ? " is-swept" : " is-broken")}")" @key="@($"{_sweep}|{_view}")">
         <MudTable T="AuditEntry" Items="Shown" Breakpoint="Breakpoint.Sm" Dense="true" Hover="true" Outlined="true" Elevation="0" RowStyleFunc="RowStyle" RowClassFunc="RowClass">
