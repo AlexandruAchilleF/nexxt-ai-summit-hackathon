@@ -46,6 +46,7 @@ public static class CrsUi
     public static string Country(string? code)
     {
         if (string.IsNullOrWhiteSpace(code)) return "-";
+        if (IsEn && Jurisdictions.Normalize(code) == Jurisdictions.UnitedStates) return "United States (US)";
         var name = Jurisdictions.Display(code, IsEn);
         return name.StartsWith("the ", StringComparison.Ordinal) ? name[4..] : name;
     }
@@ -84,7 +85,11 @@ public static class CrsUi
         _ => T("Something went wrong: {0}", ex.Message),
     };
 
-    public static string Page(string? page) => string.IsNullOrWhiteSpace(page) || page == "?" ? T("page not verified") : T("guide p. {0}", page);
+    /// <summary>"guide p. 29"; a design interpretation (<see cref="RuleCatalog.NotVerified"/>) says so instead of showing a page.</summary>
+    public static string Page(string? page) =>
+        string.IsNullOrWhiteSpace(page) || page == "?" ? T("page not verified")
+        : page == RuleCatalog.NotVerified ? T("not in the guide: our reading")
+        : T("guide p. {0}", page);
 
     // ---- Case status ----
 
@@ -371,13 +376,24 @@ public static class CrsUi
         _ => kind,
     };
 
-    /// <summary>"system", "operator", "user:admin", "agent" as a person reads them.</summary>
+    /// <summary>"system", "system:seed", "user:admin", "agent", "agent:crs-sentinel for user:admin" as a person reads them.</summary>
     public static string Actor(string? actor)
     {
         if (string.IsNullOrWhiteSpace(actor)) return "-";
         if (actor == "system") return T("System");
+        if (actor == "system:seed") return T("Seed history");
+        if (actor.StartsWith("system", StringComparison.Ordinal)) return T("System");
         if (actor == "agent") return T("Agent");
-        var id = actor.StartsWith("user:", StringComparison.Ordinal) ? actor[5..] : actor;
-        return Config.SiteConfig.Users.FirstOrDefault(u => u.Id == id)?.Name ?? actor;
+        const string agentPrefix = "agent:", onBehalf = " for user:";
+        if (actor.StartsWith(agentPrefix, StringComparison.Ordinal))
+        {
+            var cut = actor.IndexOf(onBehalf, StringComparison.Ordinal);
+            var agent = cut < 0 ? actor[agentPrefix.Length..] : actor[agentPrefix.Length..cut];
+            var agentName = agent == "crs-sentinel" ? "CRS Sentinel" : agent;
+            return cut < 0 ? agentName : T("{0} for {1}", agentName, UserName(actor[(cut + onBehalf.Length)..]));
+        }
+        return UserName(actor.StartsWith("user:", StringComparison.Ordinal) ? actor[5..] : actor);
     }
+
+    private static string UserName(string id) => Config.SiteConfig.Users.FirstOrDefault(u => u.Id == id)?.Name ?? id;
 }

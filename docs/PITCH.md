@@ -342,6 +342,8 @@ Romanian sources are quoted in Romanian, followed by our translation.
 - [ ] Text read aloud and timed: ≤ 3:00.
 - [ ] Video watched end to end after upload: duration ≤ 3:00, sound, the link opens without an account.
 - [ ] **Backup demo recorded** (by 08:00), on the same route.
+- [ ] The route can be driven automatically at the pace of the voice-over: [`tools/DemoFilm`](../tools/DemoFilm/README.md)
+      (Playwright, visible browser and cursor, chapter times for the edit in `film-chapters.txt`).
 
 ## 5. What sets us apart (for the jury and the questions)
 
