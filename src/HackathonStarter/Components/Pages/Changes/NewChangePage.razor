@@ -16,7 +16,7 @@
 
 <PageTitle>@T("New change") · @SiteConfig.Name</PageTitle>
 
-<PageHeader Title="@T("New change")" Description="@T("Record a change to a client's data, as core banking would send it. Code applies the rules of the ANAF guide at once: no case, a case with a deadline, or an alert.")" />
+<PageHeader Title="@T("New change")" />
 
 @if (_error is not null)
 {
@@ -42,10 +42,7 @@ else
         else
         {
         <div class="crs-head" style="margin-bottom:12px;flex-wrap:wrap">
-            <div>
-                <div class="app-card-title">@T("Start from a golden case")</div>
-                <div class="crs-hint">@T("The cases written before the code, with their expected result. Pick one to fill in the form, then record it.")</div>
-            </div>
+            <div class="app-card-title">@T("Start from a golden case")</div>
             <Segmented Label="@T("Start from a golden case")" @bind-Value="_group"
                        Options="@([.. Scenarios.GroupBy(s => s.Group).Select(g => new Segmented.Option(g.Key, T(g.Key), g.Count()))])" />
         </div>
@@ -172,8 +169,7 @@ else
                         </div>
                         break;
                     case ChangeKind.DocumentUploaded:
-                        <MudSelect T="int?" @bind-Value="_documentId" Label="@T("Document")" Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense" Class="span-2"
-                                   HelperText="@T("The hidden-text shield scans it before any model reads it.")">
+                        <MudSelect T="int?" @bind-Value="_documentId" Label="@T("Document")" Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense" Class="span-2">
                             @foreach (var d in _documents)
                             {
                                 <MudSelectItem T="int?" Value="d.Id">@d.FileName · @CrsUi.Label(d.Kind) · @CrsUi.Label(d.ShieldVerdict)</MudSelectItem>
@@ -288,19 +284,17 @@ else
                         </div>
                     }
 
-                    <div class="d-flex flex-wrap gap-2 mt-4">
-                        @if (res.CaseCode is { } code)
-                        {
+                    @if (res.CaseCode is { } code)
+                    {
+                        <div class="d-flex flex-wrap gap-2 mt-4">
                             <MudButton Variant="Variant.Filled" Color="Color.Primary" EndIcon="@Icons.Material.Rounded.ArrowForward" Href="@($"/cases/{code}")">@T("Open case {0}", code)</MudButton>
-                        }
-                        <MudButton Variant="Variant.Outlined" Href="@($"/clients/{_clientCode}")">@T("See the client")</MudButton>
-                    </div>
+                        </div>
+                    }
 
                     <MudDivider Class="my-4" />
                     <div class="crs-title mb-1">@T("Engine's explanation")</div>
                     <p class="mb-4">@Lang.Pick(o.ExplanationRo, o.Explanation)</p>
-                    <div class="crs-title mb-1">@T("Rules checked")</div>
-                    <div class="crs-hint mb-2">@T("Engine {0}. Same data in, same decision out.", o.EngineVersion)</div>
+                    <div class="crs-title mb-2">@T("Rules checked")</div>
                     @{ var i = 0; }
                     @foreach (var hit in o.Indicia)
                     {
@@ -349,15 +343,7 @@ else
             }
             else
             {
-                <MudPaper Outlined="true" Class="pa-4 app-enter" Style="animation-delay:160ms">
-                    <div class="app-card-title mb-3">@T("What happens when you record it")</div>
-                    <ol class="crs-steps">
-                        <li><b>@T("The change is saved and applied")</b><span>@T("Before and after, with personal data masked in storage.")</span></li>
-                        <li><b>@T("Code applies the rules")</b><span>@T("Every indicium of the guide is checked, each with its rule ID and page.")</span></li>
-                        <li><b>@T("A case opens only when it matters")</b><span>@T("An uncovered indicium opens a case and starts the legal deadline.")</span></li>
-                        <li><b>@T("Everything goes into the audit log")</b><span>@T("Hash-chained, so a later edit shows.")</span></li>
-                    </ol>
-                </MudPaper>
+                <EmptyState Icon="@Icons.Material.Rounded.Gavel" Title="@T("Decision of the code")" />
             }
         </div>
     </div>

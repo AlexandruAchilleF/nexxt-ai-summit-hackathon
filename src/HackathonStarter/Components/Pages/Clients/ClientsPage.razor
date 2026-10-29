@@ -4,7 +4,7 @@
 
 <PageTitle>@T("Clients") · @SiteConfig.Name</PageTitle>
 
-<PageHeader Title="@T("Clients")" Description="@T("Synthetic demo clients. Open one to see its data, documents and cases.")" />
+<PageHeader Title="@T("Clients")" />
 
 <MudTextField T="string" Value="_search" ValueChanged="SearchAsync" DebounceInterval="300" Placeholder="@T("Search by code or name")"
               Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Rounded.Search" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-4" Clearable="true" />
@@ -19,7 +19,7 @@ else if (_clients is null)
 }
 else if (_clients.Count == 0)
 {
-    <EmptyState Icon="@Icons.Material.Rounded.PersonSearch" Title="@T("No client found")" Description="@T("Try another code or name.")" />
+    <EmptyState Icon="@Icons.Material.Rounded.PersonSearch" Title="@T("No client found")" />
 }
 else
 {

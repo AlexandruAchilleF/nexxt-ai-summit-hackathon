@@ -29,16 +29,6 @@
     <ChildContent>
         <div class="demo-date-head">
             <div class="app-card-title" style="font-size:15px">@T("Demo")</div>
-            <div class="app-card-sub">
-                @if (_offsetDays > 0)
-                {
-                    @T("{0} days ahead of the real date. Deadlines, reminders and expiries follow it.", _offsetDays)
-                }
-                else
-                {
-                    @T("The real date. Move it forward to see reminders and expiries.")
-                }
-            </div>
         </div>
         @if (Demo?.Actions is { Count: > 0 } actions)
         {

@@ -11,7 +11,7 @@
 <PageTitle>@T("Architecture") · @SiteConfig.Name</PageTitle>
 
 @* "How it works", filmed for the architecture part of the pitch (S7). Every number on it is read live. *@
-<PageHeader Title="@T("How {0} decides", SiteConfig.Name)" Description="@T("Code decides. AI explains. A person approves.")" />
+<PageHeader Title="@T("How {0} decides", SiteConfig.Name)" />
 
 <ol class="arch-flow mb-3" aria-label="@T("Maria's case, step by step")">
     @foreach (var (step, i) in Flow.Select((s, i) => (s, i)))
@@ -89,14 +89,6 @@
         <span class="arch-tools-note"><MudIcon Icon="@Icons.Material.Outlined.HowToReg" Size="Size.Small" />@T("waits for a person's approval")</span>
     </div>
 }
-
-<MudPaper Outlined="true" Class="pa-4 d-flex align-start gap-3">
-    <MudIcon Icon="@Icons.Material.Outlined.AccountBalance" Class="mud-text-secondary mt-1" />
-    <div>
-        <MudText Typo="Typo.subtitle2">@T("In a bank")</MudText>
-        <MudText Typo="Typo.body2" Class="mud-text-secondary">@T("In the demo, the form simulates each change. In a bank, core banking would send every change to the same service, and the same rules would run.")</MudText>
-    </div>
-</MudPaper>
 
 @code {
     private record Step(string Text, string Who);

@@ -86,11 +86,14 @@
         finally { _busy = false; }
     }
 
-    private RenderFragment Head(string title, string text, string icon) => @<div class="crs-next-head">
+    private RenderFragment Head(string title, string? text, string icon) => @<div class="crs-next-head">
         <span class="crs-next-icon"><MudIcon Icon="@icon" /></span>
         <div>
             <div class="app-card-title">@title</div>
-            <div class="crs-hint" style="max-width:72ch">@text</div>
+            @if (text is not null)
+            {
+                <div class="crs-hint" style="max-width:72ch">@text</div>
+            }
             @if (Case.IsOpen && Case.Indicia.Count > 0)
             {
                 <div class="crs-why">
@@ -162,12 +165,11 @@
     {
         var kind = Case.Responses.Count > 0 ? RequestKind.FollowUp : RequestKind.Initial;
         <div>
-            @Head(T("Write the request to the client"), T("The documents to ask for are computed by code from the indicia, the regime and the account age. The text is a starting point; nothing leaves the bank before the operator approves it."), Icons.Material.Rounded.EditNote)
+            @Head(T("Write the request to the client"), null, Icons.Material.Rounded.EditNote)
             <div class="crs-grid two">
                 <div>
                     <div class="d-flex align-center gap-2 mb-2">
                         <Segmented Label="@T("Language of the letter")" Value="@_lang" ValueChanged="SetLang" Options="@([new("ro", "RO"), new("en", "EN")])" />
-                        <span class="crs-hint" style="margin:0">@T("Language of the letter")</span>
                     </div>
                     <MudTextField T="string" Value="Body" ValueChanged="v => { _body = v; _edited = true; }" Variant="Variant.Outlined" Lines="10" Sizing="InputSizing.Auto"
                                   Label="@T("Letter")" Disabled="@(!IsEditor)" Immediate="true" />
@@ -191,7 +193,6 @@
                            OnClick="@(() => RunAsync(() => Cases.DraftRequestAsync(Case.Code, _lang, Body, kind), T("Draft saved: it waits for the operator's approval")))">
                     @(kind == RequestKind.FollowUp ? T("Save the follow-up draft") : T("Save the draft"))
                 </MudButton>
-                <span class="crs-hint" style="margin:0">@T("The draft goes into the audit log with your name.")</span>
             </div>
             @if (!IsEditor)
             {
@@ -213,7 +214,7 @@
             @Head(draft.Kind == RequestKind.Reminder ? T("Approve the reminder to the client") : T("Approve the request to the client"),
                   draft.DraftedBy == CaseService.SystemActor
                       ? T("Drafted by the deadline watcher on the reminder day. Approving sends it; the case keeps waiting for the client.")
-                      : T("Drafted by {0}. Approving sends it and starts the wait for the client's answer.", CrsUi.Actor(draft.DraftedBy)),
+                      : T("Drafted by {0} · {1}", CrsUi.Actor(draft.DraftedBy), CrsUi.DateTimeText(draft.CreatedAt)),
                   Icons.Material.Rounded.HowToReg)
             <div class="crs-grid two">
                 <div class="crs-letter">@draft.Body</div>
@@ -265,7 +266,6 @@
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.Send" Disabled="@(_busy || !IsOperator)"
                                OnClick="@(() => _confirmRequest = draft.Id)">@T("Approve and send")</MudButton>
                     <MudButton Variant="Variant.Outlined" Disabled="@(_busy || !IsOperator)" OnClick="() => _rejecting = true">@T("Reject")</MudButton>
-                    <span class="crs-hint" style="margin:0">@T("You check the details once more before it goes.")</span>
                 </div>
             }
             @if (!IsOperator)
@@ -382,7 +382,7 @@
             @Head(T("Register the client's answer"),
                   Case.Status == CaseStatus.Escalated && Case.EscalationReason is { } why
                       ? T("Escalated to the tax department: {0}", why)
-                      : T("Waiting since the request was sent. Record what the client sent; code then checks whether it is enough to close."),
+                      : null,
                   Icons.Material.Rounded.MarkEmailUnread)
             <div class="crs-form cols-2">
                 <MudSelect T="ResponseKind" Value="_kind" ValueChanged="SetAnswerKind" Label="@T("Answer")" Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense" Disabled="@(_busy || !IsEditor)">
@@ -401,8 +401,7 @@
                 @if (_kind == ResponseKind.NewSelfCertification)
                 {
                     <div class="span-2">
-                        <div class="crs-title mb-1">@T("Tax residences declared")</div>
-                        <div class="crs-hint mb-3">@T("The TIN format is checked as you type: \"format valid\", never \"TIN valid\".")</div>
+                        <div class="crs-title mb-3">@T("Tax residences declared")</div>
                         @foreach (var row in _residences)
                         {
                             var r = row;
@@ -504,7 +503,7 @@
     {
         var response = Case.Responses.OrderBy(r => r.ReceivedAt).ThenBy(r => r.Id).Last();
         <div>
-            @Head(T("Approve the closing"), T("Code re-evaluates the client with the answer when you approve. If the answer is not enough, the case stays open and you ask for a follow-up."), Icons.Material.Rounded.Gavel)
+            @Head(T("Approve the closing"), null, Icons.Material.Rounded.Gavel)
             <div class="crs-grid two">
                 <div>
                     <dl class="crs-kv">
@@ -615,8 +614,7 @@
             @if (Case.Proof is { } proof)
             {
                 <MudDivider Class="my-5" />
-                <div class="crs-title mb-1">@T("Proof of confirmation")</div>
-                <div class="crs-hint mb-3">@T("Kept with the self-certification for audit (guide p. 34-35). Built by code from the answer.")</div>
+                <div class="crs-title mb-3">@T("Proof of confirmation")</div>
                 <dl class="crs-kv">
                     <dt>@T("Channel")</dt><dd>@CrsUi.Label(proof.Channel) · @CrsUi.Label(proof.EvidenceKind)</dd>
                     <dt>@T("Confirmed")</dt><dd>@CrsUi.DateTimeText(proof.ConfirmedAt)</dd>

@@ -1,5 +1,5 @@
 @* An illustrative Maria workflow, not a live case or an interactive agent session. *@
-<section class="lp-preview" aria-labelledby="landing-workflow">
+<section class="lp-preview" aria-label="@T("Illustrative CRS/FATCA workflow")">
     <aside class="lp-preview-side" aria-hidden="true">
         <div class="lp-preview-brand"><img src="@SiteConfig.Logo" alt="" />@SiteConfig.Name</div>
         @foreach (var item in SiteConfig.Nav.Take(7))
@@ -8,37 +8,29 @@
         }
     </aside>
 
-    <div class="lp-preview-content">
-        <header class="lp-preview-heading">
-            <h2 id="landing-workflow">@T("Illustrative CRS/FATCA workflow")</h2>
-            <span class="lp-preview-badge">@T("Synthetic customer data")</span>
-        </header>
-        <div class="lp-preview-panels">
-            <section class="lp-preview-case">
-                <p class="lp-preview-overline">@T("Customer change")</p>
-                <h3>@P.ItemTitle</h3>
-                <p class="lp-dim">@P.ItemDescription</p>
-                <div class="lp-preview-rule">
-                    <MudIcon Icon="@Icons.Material.Outlined.Gavel" />
-                    <div>
-                        <h4>@T("Code applies the rules")</h4>
-                        <div class="lp-preview-codes"><code>CRS-IND-ADDR</code><code>CRS-IND-PHONE</code></div>
-                        <p class="lp-preview-deadline">@T("New CRS account: 90 calendar days.")</p>
-                    </div>
+    <div class="lp-preview-panels">
+        <section class="lp-preview-case">
+            <h3>@P.ItemTitle</h3>
+            <p class="lp-dim">@P.ItemDescription</p>
+            <div class="lp-preview-rule">
+                <MudIcon Icon="@Icons.Material.Outlined.Gavel" />
+                <div>
+                    <h4>@T("Code applies the rules")</h4>
+                    <div class="lp-preview-codes"><code>CRS-IND-ADDR</code><code>CRS-IND-PHONE</code></div>
+                    <p class="lp-preview-deadline">@T("New CRS account: 90 calendar days.")</p>
                 </div>
-            </section>
+            </div>
+        </section>
 
-            <section class="lp-preview-agent">
-                <div class="lp-preview-agent-head"><MudIcon Icon="@Icons.Material.Outlined.SmartToy" /><h3>@SiteConfig.Name · @T("Evidence and draft")</h3></div>
-                <p class="lp-preview-task">@P.Prompt</p>
-                <p class="lp-preview-evidence">@P.Reply</p>
-                <div class="lp-preview-result">
-                    <MudIcon Icon="@Icons.Material.Outlined.HowToReg" />
-                    <div><h4>@T("Human approval")</h4><p>@P.ResultTitle · @P.ResultDetail</p></div>
-                </div>
-            </section>
-        </div>
-        <div class="lp-preview-audit"><MudIcon Icon="@Icons.Material.Outlined.VerifiedUser" Size="Size.Small" />@T("Changes and approvals are recorded in the audit log.")</div>
+        <section class="lp-preview-agent">
+            <div class="lp-preview-agent-head"><MudIcon Icon="@Icons.Material.Outlined.SmartToy" /><h3>@SiteConfig.Name · @T("Evidence and draft")</h3></div>
+            <p class="lp-preview-task">@P.Prompt</p>
+            <p class="lp-preview-evidence">@P.Reply</p>
+            <div class="lp-preview-result">
+                <MudIcon Icon="@Icons.Material.Outlined.HowToReg" />
+                <div><h4>@P.ResultTitle</h4><p>@P.ResultDetail</p></div>
+            </div>
+        </section>
     </div>
 </section>
 

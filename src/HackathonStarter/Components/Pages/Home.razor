@@ -10,9 +10,7 @@
 
     <main>
         <section class="lp-wrap lp-hero">
-            <p class="lp-eyebrow">@T("CRS/FATCA operations")</p>
             <h1>@L.Headline</h1>
-            <p class="lp-hero-sub">@L.Subheadline</p>
             <div class="lp-hero-actions">
                 <a class="lp-btn lp-btn-light" href="@L.CtaHref">@L.CtaLabel</a>
             </div>
@@ -21,25 +19,11 @@
 
         <div class="lp-wrap"><AppPreview /></div>
 
-        <section id="product" class="lp-wrap lp-statement">
-            <div>
-                <p class="lp-eyebrow">@T("The compliance problem")</p>
-                <h2>@T("From customer changes to a documented review")</h2>
-            </div>
-            <div class="lp-problem-copy">
-                <p>@T("A relevant customer change can make the existing tax-residency declaration unreliable. The bank needs to reassess the file, collect evidence and track the applicable deadline.")</p>
-                <p class="lp-dim">@L.Statement.Rest</p>
-            </div>
-        </section>
-
         @foreach (var s in L.Sections)
         {
-            <section class="lp-section">
+            <section id="@(s == L.Sections[0] ? "product" : null)" class="lp-section">
                 <div class="lp-wrap">
-                    <div class="lp-section-head">
-                        <h2>@s.Title</h2>
-                        <p>@s.Description</p>
-                    </div>
+                    <h2>@s.Title</h2>
                     <div class="lp-features">
                         @foreach (var f in s.Features)
                         {
@@ -75,10 +59,7 @@
         </section>
 
         <section class="lp-closing">
-            <h2><span>@L.Closing.Lead</span><br />@L.Closing.Rest</h2>
-            <div class="lp-closing-actions">
-                <a class="lp-btn lp-btn-light" href="@L.CtaHref">@L.CtaLabel</a>
-            </div>
+            <a class="lp-btn lp-btn-light" href="@L.CtaHref">@L.CtaLabel</a>
         </section>
     </main>
 
