@@ -51,7 +51,7 @@ operator approves sending it and closing the case.
 
 For the "Functional completeness and testability" criterion (20%): the jury must be able to check it on their own.
 
-1. The app: <https://hackathon-starter-k0ym.onrender.com/> (access code in the README; the first start takes up to a
+1. The app: <https://hackathon-starter-k0ym.onrender.com/> (open, no access code; the first start takes up to a
    minute). Or locally: `tools/setup-dev.sh`, then `dotnet run --project src/HackathonStarter` (no keys, on the mock).
 2. **Maria end to end:** `/changes/new` → "Start from a golden case" → case 4 (Maria Popescu) → "Record and apply the
    rules" → the case code → "Analyze the file" → "Approve" → "Demo" → "To the reminder day" → "The client answers" →
