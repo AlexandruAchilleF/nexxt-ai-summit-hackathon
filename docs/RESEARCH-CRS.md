@@ -51,7 +51,8 @@ De aceea **contul Mariei e un cont nou** (deschis după 2016), ca termenul de 90
 | e | Împuternicire sau delegare de semnătură valabilă, acordată unei persoane cu adresă într-o jurisdicție raportabilă | |
 | f | Adresă „post-restant” sau „în atenția” într-o jurisdicție raportabilă, **dacă banca nu are altă adresă** | |
 
-Sursa: p. 29 (Legea 207/2015, Anexa 1, Secțiunea III, subsecțiunea B, pct. 13).
+Sursa: p. 29. În Legea 207/2015 (Anexa 1, Secțiunea III, subsecțiunea B), lista e la pct. 12 (ghidul, p. 42:
+„indiciile descrise la pct. 12 subsecţiunea B din secţiunea III”), iar cerințele pentru indicii la pct. 13 (ghidul, p. 30).
 
 ### Indiciile FATCA (conturi individuale preexistente)
 
@@ -127,5 +128,6 @@ răspunsul la 1 e „totul e automatizat cap-coadă”, mutăm accentul pe evalu
 - [x] Cuantumul amenzilor: Codul de procedură fiscală, art. 336 alin. (2) lit. k^1) și k^2), introduse prin OUG 102/2022 (tabelul din secțiunea 3).
 - [x] Termenul de depunere F3000: 15 mai, în [Codul de procedură fiscală](https://legislatie.just.ro/Public/DetaliiDocument/312603), art. 62 alin. (7). [OPANAF 1711/2022](https://legislatie.just.ro/Public/DetaliiDocument/259750) doar aprobă formularele F3000 DAC2/CRS și F3000 FATCA.
 - [x] Riscul FATCA (reținerea de 30%): nu îl spunem în pitch. România are [acord FATCA Model 1](https://home.treasury.gov/system/files/131/FATCA-Agreement-Romania-5-28-2015.pdf): o bancă conformă nu e supusă reținerii (art. 4(1)). Doar o neconformare semnificativă nerezolvată în 18 luni de la notificare o poate face instituție nonparticipantă (art. 5(2)(b)), iar reținerea e de 30% ([26 U.S.C. 1471(a)](https://www.govinfo.gov/content/pkg/USCODE-2023-title26/html/USCODE-2023-title26-subtitleA-chap4-sec1471.htm)).
-- [ ] Datele OCDE pentru Austria (emite TIN tuturor rezidenților sau nu), pentru cazul 3.
+- [x] Datele OCDE pentru Austria, pentru cazul 3: fișa OCDE AT spune că Austria nu emite TIN tuturor persoanelor fizice
+  (Q1 „Individuals No”), salvată cu URL, data accesării și citatele în [`surse/oecd-tin-at.md`](surse/oecd-tin-at.md).
 - [x] Regula concursului despre codul scris înainte de hackathon: avem voie. [Rulebook-ul](https://nexxtsummit.com/rulebook) nu îl interzice și cere doar ca lucrul pe temă să înceapă la startul oficial (28 oct., 09:00); organizatorii au confirmat pe 28 oct. O spunem deschis în README (secțiunea 13).

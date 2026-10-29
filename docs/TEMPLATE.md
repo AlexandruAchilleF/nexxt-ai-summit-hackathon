@@ -1,4 +1,4 @@
-# Hackathon Starter (.NET): the template CRS Sentinel is built on
+# Hackathon Starter (.NET): the template TRACE is built on
 
 > Reference for the team's template, written before the hackathon (commit `381d8c2` in the git history). The product
 > itself is described in the [README](../README.md) and [`PLAN.md`](PLAN.md). Kept in English, as written.
@@ -56,7 +56,8 @@ flowchart LR
   R --> H[(Run history<br/>audit trail)]
 ```
 
-The in-app **/architecture** page shows the same flow with the live list of agents and tools (for the video).
+In the template, the in-app **/architecture** page showed this flow with the live list of agents and tools. In TRACE it
+shows only the TRACE agent: how it decides, its tools and checks, and the state of the audit chain.
 
 ## Project structure
 
@@ -185,7 +186,7 @@ Ready-made blocks for Anthropic, Featherless, OpenAI, Azure OpenAI and Ollama ar
 
 | Setting | Effect |
 | --- | --- |
-| `AI:Provider` | `None` (default), `Anthropic`, `OpenAI` (any OpenAI-compatible endpoint), `AzureOpenAI` |
+| `AI:Provider` | `None` (default), `Anthropic`, `Bedrock` (added for TRACE: `AI:Region`, default `us-west-2`; credentials only from the AWS default chain), `OpenAI` (any OpenAI-compatible endpoint), `AzureOpenAI` |
 | `AI:Model`, `AI:ApiKey`, `AI:Endpoint` | Model id (or Azure deployment), key, base URL |
 | `AI:StructuredOutputs` | `true` if the endpoint enforces JSON schemas (OpenAI, Azure OpenAI) |
 | `AI:ToolMode` / `AI:AgentMode` / `AI:Record` | See Agents above |

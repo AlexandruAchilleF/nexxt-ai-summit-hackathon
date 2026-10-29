@@ -1,4 +1,4 @@
-# CRS Sentinel: cum funcționează, cap-coadă
+# TRACE: cum funcționează, cap-coadă
 
 > Documentul de înțelegere pentru toată echipa. Detaliile tehnice (entități, interfețe, program) sunt în `docs/PLAN.md`,
 > regulile cu pagina din ghid în `docs/reguli-verificate.md`. Ce e marcat NEVERIFICAT nu intră în pitch.
@@ -11,7 +11,7 @@ pierde valabilitatea și banca are **90 de zile** să obțină o declarație nou
 ca rezident fiscal **și** în jurisdicția inițială, **și** în cea nouă (Ghid ANAF, p. 35–36). Raportarea greșită se face pe fiecare cont.
 
 Azi, verificarea înseamnă un om care compară câmpuri, caută prin documente, scrie clientului și ține minte un termen.
-CRS Sentinel face partea repetitivă, iar omul aprobă.
+TRACE face partea repetitivă, iar omul aprobă.
 
 ## 2. Cele trei principii
 
@@ -34,7 +34,7 @@ CRS Sentinel face partea repetitivă, iar omul aprobă.
        capcane verificate și respinse, cu explicație ("Cleared")
        → Decision = Clarification                       ── jurnal: rule.applied ×2
             │
- [3] CaseService deschide CRS-2026-0001
+ [3] CaseService deschide CRS-2026-0008 (istoricul pus la pornire deschide întâi 7 cazuri)
        DueAt = data aflării + 90 zile, RemindAt = ziua 85 ── jurnal: case.opened
             │
  [4] Agentul pregătește cazul (Bedrock live, sau mock)
@@ -43,26 +43,26 @@ CRS Sentinel face partea repetitivă, iar omul aprobă.
        recordSignal("salariu de la Müller GmbH") → semnal, FĂRĂ alertă
        draftClientRequest → lista de documente vine din cod, textul îl scrie modelul
             │
- [5] sendClientRequest  ── cere APROBARE ── doar admin și member aprobă (Ana și Mihai da, Vera nu) ── jurnal: request.approved
+ [5] sendClientRequest  ── cere APROBARE ── doar operatorul aprobă (Ana da; Mihai și Vera nu) ── jurnal: request.approved
             │
- [6] Data simulată +85 zile → DeadlineWatcher: memento + escaladare la fiscal
+ [6] Meniul Demo → „La ziua mementoului” (data demo „+85 z”) → DeadlineWatcher: memento + escaladare la fiscal
             │
  [7] Răspunsul Mariei: autocertificare nouă (DE, TIN)
        checkTin(DE, …) → "format valid" (live la Comisia Europeană sau reguli locale)
        evaluateRules → Compliant, raportabil pentru DE
             │
- [8] closeCase ── cere APROBARE ── doar admin și member aprobă (Ana și Mihai da, Vera nu) ── ConfirmationProof (canal, moment, dovadă) ── jurnal: case.closed
+ [8] closeCase ── cere APROBARE ── doar operatorul aprobă (Ana da; Mihai și Vera nu) ── ConfirmationProof (canal, moment, dovadă) ── jurnal: case.closed
             │
- [9] /audit → "Verifică" lanțul de hash-uri; "Tamper" pe o intrare → se vede exact intrarea ruptă
+ [9] /audit → „Verifică” lanțul de hash-uri; meniul Demo → „Modul de falsificare” (doar admin), apoi „Falsifică” pe o intrare → se vede exact intrarea ruptă
 ```
 
 Varianta fără răspuns: la ziua 91 cazul trece în `Expired`, cu consecința din ghid (rezident în ambele jurisdicții).
 
 ## 4. Ce se întâmplă cu fiecare tip de intrare
 
-**Nota asupra aprobărilor:** Uneltele cu `needsApproval` (sendClientRequest și closeCase) nu rulează imediat. Agentul primește mesajul `awaiting_human_approval` și nu mai cheamă alte unelte. După ce operatorul aprobă (doar admin sau member), unealta rulează **fără model**. Fiecare etapă de aprobare creează o nouă rulare a agentului. De aceea cazul Mariei = mai multe rulări (pregătire + aprobare cererii; răspuns + aprobare închiderii).
+**Nota asupra aprobărilor:** Uneltele cu `needsApproval` (`sendClientRequest` și `closeCase`) nu rulează imediat. Agentul primește mesajul `awaiting_human_approval` și nu mai cheamă alte unelte. După ce operatorul aprobă (doar Ana, rolul admin), unealta rulează fără model, în aceeași rulare. Cazul Mariei are două rulări: „Analizează dosarul” (se oprește la aprobarea cererii) și „Verifică răspunsul” (se oprește la aprobarea închiderii).
 
-**Nota asupra replay-ului:** Replay-ul **nu rulează uneltele**. Reafișează doar pașii înregistrați (inclusiv rezultatele uneltelor), fără să cheme codul. Pentru video și demo, folosim Bedrock live sau mock (care cheamă uneltele reale). **Niciodată nu filmăm pași care modifică date în Replay mode**—pentru asta sunt necesare live sau mock. Înregistrările sunt utile doar pentru întrebări care doar citesc datele (ex. „rezumă cazul").
+**Nota asupra replay-ului:** Replay-ul nu rulează uneltele: reafișează pașii înregistrați (inclusiv rezultatele uneltelor), fără să cheme codul. De aceea nu filmăm și nu facem demo în Replay cu pașii care schimbă date; pentru ei folosim Bedrock live sau mock (mock-ul cheamă uneltele reale). Înregistrările servesc doar la întrebările care doar citesc datele (de exemplu „Rezumă cazul”).
 
 | Intrare | Ce face sistemul | Rezultat |
 | --- | --- | --- |
@@ -96,7 +96,7 @@ Toate cele 21 de cazuri-etalon, cu datele și rezultatul așteptat, sunt în `do
 | --- | --- | --- |
 | 1 · Reguli | Motorul de reguli CRS/FATCA, catalogul cu pagini, explicațiile capcanelor | cazurile 1–9 și 11–15 trec |
 | 2 · Termene și cazuri | Data simulată, termene, stările cazului, memento/escaladare/expirare, dovada | cazurile 16–18 trec |
-| 3 · Încredere | Scutul, verificarea citatelor, formatul TIN, TIN on Europa, jurnalul | cazul 10 trece, „Tamper” arată intrarea |
+| 3 · Încredere | Scutul, verificarea citatelor, formatul TIN, TIN on Europa, jurnalul | cazul 10 trece, „Falsifică” arată intrarea ruptă |
 | 4 · Agent și AI | Agentul, uneltele, aprobările, mock-ul, Bedrock, verificările, înregistrările | Maria cap-coadă pe mock și o dată live |
 | 5 · Date și livrare | Cele 21 de cazuri-etalon, 50 de clienți sintetici, PDF-uri, metrici, documente, video | `/metrics` din rulări reale |
 
@@ -110,16 +110,19 @@ Toate cele 21 de cazuri-etalon, cu datele și rezultatul așteptat, sunt în `do
 
 ## 6. Agentul, pe scurt (Persoana 4)
 
-- **Un singur agent cu unelte**, nu un roi. Orchestrarea pașilor (cine pornește cazul, când expiră) e în cod (`ChangeService`,
+- **Un singur agent cu unelte** (`CrsSentinelAgent`, id `crs-sentinel`: „CRS Sentinel” a fost numele de lucru), nu un roi. Orchestrarea pașilor (cine pornește cazul, când expiră) e în cod (`ChangeService`,
   `CaseService`, `DeadlineWatcher`). Agentul face doar ce cere limbaj: citește, citează, scrie, explică.
 - **Două modele:** profilul `extract` (Claude Haiku 5.5) pentru extrageri tipizate și clasificări mici; profilul principal
   (Claude Sonnet 5.5) pentru agent și textul către client. Amândouă pe Amazon Bedrock, us-west-2.
-- **Uneltele** (`docs/PLAN.md` 13.1): citire caz și client, `evaluateRules`, `readDocument`, `recordEvidence`, `recordSignal`,
-  `extractSelfCertification` (extrage autocertificarea din PDF cu citatele verificate), `checkTin`, `draftClientRequest`, `sendClientRequest` (aprobare), `registerResponse`, `closeCase` (aprobare), `escalate`.
-- **Lanțul care nu pică:** live pe Bedrock → înregistrare (`Recordings/crs-sentinel.json`) → mock scris de noi, care cheamă
+- **Cele 14 unelte** (`Features/Sentinel/SentinelTools.cs`; planul inițial în `docs/PLAN.md` 13.1): `getCase`,
+  `getClientSnapshot`, `evaluateRules`, `listDocuments`, `readDocument`, `recordEvidence`, `recordSignal`,
+  `extractSelfCertification` (extrage autocertificarea din PDF cu citatele verificate), `checkTin`, `draftClientRequest`,
+  `sendClientRequest` (aprobare), `registerResponse`, `closeCase` (aprobare), `escalate`.
+- **Lanțul de rezervă:** live pe Bedrock → înregistrare (`Recordings/crs-sentinel.json`) → mock scris de noi, care cheamă
   uneltele reale. Aplicația merge cap-coadă și fără internet.
-- **Verificări după fiecare răspuns** (cod, nu model): fără date personale scăpate, citatele sunt printre dovezile verificate,
-  semnalele nu sunt prezentate ca alerte, „format valid” în loc de „TIN valid”, fiecare indiciu cu regula și pagina.
+- **Verificări după fiecare răspuns** (cod, nu model): `pii-leak` (nicio dată personală scăpată) și `evidence-quoted`
+  (citatele din răspuns sunt printre citatele verificate de unelte). `CrsChecks` mai are `signals-never-alert`,
+  `rule-cited` și `no-tin-valid-claim`, testate, dar neactive pe agent.
 
 ## 7. Cum ne apărăm de prompt injection
 
@@ -129,15 +132,19 @@ Un document încărcat de client poate conține instrucțiuni ascunse pentru mod
    Documentul primește semnal roșu, iar operatorul vede ce s-a scos.
 2. **Modelul nu poate decide nimic.** Chiar convins de un text, nu poate închide un caz sau șterge un indiciu: deciziile vin din
    `CrsRuleEngine`, iar acțiunile care schimbă ceva cer aprobarea omului.
-3. **Citatele sunt verificate de cod** în textul vizibil al paginii. Un citat inventat sau luat din textul ascuns apare „negăsit”.
+3. **Citatele sunt verificate de cod** în textul vizibil al paginii. Un citat inventat apare „Citat negăsit”; unul care
+   există doar în textul ascuns e respins cu semnal roșu („Doar în textul ascuns”).
 4. **Datele personale sunt mascate** înainte de model (`PiiVault`); uneltele lucrează cu valorile reale.
-5. **Verificările de după răspuns** blochează formulările interzise și afirmațiile fără dovadă.
+5. **Verificările de după răspuns** (`pii-leak`, `evidence-quoted`) marchează în rulare datele personale scăpate și citatele
+   care nu vin din unelte.
 
 Ce nu detectăm și spunem deschis: text acoperit de o formă desenată peste el.
 
 ## 8. Data simulată și jurnalul
 
-- **Data simulată** (`SimClock`): în bara de sus, „Azi: … (+85 zile)”, cu butoane +1 / +30 / +85 / resetare. Tot codul CRS (cazuri,
+- **Data simulată** (`SimClock`): în bara de sus stă data demo, cu „+85 z” lângă ea când e mutată înainte. Un clic pe dată
+  deschide meniul Demo: „+1 zi”, „+7 zile”, „+30 zile” și „Înapoi la data reală” (doar operatorul mută data). Pe pagina
+  unui caz, meniul are și pașii cazului: „La ziua mementoului”, „După termen”, „Răspunde clientul”. Tot codul CRS (cazuri,
   termene, jurnal) citește timpul de aici, deci în 3 minute de video arătăm 90 de zile. Restul aplicației (login, chei,
   ștergerea rulărilor) rămâne pe ceasul real, ca să nu expire nimic la „+85 zile”.
 - **Jurnalul** (`AuditLog`): fiecare pas (modificare, regulă, dovadă, aprobare, memento, închidere) e o intrare cu

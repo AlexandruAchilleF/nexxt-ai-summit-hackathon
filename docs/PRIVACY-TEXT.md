@@ -1,8 +1,18 @@
 # Textul pentru `/privacy` (RO/EN)
 
-Textul final al paginii `/privacy` (`Components/Pages/Privacy.razor`), pregătit ca document, ca R3 să-l aplice pe
-măsură ce intră pe `main` codul descris, fără să mai caute surse. Secțiunile urmează ordinea paginii de pe `main`
-(4c8addb; pagina e neschimbată de la PR #10, 76c9acc, care a adăugat secțiunea „Temeiul legal”). Stare la 28.10.2026.
+Textul paginii `/privacy` (`Components/Pages/Privacy.razor`, RO/EN), cu sursele. A fost documentul de lucru pentru
+pagină (28.10.2026), iar coloana „Stare” arată cum urma să intre fiecare rând. Citatele din lege: secțiunea 7.
+
+Pagina de azi e sursa finală. Față de propunerile de mai jos, pe pagină:
+
+- subtitlul din antet („What happens to personal data…”, secțiunea 0) nu mai apare: a fost scos în PR #91;
+- nu apar propozițiile despre scut și despre țara de lângă valoarea mascată (secțiunea 1) și nici rândul „Clients and
+  cases” (secțiunea 2); în locul lui, tabelul „What is stored” are rândul „Case evidence” (citatele din documentele
+  clientului, păstrate nemascate în dosarul cazului);
+- din secțiunea 6 a intrat doar „Test data”, ca secțiune proprie; „Nationality” și „AI signals” nu sunt pe pagină;
+- paragraful TIN on Europa (secțiunea 5) are o formă mai nouă: înregistrările maschează TIN-urile care arată ca un CNP
+  sau un număr de card și păstrează o amprentă SHA-256 a țării și a TIN-ului;
+- propoziția Bedrock apare doar când un model Bedrock rulează în us-west-2.
 
 Cum se citesc tabelele:
 
@@ -10,9 +20,8 @@ Cum se citesc tabelele:
   stau în `Lang.Ro.cs`, cele noi intră în `Lang.Ro.Audit.cs`, vezi secțiunea 8).
 - **Stare:** „cheie existentă” (e deja în `Services/Lang.Ro.cs` cu exact acest RO), „cheie nouă” sau „acum Lang.Pick (din
   #10)” (textul e scris acum cu `Lang.Pick(ro, en)`; coloanele dau cele două argumente).
-- „după R1”, „după R2”, „după R3”, „după R4”, „după R5”, „după #5”: textul descrie cod care nu e încă pe `main`. Faza 0
-  (#13, 874ba83) a adus doar contracte și înlocuitori, deci nu deblochează niciun rând. Nu se pune pe pagină înainte să
-  existe codul. #9 (PDF-urile sintetice) e pe `main` din 4c8addb: rândul care depindea de el se poate pune acum.
+- „după R1”, „după R2”, „după R3”, „după R4”, „după R5”, „după #5”: la 28.10.2026, textul descria cod care nu era încă
+  pe `main` și intra pe pagină doar după acel cod. Ce a intrat până la urmă e lista de mai sus.
 - Fiecare trimitere la lege are citatul exact în secțiunea 7. Nu e un text juridic: e ce face aplicația, spus simplu.
 
 ## 0. Antetul paginii
@@ -20,7 +29,7 @@ Cum se citesc tabelele:
 | Cheie EN (@T) | RO (Lang.Ro.cs) | Stare |
 | --- | --- | --- |
 | Data and privacy | Date și confidențialitate | cheie existentă |
-| What happens to personal data in this app, read from the live configuration: what reaches a model, what is stored, and for how long. | Ce se întâmplă cu datele personale în aplicație, citit din configurația curentă: ce ajunge la un model, ce se salvează și cât timp. | cheie existentă |
+| What happens to personal data in this app, read from the live configuration: what reaches a model, what is stored, and for how long. | Ce se întâmplă cu datele personale în aplicație, citit din configurația curentă: ce ajunge la un model, ce se salvează și cât timp. | cheie existentă · scoasă de pe pagină în PR #91 |
 
 ## 1. Ce ajunge la un model
 
@@ -233,7 +242,7 @@ alin. (11) apare la fel și în OUG 102/2022.
 | Pagina | Citat exact |
 | --- | --- |
 | p. 4 (`docs/ghid/pagini/p-004.md`) | „Legislația incidentă prevede obligația Instituțiilor Financiare Române de a identifica titularii de cont (atât persoane fizice cât și entități) care nu sunt rezidenți fiscali în România sau care sunt cetățeni americani și de a raporta către A.N.A.F. informații relevante cu privire la conturile financiare.” și „Prevederile referitoare la definițiile termenilor, condițiile și termenele de raportare a informațiilor cu privire la conturile financiare ale contribuabililor nerezidenți se regăsesc la art. 62, alin. (7), art. 291, alin. (4) și în Anexa nr. 1 din Legea nr. 207/2015 privind Codul de procedură fiscală, respectiv în cuprinsul Acordului dintre România și Statele Unite ale Americii [...] (Acordul FATCA).” |
-| p. 29 (`p-029.md`) | Lista indiciilor CRS din căutarea electronică, lit. a)–f), începe cu „a) identificarea titularului de cont drept rezident al unei jurisdicții care face obiectul raportării;” și se termină cu adresa „post-restant” sau „în atenția”. Naționalitatea nu e în listă (confirmat și în `docs/reguli-verificate.md`, r. 63). |
+| p. 29 (`p-029.md`) | Lista indiciilor CRS din căutarea electronică, lit. a)–f), începe cu „a) identificarea titularului de cont drept rezident al unei jurisdicții care face obiectul raportării;” și se termină cu adresa „post-restant” sau „în atenția”. Naționalitatea nu e în listă (confirmat și în `docs/reguli-verificate.md`, secțiunea „Alte afirmații din brief”). |
 | p. 31 (`p-031.md`) | Indiciile FATCA: „identificarea Titularului de Cont ca fiind cetățean sau rezident al Statelor Unite;” |
 
 ### 7.4 Ce am verificat din #10
@@ -247,7 +256,7 @@ alin. (11) apare la fel și în OUG 102/2022.
 | „Legea 207/2015 (art. 62 alin. (7), art. 291 alin. (4), Anexa nr. 1) [...] așa cum le citează ghidul (p. 4)” | Citatul din ghid e exact: p. 4 numește aceste trei trimiteri. Dar ghidul le dă ca loc pentru „definițiile termenilor, condițiile și termenele de raportare”, nu ca temei al obligației. Art. 62 alin. (7) e termenul de 15 mai. Legea numește anexele nr. 1 **și 2** (art. 291 alin. (4)). Corectura propusă: art. 62 alin. (1) și (3), art. 291 alin. (4), anexele nr. 1 și 2. |
 | Termenul de păstrare a dosarului (în PLAN și PLAYBOOK, NEVERIFICAT) | VERIFICAT: 10 ani de la termenul din art. 62 alin. (7), art. 62 alin. (11), aplicabil și la FATCA. |
 
-## 8. Cum se aplică după Faza 0
+## 8. Cum se aplică după Faza 0 (istoric)
 
 Pași pentru R3 (`security-engineer`, proprietarul `/privacy`). Sunt propuneri; Tech Lead-ul decide.
 
