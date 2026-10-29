@@ -1,5 +1,6 @@
 using HackathonStarter.Agents;
 using HackathonStarter.Features.Sentinel.Demo;
+using HackathonStarter.Services;
 
 namespace HackathonStarter.Features.Sentinel;
 
@@ -31,7 +32,7 @@ public class CrsSentinelAgent : ToolAgent
     /// <summary>Run 1 is seven tool calls and run 2 seven more; leave room for a re-read.</summary>
     public override int? MaxSteps => 14;
 
-    public override string SystemPrompt(ToolContext ctx) => SentinelPrompt.Text;
+    public override string SystemPrompt(ToolContext ctx) => SentinelPrompt.For(Lang.IsEn);
 
     public override IEnumerable<AgentTool> Tools(ToolContext ctx) => new SentinelTools(ctx.Services).All();
 

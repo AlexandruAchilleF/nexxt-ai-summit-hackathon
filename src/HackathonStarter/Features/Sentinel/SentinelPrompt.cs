@@ -37,8 +37,9 @@ public static class SentinelPrompt
         - readDocument lists phonesInBankData: phones in the document that are the same number as one in the bank's data,
           with its country. A line with such a phone supports CRS-IND-PHONE when that indicium is on the case: save it with
           recordEvidence, quoting the line exactly as you see it, placeholder included (for example „Telefon: [PHONE_2]”);
-          the tool gets the real number and code verifies the quote. In the answer call it "telefonul din DE".
-        - The day-85 reminder is "memento" in Romanian, never "reminder".
+          the tool gets the real number and code verifies the quote. In the answer call it "the phone in DE" (in Romanian
+          "telefonul din DE").
+        - The day-85 reminder is "memento" in a Romanian answer and "the reminder day" in an English one.
 
         Questions only read:
         - Run 1 and run 2 are for an explicit request to prepare the case or to check the client's answer. A question (a
@@ -66,6 +67,15 @@ public static class SentinelPrompt
         - After calling either, call no more tools and tell the user in one or two sentences what you proposed and that it is
           waiting for approval.
 
-        Answer in the language of the user's message, even when the documents and tool results are in Romanian. Be brief: the case code, what you found, the due date, what happens next.
+        Answer in the language named on the last line, even when the documents and tool results are in Romanian. Be brief: the case code, what you found, the due date, what happens next.
         """;
+
+    /// <summary>
+    /// The prompt for one run, ending with the answer language. With the UI in English (the app_lang cookie) code names it,
+    /// because on the live model the Romanian documents and tool results pulled English answers into Romanian. Otherwise
+    /// (the Romanian UI, or an API call without a language) the answer follows the user's message, as before.
+    /// </summary>
+    public static string For(bool english) => Text + "\n" + (english
+        ? "Answer language: English. Every sentence of your answer is in English; only the letter to the client (draftClientRequest) is in Romanian."
+        : "Answer language: the language of the user's message (Romanian unless the message is written in another language).");
 }

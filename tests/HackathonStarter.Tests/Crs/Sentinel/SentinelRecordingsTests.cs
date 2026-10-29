@@ -2,6 +2,8 @@ using System.Globalization;
 using System.Text.Json;
 using HackathonStarter.Agents;
 using HackathonStarter.Features.Sentinel;
+using HackathonStarter.Features.Targets;
+using HackathonStarter.Features.Tin;
 using HackathonStarter.Services;
 using HackathonStarter.Tests.Support;
 
@@ -62,6 +64,28 @@ public class SentinelRecordingsTests
             }
         }
         finally { CultureInfo.CurrentUICulture = before; }
+    }
+
+    [Theory]
+    [InlineData("ro-RO")]
+    [InlineData("en-US")]
+    public async Task Maria_tin_recording_replays_offline_and_only_claims_format(string culture)
+    {
+        using var language = new UiLanguage(culture);
+        await using var host = await TestHost.CreateAsync(client: null, targets: t =>
+            t[TinOnEuropaClient.Target] = new TargetOptions { Kind = "Http", Endpoint = "http://127.0.0.1:9", TimeoutSeconds = 1 });
+        var targetDir = Path.Combine(host.RecordingsDir, "targets");
+        Directory.CreateDirectory(targetDir);
+        File.Copy(Path.Combine(Path.GetDirectoryName(RecordingFile())!, "targets", "tin-on-europa.json"),
+            Path.Combine(targetDir, "tin-on-europa.json"));
+        var europa = new TinOnEuropaClient(host.Get<TargetClient>());
+        var answer = await europa.CheckAsync("DE", "86095174223");
+        Assert.Equal(TargetSource.Replay, answer.Source);
+        Assert.Equal(new TinOnEuropaAnswer(true, true), answer.Answer);
+        var check = await new TinValidator(new TinFormat(), europa).CheckAsync("DE", "86095174223");
+        Assert.Equal(TinCheckSource.TinOnEuropaReplay, check.Source);
+        Assert.Contains("format valid", check.Label);
+        Assert.DoesNotContain("tin valid", check.Label, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string RecordingFile()

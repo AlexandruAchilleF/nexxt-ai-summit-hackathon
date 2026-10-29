@@ -27,6 +27,7 @@ public class SentinelMariaTests
     [Theory]
     [InlineData("ro-RO")]
     [InlineData("en-GB")]
+    [InlineData("en-US")]
     public async Task Maria_on_the_mock_two_runs_two_approvals_the_reminder_and_the_proof(string culture)
     {
         using var _ = new UiLanguage(culture);
@@ -48,6 +49,10 @@ public class SentinelMariaTests
         Assert.Equal(["getCase", "listDocuments", "readDocument", "recordEvidence", "recordSignal", "draftClientRequest"], run1.ToolCalls());
         Assert.Equal(SentinelTools.SendClientRequest, Assert.Single(run1.Steps, s => s.Kind == StepKind.Approval).Tool);
         run1.ChecksPass();
+        if (culture.StartsWith("en")) AssertEnglish(run1.Answer());
+        var letter = (await host.CaseAsync(CaseCode))!.Requests.Single();
+        Assert.Equal("ro", letter.Language);
+        Assert.StartsWith("Bună ziua", letter.Body);
         var answer1 = run1.Answer();
         Assert.Contains("CRS-IND-PHONE", answer1);
         Assert.Contains("„Angajator: Müller Logistik GmbH”", answer1);
@@ -87,6 +92,7 @@ public class SentinelMariaTests
         Assert.Equal(["getCase", "listDocuments", "extractSelfCertification", "checkTin", "registerResponse", "evaluateRules"], run2.ToolCalls());
         Assert.Equal(SentinelTools.CloseCase, Assert.Single(run2.Steps, s => s.Kind == StepKind.Approval).Tool);
         run2.ChecksPass();
+        if (culture.StartsWith("en")) AssertEnglish(run2.Answer());
         var answer2 = run2.Answer();
         Assert.Contains("format valid", answer2);
         Assert.Contains("Compliant", answer2);
@@ -119,6 +125,55 @@ public class SentinelMariaTests
         Assert.Equal(expected, kinds.Where(expected.Contains));
         Assert.True(kinds.Take(kinds.IndexOf(AuditKinds.EvidenceRecorded)).Count(k => k == AuditKinds.RuleApplied) >= 2); // the two indicia
         Assert.True((await host.VerifyAuditAsync()).Ok);
+    }
+
+    [Theory]
+    [InlineData("ro-RO", false)]
+    [InlineData("en-US", false)]
+    [InlineData("ro-RO", true)]
+    [InlineData("en-US", true)]
+    public async Task Wrong_state_button_guidance_passes_both_checks(string culture, bool alreadySent)
+    {
+        using var _ = new UiLanguage(culture);
+        var (host, _) = await RealWorld.CreateAsync();
+        await using var lifetime = host;
+        await host.RecordGoldenChangeAsync("4");
+        if (alreadySent)
+            await host.DecideAsync(await host.RunAsync(SentinelTools.AgentName, SentinelActions.Analyze(CaseCode)), SentinelTools.SendClientRequest);
+
+        var run = await host.RunAsync(SentinelTools.AgentName,
+            alreadySent ? SentinelActions.Analyze(CaseCode) : SentinelActions.Verify(CaseCode));
+
+        Assert.Equal(RunStatus.Completed, run.Status);
+        Assert.Equal(["getCase"], run.ToolCalls());
+        Assert.Equal(alreadySent ? CaseStatus.AwaitingClient : CaseStatus.Open, (await host.CaseAsync(CaseCode))!.Status);
+        Assert.Contains(alreadySent ? SentinelActions.VerifyLabel : SentinelActions.AnalyzeLabel, run.Answer());
+        Assert.Equal(new[] { "evidence-quoted", "pii-leak" },
+            run.Steps.Single(s => s.Kind == StepKind.Check).Checks!.Select(c => c.CheckId).Order());
+        var checks = run.Steps.Single(s => s.Kind == StepKind.Check).Checks!;
+        Assert.Equal(Features.Checks.CheckOutcome.Pass, checks.Single(c => c.CheckId == "pii-leak").Outcome);
+        Assert.Equal(Features.Checks.CheckOutcome.NotApplicable, checks.Single(c => c.CheckId == "evidence-quoted").Outcome);
+    }
+
+    // Romanian narrative in an English answer: diacritics or common Romanian words, outside the verified quotes („...”).
+    private static readonly string[] RomanianWords = ["cazul", "termen", "clientul", "dovada", "cererea", "aprobare", "nu am", "este", "sunt", "pentru", "și", "că"];
+
+    internal static void AssertEnglish(string text)
+    {
+        Assert.NotEmpty(text);
+        var narrative = System.Text.RegularExpressions.Regex.Replace(text, "„[^”]*”", " ");
+        Assert.DoesNotMatch("[ăâîșțşţĂÂÎȘȚŞŢ]", narrative);
+        var words = System.Text.RegularExpressions.Regex.Split(narrative.ToLowerInvariant(), @"[^\p{L}]+");
+        foreach (var word in RomanianWords)
+            Assert.False(word.Contains(' ') ? narrative.Contains(word, StringComparison.OrdinalIgnoreCase) : words.Contains(word), $"Romanian \"{word}\" in: {text}");
+    }
+
+    [Fact]
+    public void The_english_check_fails_on_romanian_narrative_and_ignores_the_quotes()
+    {
+        AssertEnglish("Case CRS-2026-0001: the salary from „Angajator: Müller Logistik GmbH” is a signal, no alert.");
+        Assert.ThrowsAny<Exception>(() => AssertEnglish("Nu am trimis nimic. Așteaptă aprobarea operatorului."));
+        Assert.ThrowsAny<Exception>(() => AssertEnglish("Case CRS-2026-0001 este deschis pentru client."));
     }
 
     [Fact]

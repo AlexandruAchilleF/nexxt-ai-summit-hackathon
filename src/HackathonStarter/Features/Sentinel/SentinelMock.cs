@@ -53,15 +53,15 @@ internal static partial class SentinelMock
         if (action == SentinelActions.Action.Analyze && status is not "Open")
         {
             await m.SayAsync(Join(Summary(c, canEdit),
-                L($"Cererea către client a plecat deja. Când sosește răspunsul, folosește „{SentinelActions.VerifyLabel}”.",
-                  $"The request to the client has already gone out. When the answer arrives, use \"{SentinelActions.VerifyLabel}\".")));
+                L($"Cererea către client a plecat deja. Când sosește răspunsul, folosește {SentinelActions.VerifyLabel}.",
+                  $"The request to the client has already gone out. When the answer arrives, use {SentinelActions.VerifyLabel}.")));
             return;
         }
         if (action == SentinelActions.Action.Verify && status is "Open")
         {
             await m.SayAsync(Join(Summary(c, canEdit),
-                L($"Cererea către client nu a fost trimisă încă: întâi „{SentinelActions.AnalyzeLabel}”, apoi aprobarea operatorului.",
-                  $"The request to the client has not been sent yet: first \"{SentinelActions.AnalyzeLabel}\", then the operator's approval.")));
+                L($"Cererea către client nu a fost trimisă încă: întâi {SentinelActions.AnalyzeLabel}, apoi aprobarea operatorului.",
+                  $"The request to the client has not been sent yet: first {SentinelActions.AnalyzeLabel}, then the operator's approval.")));
             return;
         }
 
@@ -495,7 +495,7 @@ internal static partial class SentinelMock
     }
 
     private static string Next(string action) =>
-        L($"Pasul următor, când operatorul decide: „{action}”.", $"Next step, when the operator decides: \"{action}\".");
+        L($"Pasul următor, când operatorul decide: {action}.", $"Next step, when the operator decides: {action}.");
 
     /// <summary>"text alb, font sub 2 pt": why the shield removed the text (HiddenTextShield reasons).</summary>
     private static string Reasons(JsonElement d) => string.Join(", ", d.Arr("hiddenReasons").Select(r => r.GetString() switch
