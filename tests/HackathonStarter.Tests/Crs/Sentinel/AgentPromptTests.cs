@@ -31,7 +31,7 @@ public class AgentPromptTests
     // Romanian, so code names the answer language from the UI language, on the prompt's last line.
     [Theory]
     [InlineData("en-US", "Answer language: English.")]
-    [InlineData("ro-RO", "Answer language: Romanian.")]
+    [InlineData("ro-RO", "Answer language: the language of the user's message")]
     public async Task The_prompt_ends_with_the_answer_language_of_the_ui(string culture, string line)
     {
         using var _ = new UiLanguage(culture);

@@ -71,10 +71,11 @@ public static class SentinelPrompt
         """;
 
     /// <summary>
-    /// The prompt for one run, ending with the answer language: the operator's UI language when the run starts (the mock
-    /// follows it too). Code sets it, so the documents and tool results in Romanian do not pull an English answer into Romanian.
+    /// The prompt for one run, ending with the answer language. With the UI in English (the app_lang cookie) code names it,
+    /// because on the live model the Romanian documents and tool results pulled English answers into Romanian. Otherwise
+    /// (the Romanian UI, or an API call without a language) the answer follows the user's message, as before.
     /// </summary>
     public static string For(bool english) => Text + "\n" + (english
         ? "Answer language: English. Every sentence of your answer is in English; only the letter to the client (draftClientRequest) is in Romanian."
-        : "Answer language: Romanian. Every sentence of your answer is in Romanian.");
+        : "Answer language: the language of the user's message (Romanian unless the message is written in another language).");
 }

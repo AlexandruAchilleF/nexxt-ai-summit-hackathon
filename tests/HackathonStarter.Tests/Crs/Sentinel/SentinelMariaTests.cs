@@ -155,11 +155,25 @@ public class SentinelMariaTests
         Assert.Equal(Features.Checks.CheckOutcome.NotApplicable, checks.Single(c => c.CheckId == "evidence-quoted").Outcome);
     }
 
+    // Romanian narrative in an English answer: diacritics or common Romanian words, outside the verified quotes („...”).
+    private static readonly string[] RomanianWords = ["cazul", "termen", "clientul", "dovada", "cererea", "aprobare", "nu am", "este", "sunt", "pentru", "și", "că"];
+
     internal static void AssertEnglish(string text)
     {
         Assert.NotEmpty(text);
-        foreach (var word in new[] { "Cazul", "termen", "clientul", "dovada" })
-            Assert.DoesNotContain(word, text, StringComparison.OrdinalIgnoreCase);
+        var narrative = System.Text.RegularExpressions.Regex.Replace(text, "„[^”]*”", " ");
+        Assert.DoesNotMatch("[ăâîșțşţĂÂÎȘȚŞŢ]", narrative);
+        var words = System.Text.RegularExpressions.Regex.Split(narrative.ToLowerInvariant(), @"[^\p{L}]+");
+        foreach (var word in RomanianWords)
+            Assert.False(word.Contains(' ') ? narrative.Contains(word, StringComparison.OrdinalIgnoreCase) : words.Contains(word), $"Romanian \"{word}\" in: {text}");
+    }
+
+    [Fact]
+    public void The_english_check_fails_on_romanian_narrative_and_ignores_the_quotes()
+    {
+        AssertEnglish("Case CRS-2026-0001: the salary from „Angajator: Müller Logistik GmbH” is a signal, no alert.");
+        Assert.ThrowsAny<Exception>(() => AssertEnglish("Nu am trimis nimic. Așteaptă aprobarea operatorului."));
+        Assert.ThrowsAny<Exception>(() => AssertEnglish("Case CRS-2026-0001 este deschis pentru client."));
     }
 
     [Fact]
