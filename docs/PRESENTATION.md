@@ -1,4 +1,4 @@
-# CRS Sentinel: the presentation (slides)
+# TRACE: the presentation (slides)
 
 > The presentation is a required link in the submission ([`SUBMISSION.md`](SUBMISSION.md)). This is its content, slide by
 > slide; it goes into Google Slides or Keynote, is exported to PDF and uploaded with a public link. The order follows the jury
@@ -6,7 +6,9 @@
 > and README §8, with their sources; nothing NEVERIFICAT (unverified). No emoji. Screenshots are taken on synthetic data,
 > with "SPECIMEN" visible wherever there is an identity document.
 
-## 1. CRS Sentinel
+## 1. TRACE
+
+**T**ax **R**esidency and **A**nomaly **C**orrelation **E**ngine
 
 **Every change to a client's data becomes a CRS/FATCA decision before the legal deadline runs out.**
 
@@ -18,7 +20,7 @@ App: <https://hackathon-starter-k0ym.onrender.com/> · Code: <https://github.com
 
 ## 2. The user and the problem (research, business)
 
-**We built CRS Sentinel for the bank's tax compliance operators.**
+**We built TRACE for the bank's tax compliance operators.**
 
 - In a self-certification the client declares where they are tax resident. When the bank "knows or has reason to know"
   (our translation) that the situation has changed (address, phone, standing order, power of attorney), the declaration
@@ -68,7 +70,7 @@ agent panel.
 
 ## 5. The agent: why a single agent (design and orchestration)
 
-**One tool-using agent, orchestrated by code, with the human deciding.** The rules are a closed list, so they are code; the
+**One tool-using agent (CRS Sentinel), orchestrated by code, with the human deciding.** The rules are a closed list, so they are code; the
 model does only what code cannot: it reads free text and writes the letter. More agents would add nothing here.
 
 - **14 tools:** `getCase`, `getClientSnapshot`, `evaluateRules`, `listDocuments`, `readDocument`, `recordEvidence`,
@@ -127,7 +129,7 @@ PDF → HiddenTextShield → CrsSentinelAgent (Claude on Bedrock) → EvidenceVe
 | **What is measured** | 0 missed and 0 false alarms on the golden set and on the 50 synthetic clients |
 | **What is an estimate** | Time saved per case: not measured, there is no manual baseline time |
 | **The barriers** | Integration with the core banking data-change feed; the model in an EU region or at the bank; validating the design interpretations with the tax department; company accounts, not covered yet |
-| **The next step** | Shadow pilot: Sentinel runs next to the current process, on a sample of real changes; the operators compare the decisions and the time |
+| **The next step** | Shadow pilot: TRACE runs next to the current process, on a sample of real changes; the operators compare the decisions and the time |
 
 ## 9. What is real, what is simulated, what is not ready
 
@@ -140,7 +142,7 @@ written on 28–29 Oct 2026 (README §13).
 
 ## 10. Closing
 
-**CRS Sentinel: code decides, AI explains, a person approves.**
+**TRACE: code decides, AI explains, a person approves.**
 
 Video (3 min): `[link]` · App: <https://hackathon-starter-k0ym.onrender.com/> · Code:
 <https://github.com/AlexandruAchilleF/nexxt-ai-summit-hackathon>
