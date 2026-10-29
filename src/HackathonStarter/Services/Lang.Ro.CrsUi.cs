@@ -295,6 +295,7 @@ public static partial class Lang
         ro["Open case {0}"] = "Deschide cazul {0}";
         ro["Open cases"] = "Cazuri deschise";
         ro["Open cases on the demo date, the closest first"] = "Cazurile deschise la data demo, cele mai apropiate primele";
+        ro["not in the guide: our reading"] = "nu e în ghid: interpretarea noastră";
         ro["Opened"] = "Deschis";
         ro["Opens a case"] = "Deschide un caz";
         ro["Other"] = "Altele";
@@ -348,6 +349,7 @@ public static partial class Lang
         ro["Rule checked"] = "Regulă verificată";
         ro["Rules checked"] = "Reguli verificate";
         ro["Rules code checked on the client's data today, with the reason they do not apply."] = "Reguli verificate de cod pe datele de azi ale clientului, cu motivul pentru care nu se aplică.";
+        ro["Seed history"] = "Istoricul din seed";
         ro["Save the draft"] = "Salvează ciorna";
         ro["Save the follow-up draft"] = "Salvează ciorna completării";
         ro["Search by name or code"] = "Caută după nume sau cod";
@@ -430,6 +432,7 @@ public static partial class Lang
         ro["Write the request to the client"] = "Scrie cererea către client";
         ro["{0} account(s)"] = "{0} cont(uri)";
         ro["{0} clean documents, {1} false alarm(s)."] = "{0} documente curate, {1} alarmă(e) falsă(e).";
+        ro["{0} for {1}"] = "{0} pentru {1}";
         ro["{0} clients"] = "{0} clienți";
         ro["{0} closed or expired"] = "{0} închise sau expirate";
         ro["{0} d overdue"] = "{0} z întârziere";
